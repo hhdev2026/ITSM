@@ -1,36 +1,129 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Aplicación web de **Service Desk / Mesa de Servicios (ITSM)** inspirada en ITIL, con:
+
+- Supabase (Postgres) como backend principal: Auth + RLS + Realtime + PostgREST.
+- UI moderna (Next.js + Tailwind) con dashboard tipo Kanban para agentes.
+- Analytics para supervisión (KPIs: volumen, MTTR, SLA, pendientes, carga, FCR).
+- Automatizaciones (workflows) con un worker Node.js.
 
 ## Getting Started
 
-First, run the development server:
+### 1) Variables de entorno
+
+Copia `.env.example` a:
+
+- `.env.local` (Next.js)
+- `.env` (API/Workers)
+
+Completa los valores:
+
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+
+### Modo DEMO (sin Supabase)
+
+Para ver la UI sin conectar Supabase, activa:
+
+- `NEXT_PUBLIC_DEMO_MODE=true` en `.env.local`
+
+Luego entra en `http://localhost:3000/login` y elige un rol (Admin/Agent/Supervisor/User).
+
+### 2) Base de datos (Supabase)
+
+En tu proyecto Supabase ejecuta (SQL Editor o Supabase CLI) las migraciones:
+
+- `supabase/migrations/001_init.sql`
+- `supabase/migrations/002_analytics.sql`
+- `supabase/migrations/003_profiles_rls.sql`
+
+Opcional (datos ejemplo):
+
+- `supabase/seed.sql`
+
+Para que Realtime funcione en la UI (suscripciones `postgres_changes`), habilita la replicación de:
+
+- `tickets`, `comments`, `knowledge_base`
+
+### 3) Roles y multi-departamento
+
+Al registrarse un usuario se crea su fila en `profiles` con `role='user'` y `department_id=NULL`.
+Para poder crear/ver tickets, un **admin** debe asignar `department_id` y, si aplica, ajustar el `role`:
+
+- `user`: solicitante
+- `agent`: agente
+- `supervisor`: supervisor
+- `admin`: admin (todo)
+
+### 4) Ejecutar en desarrollo
+
+Instala dependencias:
+
+```bash
+npm install
+```
+
+### 4.1) Crear usuario superadmin (bootstrap)
+
+Una vez que tengas tu proyecto Supabase y variables `.env` completas, ejecuta:
+
+```bash
+npm run seed:superadmin
+```
+
+Variables usadas (ver `.env.example`):
+
+- `SUPERADMIN_EMAIL`
+- `SUPERADMIN_PASSWORD`
+- `SUPERADMIN_FULL_NAME`
+- `SUPERADMIN_DEPARTMENT_ID` (opcional; si no se define, crea/usa el departamento `TI`)
+
+Web (Next.js):
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+API (Express):
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run dev:api
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Todo junto (web + API + workflows):
 
-## Learn More
+```bash
+npm run dev:all
+```
 
-To learn more about Next.js, take a look at the following resources:
+Worker de workflows (automatizaciones):
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run dev:workflows
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Worker de problemas (detección básica de recurrencia):
 
-## Deploy on Vercel
+```bash
+npm run dev:problem-linker
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Luego abre `http://localhost:3000`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Arquitectura (alto nivel)
+
+- **Supabase**: fuente de verdad para tickets, comentarios, KB, SLAs, workflows, problemas y cambios (RLS por departamento/rol).
+- **Next.js**: UI (solicitante, agente, supervisor).
+- **Express API**: endpoints de analytics (usa `rpc(kpi_dashboard)`) y base para servicios backend.
+- **Workers**:
+  - `server/workers/workflows.ts`: monitorea `tickets` (Realtime) y ejecuta acciones según `workflows`.
+  - `server/workers/problem-linker.ts`: crea `problems` por recurrencia (scaffold).
+
+## Notas
+
+- La gamificación se actualiza automáticamente en DB al pasar tickets a `Cerrado` (puntos + rank).
+- `sla_deadline` se calcula en DB en el `insert` según `slas` activo (prefiere SLA por departamento y usa global como fallback).
+
+## Screens principales
+
+- Solicitante: creación de tickets + seguimiento + comentarios + autoservicio (KB).
+- Agente: Kanban por estado + indicador SLA + asignación/estado.
+- Supervisor/Admin: dashboard de KPIs + configuración de SLAs.
