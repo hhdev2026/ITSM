@@ -1,17 +1,70 @@
 "use client";
 
 import { AppShell } from "@/components/AppShell";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Combobox } from "@/components/ui/combobox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/cn";
 import { useProfile, useSession } from "@/lib/hooks";
 import { supabase } from "@/lib/supabaseBrowser";
 import type { Comment, Ticket } from "@/lib/types";
-import { TicketStatuses } from "@/lib/constants";
+import { TicketStatuses, priorityBadge, slaBadge } from "@/lib/constants";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { errorMessage } from "@/lib/error";
 import { isDemoMode } from "@/lib/demo";
 import { listDemoAgents } from "@/lib/demoAuth";
-import { addComment as demoAddComment, getTicket as demoGetTicket, listComments as demoListComments, updateTicket as demoUpdateTicket } from "@/lib/demoStore";
+import {
+  addComment as demoAddComment,
+  decideTicketApproval as demoDecideTicketApproval,
+  getTicket as demoGetTicket,
+  listCategories as demoListCategories,
+  listComments as demoListComments,
+  listSubcategories as demoListSubcategories,
+  listTicketApprovals as demoListTicketApprovals,
+  updateTicket as demoUpdateTicket,
+} from "@/lib/demoStore";
+import { Check, ChevronDown, Copy, RefreshCcw, UserPlus } from "lucide-react";
+import { toast } from "sonner";
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
+type TicketApproval = {
+  id: string;
+  ticket_id: string;
+  step_order: number;
+  kind: string;
+  required: boolean;
+  approver_profile_id: string | null;
+  approver_role: string | null;
+  status: "pending" | "approved" | "rejected" | "skipped";
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_comment: string | null;
+  created_at?: string;
+};
+
+function approvalKindLabel(kind: string) {
+  if (kind === "requester_manager") return "Manager";
+  if (kind === "service_owner") return "Owner";
+  if (kind === "specific_user") return "Aprobador";
+  if (kind === "role") return "Rol";
+  return kind;
+}
+
+function approvalStatusBadge(status: TicketApproval["status"]) {
+  if (status === "approved") return "bg-emerald-500/15 text-emerald-200 border-emerald-500/30";
+  if (status === "rejected") return "bg-rose-500/15 text-rose-200 border-rose-500/30";
+  if (status === "pending") return "bg-[hsl(var(--brand-cyan))]/12 text-[hsl(var(--brand-cyan))] border-[hsl(var(--brand-cyan))]/30";
+  return "bg-zinc-800/60 text-zinc-200 border-zinc-700";
+}
 
 export default function TicketDetailPage() {
   const router = useRouter();
@@ -25,11 +78,16 @@ export default function TicketDetailPage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [agents, setAgents] = useState<Array<{ id: string; label: string }>>([]);
   const [assigneeId, setAssigneeId] = useState<string>("");
+  const [categoryLabel, setCategoryLabel] = useState<string | null>(null);
+  const [subcategoryLabel, setSubcategoryLabel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [body, setBody] = useState("");
   const [internal, setInternal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [approvals, setApprovals] = useState<TicketApproval[]>([]);
+  const [approvalComment, setApprovalComment] = useState("");
+  const [approvalsActing, setApprovalsActing] = useState<null | "approve" | "reject">(null);
 
   const canModerate = profile?.role === "agent" || profile?.role === "supervisor" || profile?.role === "admin";
   const canReassign = profile?.role === "supervisor" || profile?.role === "admin";
@@ -47,6 +105,19 @@ export default function TicketDetailPage() {
       setTicket(t);
       setAssigneeId(t?.assignee_id ?? "");
       setComments((demoListComments(ticketId) as unknown) as Comment[]);
+      setApprovals((demoListTicketApprovals(ticketId) as unknown) as TicketApproval[]);
+      if (profile?.department_id) {
+        const cats = (demoListCategories(profile.department_id) as unknown) as Array<{ id: string; name: string }>;
+        const catName = t?.category_id ? cats.find((c) => c.id === t.category_id)?.name ?? null : null;
+        setCategoryLabel(catName);
+        if (t?.category_id) {
+          const subs = (demoListSubcategories(t.category_id) as unknown) as Array<{ id: string; name: string }>;
+          const subName = t.subcategory_id ? subs.find((s) => s.id === t.subcategory_id)?.name ?? null : null;
+          setSubcategoryLabel(subName);
+        } else {
+          setSubcategoryLabel(null);
+        }
+      }
       if (canReassign && profile?.department_id) {
         setAgents(listDemoAgents(profile.department_id).map((p) => ({ id: p.id, label: p.full_name || p.email })));
       }
@@ -55,13 +126,28 @@ export default function TicketDetailPage() {
     }
     const { data: t, error: tErr } = await supabase
       .from("tickets")
-      .select("id,department_id,type,title,description,status,priority,category_id,requester_id,assignee_id,created_at,updated_at,sla_deadline,first_response_at,resolved_at,closed_at")
+      .select(
+        "id,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,response_deadline,sla_deadline,ola_response_deadline,ola_deadline,first_response_at,resolved_at,closed_at"
+      )
       .eq("id", ticketId)
       .single();
     if (tErr) setError(tErr.message);
     const parsed = ((t ?? null) as unknown) as Ticket | null;
     setTicket(parsed);
     setAssigneeId(parsed?.assignee_id ?? "");
+
+    if (parsed?.category_id) {
+      const { data: cat } = await supabase.from("categories").select("id,name").eq("id", parsed.category_id).maybeSingle();
+      setCategoryLabel(((cat as unknown) as { name?: string } | null)?.name ?? null);
+    } else {
+      setCategoryLabel(null);
+    }
+    if (parsed?.subcategory_id) {
+      const { data: sub } = await supabase.from("subcategories").select("id,name").eq("id", parsed.subcategory_id).maybeSingle();
+      setSubcategoryLabel(((sub as unknown) as { name?: string } | null)?.name ?? null);
+    } else {
+      setSubcategoryLabel(null);
+    }
 
     const { data: c, error: cErr } = await supabase
       .from("comments")
@@ -70,6 +156,14 @@ export default function TicketDetailPage() {
       .order("created_at", { ascending: true });
     if (cErr) setError(cErr.message);
     setComments((c ?? []) as Comment[]);
+
+    const { data: appr, error: apprErr } = await supabase
+      .from("ticket_approvals")
+      .select("id,ticket_id,step_order,kind,required,approver_profile_id,approver_role,status,decided_by,decided_at,decision_comment,created_at")
+      .eq("ticket_id", ticketId)
+      .order("step_order", { ascending: true });
+    if (apprErr) setError(apprErr.message);
+    setApprovals((appr ?? []) as TicketApproval[]);
 
     if (canReassign && profile?.department_id) {
       const { data: profsRaw } = await supabase
@@ -93,6 +187,7 @@ export default function TicketDetailPage() {
       .channel(`rt-ticket-${ticketId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "tickets", filter: `id=eq.${ticketId}` }, () => void load())
       .on("postgres_changes", { event: "*", schema: "public", table: "comments", filter: `ticket_id=eq.${ticketId}` }, () => void load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "ticket_approvals", filter: `ticket_id=eq.${ticketId}` }, () => void load())
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
@@ -121,6 +216,7 @@ export default function TicketDetailPage() {
         setBody("");
         setInternal(false);
         await load();
+        toast.success("Comentario enviado");
         return;
       }
       const { error } = await supabase.from("comments").insert({
@@ -133,8 +229,11 @@ export default function TicketDetailPage() {
       setBody("");
       setInternal(false);
       await load();
+      toast.success("Comentario enviado");
     } catch (e: unknown) {
-      setError(errorMessage(e) ?? "No se pudo guardar el comentario");
+      const msg = errorMessage(e) ?? "No se pudo guardar el comentario";
+      setError(msg);
+      toast.error("No se pudo guardar", { description: msg });
     } finally {
       setSaving(false);
     }
@@ -147,7 +246,8 @@ export default function TicketDetailPage() {
       await load();
       return;
     }
-    await supabase.from("tickets").update({ assignee_id: profile.id, status: "Asignado" }).eq("id", ticketId);
+    const { error } = await supabase.from("tickets").update({ assignee_id: profile.id, status: "Asignado" }).eq("id", ticketId);
+    if (error) toast.error("No se pudo asignar", { description: error.message });
   }
 
   async function reassign(id: string) {
@@ -157,7 +257,8 @@ export default function TicketDetailPage() {
       await load();
       return;
     }
-    await supabase.from("tickets").update({ assignee_id: id || null, status: id ? "Asignado" : "Nuevo" }).eq("id", ticketId);
+    const { error } = await supabase.from("tickets").update({ assignee_id: id || null, status: id ? "Asignado" : "Nuevo" }).eq("id", ticketId);
+    if (error) toast.error("No se pudo reasignar", { description: error.message });
   }
 
   async function setStatus(status: string) {
@@ -169,151 +270,383 @@ export default function TicketDetailPage() {
       await load();
       return;
     }
-    await supabase.from("tickets").update({ status }).eq("id", ticketId);
+    const { error } = await supabase.from("tickets").update({ status }).eq("id", ticketId);
+    if (error) toast.error("No se pudo actualizar estado", { description: error.message });
   }
 
-  if (sessionLoading || profileLoading) return <div className="p-6 text-sm text-zinc-300">Cargando...</div>;
+  async function decideApproval(action: "approve" | "reject") {
+    if (!profile || !ticketId) return;
+    setApprovalsActing(action);
+    try {
+      const comment = approvalComment.trim() || null;
+      if (isDemoMode()) {
+        demoDecideTicketApproval({ ticket_id: ticketId, actor_id: profile.id, action, comment });
+        toast.success(action === "approve" ? "Aprobado" : "Rechazado");
+        setApprovalComment("");
+        await load();
+        return;
+      }
+      const { error } = await supabase.rpc("approval_decide", { p_ticket_id: ticketId, p_action: action, p_comment: comment });
+      if (error) throw error;
+      toast.success(action === "approve" ? "Aprobado" : "Rechazado");
+      setApprovalComment("");
+      await load();
+    } catch (e: unknown) {
+      toast.error("No se pudo decidir", { description: errorMessage(e) ?? "Error" });
+    } finally {
+      setApprovalsActing(null);
+    }
+  }
+
+  if (sessionLoading || profileLoading) return <div className="p-6 text-sm text-muted-foreground">Cargando...</div>;
   if (!session || !profile) return null;
+
+  const statusBadge = ticket ? <Badge variant="outline">{ticket.status}</Badge> : null;
+  const priorityBadgeEl = ticket ? <span className={cn("rounded-full px-2 py-1 text-[11px]", priorityBadge(ticket.priority))}>{ticket.priority}</span> : null;
+  const slaBadgeEl =
+    ticket ? (
+      <span className={cn("rounded-full px-2 py-1 text-[11px]", slaBadge(new Date(), ticket.sla_deadline))}>
+        {ticket.sla_deadline ? `SLA ${new Date(ticket.sla_deadline).toLocaleString()}` : "SLA n/a"}
+      </span>
+    ) : null;
+
+  const metadata = ticket?.metadata ?? {};
+  const serviceMetaRaw = metadata["service_catalog"];
+  const serviceMeta = isRecord(serviceMetaRaw) ? serviceMetaRaw : null;
+  const metaContextRaw = metadata["context"];
+  const metaContext = isRecord(metaContextRaw) ? metaContextRaw : null;
+  const metaFieldsRaw = metadata["fields"];
+  const metaFields = isRecord(metaFieldsRaw) ? metaFieldsRaw : null;
+  const metaImpact = typeof metadata["impact"] === "string" ? metadata["impact"] : undefined;
+  const metaUrgency = typeof metadata["urgency"] === "string" ? metadata["urgency"] : undefined;
+
+  const pendingForMe =
+    approvals.find(
+      (a) =>
+        a.status === "pending" &&
+        (a.approver_profile_id === profile.id || (a.approver_profile_id === null && a.approver_role && a.approver_role === profile.role))
+    ) ?? null;
 
   return (
     <AppShell profile={profile}>
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
+      <div className="space-y-5">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
-            <div className="text-xs text-zinc-500">
-              <Link href="/app" className="hover:text-zinc-300">
+            <div className="text-xs text-muted-foreground">
+              <Link href="/app" className="hover:underline">
                 ← Volver
               </Link>
             </div>
-            <div className="truncate text-xl font-semibold">{ticket?.title ?? "Ticket"}</div>
-            <div className="mt-1 text-sm text-zinc-400">
-              {ticket ? `${ticket.type} · ${ticket.priority} · ${ticket.status}` : ""}
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <div className="truncate text-2xl font-semibold tracking-tight">{ticket?.title ?? "Ticket"}</div>
+              {statusBadge}
+              {priorityBadgeEl}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              {ticket ? <span>{ticket.type}</span> : null}
+              {categoryLabel ? <span>· {categoryLabel}</span> : null}
+              {subcategoryLabel ? <span>· {subcategoryLabel}</span> : null}
+              {slaBadgeEl ? <span>· {slaBadgeEl}</span> : null}
             </div>
           </div>
-          <button onClick={() => void load()} className="rounded-xl bg-white/5 px-3 py-2 text-xs text-white ring-1 ring-white/10 hover:bg-white/10">
-            Actualizar
-          </button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" onClick={() => void load()}>
+              <RefreshCcw className="h-4 w-4" />
+              Actualizar
+            </Button>
+            {ticketId ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  void navigator.clipboard.writeText(ticketId);
+                  toast.success("ID copiado");
+                }}
+              >
+                <Copy className="h-4 w-4" />
+                Copiar ID
+              </Button>
+            ) : null}
+          </div>
         </div>
 
-        {error && <div className="rounded-xl bg-rose-500/15 px-3 py-2 text-xs text-rose-200 ring-1 ring-rose-500/25">{error}</div>}
+        {error ? <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div> : null}
 
         {loading ? (
-          <div className="text-sm text-zinc-400">Cargando...</div>
+          <div className="text-sm text-muted-foreground">Cargando…</div>
         ) : !ticket ? (
-          <div className="text-sm text-zinc-400">No existe o no tienes acceso.</div>
+          <div className="text-sm text-muted-foreground">No existe o no tienes acceso.</div>
         ) : (
-          <>
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4 md:col-span-2">
-                <div className="text-sm font-medium">Descripción</div>
-                <div className="mt-2 whitespace-pre-wrap text-sm text-zinc-300">{ticket.description || "—"}</div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="text-sm font-medium">Detalles</div>
-                <div className="mt-3 space-y-2 text-sm text-zinc-300">
-                  <div className="flex justify-between gap-3">
-                    <span className="text-zinc-500">Creado</span>
-                    <span>{new Date(ticket.created_at).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-zinc-500">SLA</span>
-                    <span>{ticket.sla_deadline ? new Date(ticket.sla_deadline).toLocaleString() : "n/a"}</span>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-zinc-500">Asignado</span>
-                    <span>{ticket.assignee_id ? ticket.assignee_id.slice(0, 8) : "—"}</span>
-                  </div>
-                </div>
+          <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+            <div className="space-y-4">
+              <Card className="tech-border">
+                <CardHeader>
+                  <CardTitle>Descripción</CardTitle>
+                  <CardDescription>Detalle del caso.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="whitespace-pre-wrap text-sm text-foreground/90">{ticket.description || "—"}</div>
+                </CardContent>
+              </Card>
 
-                {canModerate && (
-                  <div className="mt-4 space-y-2">
-                    {canReassign && (
-                      <label className="block">
-                        <div className="text-xs text-zinc-400">Reasignar</div>
-                        <select
-                          value={assigneeId}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setAssigneeId(v);
-                            void reassign(v);
-                          }}
-                          className="mt-1 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20"
-                        >
-                          <option value="">(Sin asignación)</option>
-                          {agents.map((a) => (
-                            <option key={a.id} value={a.id}>
-                              {a.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+              <Card className="tech-border">
+                <CardHeader>
+                  <CardTitle>Actividad</CardTitle>
+                  <CardDescription>Comentarios y notas internas.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {comments.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">Sin comentarios.</div>
+                    ) : (
+                      comments.map((c) => (
+                        <div key={c.id} className={cn("rounded-xl border border-border bg-background/40 p-3", c.is_internal && "bg-amber-500/10")}>
+                          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{c.author_id.slice(0, 8)}</span>
+                              {c.is_internal ? <Badge variant="outline">Interna</Badge> : null}
+                            </div>
+                            <div>{new Date(c.created_at).toLocaleString()}</div>
+                          </div>
+                          <div className="mt-2 whitespace-pre-wrap text-sm">{c.body}</div>
+                        </div>
+                      ))
                     )}
-                    {!ticket.assignee_id && (
-                      <button onClick={() => void assignToMe()} className="w-full rounded-xl bg-white px-3 py-2 text-sm font-medium text-zinc-900">
-                        Asignarme
-                      </button>
-                    )}
-                    <div className="grid grid-cols-2 gap-2">
-                      {statusActions.map((a) => (
-                        <button
-                          key={a.value}
-                          onClick={() => void setStatus(a.value)}
-                          className="rounded-xl bg-white/5 px-3 py-2 text-xs text-white ring-1 ring-white/10 hover:bg-white/10"
-                        >
-                          {a.label}
-                        </button>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
+                    <Textarea
+                      value={body}
+                      onChange={(e) => setBody(e.target.value)}
+                      placeholder={ticket.status === "Pendiente Info" ? "Provee la información solicitada…" : "Escribe un comentario…"}
+                      className="min-h-28"
+                    />
+                    <div className="flex flex-col gap-2">
+                      {canModerate ? (
+                        <label className="flex items-center gap-2 rounded-xl border border-border bg-background/40 px-3 py-2 text-sm text-muted-foreground">
+                          <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
+                          Nota interna
+                        </label>
+                      ) : null}
+                      <Button disabled={saving || body.trim().length < 2} onClick={() => void postComment()}>
+                        {saving ? "Enviando…" : "Enviar"}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-4">
+              <Card className="tech-border tech-glow">
+                <CardHeader>
+                  <CardTitle>Acciones</CardTitle>
+                  <CardDescription>Asignación y estado.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {canModerate ? (
+                    <>
+                      <div className="grid gap-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="justify-between">
+                              Cambiar estado
+                              <ChevronDown className="h-4 w-4 opacity-70" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            {statusActions.map((a) => (
+                              <DropdownMenuItem key={a.value} onSelect={() => void setStatus(a.value)}>
+                                <Check className={cn("h-4 w-4", ticket.status === a.value ? "opacity-100" : "opacity-0")} />
+                                {a.label}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {!ticket.assignee_id ? (
+                          <Button onClick={() => void assignToMe()}>
+                            <UserPlus className="h-4 w-4" />
+                            Asignarme
+                          </Button>
+                        ) : null}
+                      </div>
+
+                      {canReassign ? (
+                        <div className="rounded-xl border border-border bg-background/40 p-3">
+                          <div className="text-xs text-muted-foreground">Reasignar</div>
+                          <div className="mt-2">
+                            <Combobox
+                              value={assigneeId || null}
+                              onValueChange={(next) => {
+                                const v = next ?? "";
+                                setAssigneeId(v);
+                                void reassign(v);
+                              }}
+                              options={[
+                                { value: "", label: "(Sin asignación)" },
+                                ...agents.map((a) => ({ value: a.id, label: a.label })),
+                              ]}
+                              placeholder="Selecciona agente…"
+                              searchPlaceholder="Buscar agente…"
+                              emptyText="Sin resultados."
+                            />
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">No tienes permisos para modificar.</div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {approvals.length > 0 ? (
+                <Card className="tech-border">
+                  <CardHeader>
+                    <CardTitle>Aprobaciones</CardTitle>
+                    <CardDescription>Flujo multi-nivel (manager/owner) y decisiones.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      {approvals.map((a) => (
+                        <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-background/40 px-3 py-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline">Paso {a.step_order}</Badge>
+                            <Badge variant="outline">{approvalKindLabel(a.kind)}</Badge>
+                            {a.required ? <Badge variant="outline">Requerida</Badge> : <Badge variant="outline">Opcional</Badge>}
+                          </div>
+                          <Badge variant="outline" className={approvalStatusBadge(a.status)}>
+                            {a.status === "pending"
+                              ? "Pendiente"
+                              : a.status === "approved"
+                                ? "Aprobada"
+                                : a.status === "rejected"
+                                  ? "Rechazada"
+                                  : "Omitida"}
+                          </Badge>
+                        </div>
                       ))}
                     </div>
-                  </div>
-                )}
-              </div>
-            </div>
 
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="text-sm font-medium">Comentarios</div>
-              <div className="mt-3 space-y-2">
-                {comments.length === 0 ? (
-                  <div className="text-sm text-zinc-400">Sin comentarios.</div>
-                ) : (
-                  comments.map((c) => (
-                    <div key={c.id} className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
-                      <div className="flex items-center justify-between gap-2 text-xs text-zinc-400">
-                        <div>
-                          {c.author_id.slice(0, 8)} {c.is_internal ? "· interna" : ""}
+                    {pendingForMe ? (
+                      <div className="rounded-2xl border border-border bg-background/40 p-3">
+                        <div className="text-sm font-medium">Tu decisión</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Pendiente en paso {pendingForMe.step_order} ({approvalKindLabel(pendingForMe.kind)}).
                         </div>
-                        <div>{new Date(c.created_at).toLocaleString()}</div>
+                        <div className="mt-3 grid gap-2">
+                          <Input value={approvalComment} onChange={(e) => setApprovalComment(e.target.value)} placeholder="Comentario (opcional)" />
+                          <div className="flex items-center gap-2">
+                            <Button disabled={approvalsActing !== null} onClick={() => void decideApproval("approve")}>
+                              Aprobar
+                            </Button>
+                            <Button disabled={approvalsActing !== null} variant="destructive" onClick={() => void decideApproval("reject")}>
+                              Rechazar
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="mt-2 whitespace-pre-wrap text-sm text-zinc-200">{c.body}</div>
-                    </div>
-                  ))
-                )}
-              </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">No tienes aprobaciones pendientes en este ticket.</div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : null}
 
-              <div className="mt-4 grid gap-2 md:grid-cols-[1fr_auto]">
-                <textarea
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  className="min-h-24 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20"
-                  placeholder={ticket.status === "Pendiente Info" ? "Provee la información solicitada..." : "Escribe un comentario..."}
-                />
-                <div className="flex flex-col gap-2">
-                  {canModerate && (
-                    <label className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs text-white ring-1 ring-white/10">
-                      <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
-                      Nota interna
-                    </label>
-                  )}
-                  <button
-                    disabled={saving || body.trim().length < 2}
-                    onClick={() => void postComment()}
-                    className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
-                  >
-                    {saving ? "Enviando..." : "Enviar"}
-                  </button>
-                </div>
-              </div>
+              <Card className="tech-border">
+                <CardHeader>
+                  <CardTitle>Detalles</CardTitle>
+                  <CardDescription>Datos del ticket.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Creado</span>
+                    <span>{new Date(ticket.created_at).toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Actualizado</span>
+                    <span>{new Date(ticket.updated_at).toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Asignado</span>
+                    <span>{ticket.assignee_id ? ticket.assignee_id.slice(0, 8) : "—"}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">SLA</span>
+                    <span>{ticket.sla_deadline ? new Date(ticket.sla_deadline).toLocaleString() : "n/a"}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Respuesta (SLA)</span>
+                    <span>{ticket.response_deadline ? new Date(ticket.response_deadline).toLocaleString() : "n/a"}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">OLA</span>
+                    <span>{ticket.ola_deadline ? new Date(ticket.ola_deadline).toLocaleString() : "n/a"}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Respuesta (OLA)</span>
+                    <span>{ticket.ola_response_deadline ? new Date(ticket.ola_response_deadline).toLocaleString() : "n/a"}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {(serviceMeta || metaContext || metaFields) && (
+                <Card className="tech-border">
+                  <CardHeader>
+                    <CardTitle>Solicitud</CardTitle>
+                    <CardDescription>Service Catalog / metadata.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {serviceMeta ? (
+                      <div className="rounded-xl border border-border bg-background/40 p-3">
+                        <div className="text-xs text-muted-foreground">Servicio</div>
+                        <div className="mt-1 text-sm font-medium">{typeof serviceMeta["service_name"] === "string" ? serviceMeta["service_name"] : "—"}</div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {metaImpact ? <Badge variant="outline">Impacto: {metaImpact}</Badge> : null}
+                          {metaUrgency ? <Badge variant="outline">Urgencia: {metaUrgency}</Badge> : null}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {metaContext ? (
+                      <div className="rounded-xl border border-border bg-background/40 p-3">
+                        <div className="text-xs text-muted-foreground">Contexto</div>
+                        <div className="mt-2 grid gap-2 text-sm">
+                          {Object.entries(metaContext)
+                            .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== "")
+                            .slice(0, 10)
+                            .map(([k, v]) => (
+                              <div key={k} className="flex items-center justify-between gap-3">
+                                <span className="text-muted-foreground">{k}</span>
+                                <span className="truncate">{String(v)}</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {metaFields ? (
+                      <div className="rounded-xl border border-border bg-background/40 p-3">
+                        <div className="text-xs text-muted-foreground">Campos</div>
+                        <div className="mt-2 grid gap-2 text-sm">
+                          {Object.entries(metaFields)
+                            .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== "")
+                            .slice(0, 12)
+                            .map(([k, v]) => (
+                              <div key={k} className="flex items-center justify-between gap-3">
+                                <span className="text-muted-foreground">{k}</span>
+                                <span className="truncate">{String(v)}</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              )}
             </div>
-          </>
+          </div>
         )}
       </div>
     </AppShell>

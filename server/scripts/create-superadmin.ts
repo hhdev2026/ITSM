@@ -3,6 +3,47 @@ import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+type Database = {
+  public: {
+    Tables: {
+      departments: {
+        Row: { id: string; name: string; description: string | null };
+        Insert: { name: string; description?: string | null };
+        Update: { name?: string; description?: string | null };
+        Relationships: [];
+      };
+      profiles: {
+        Row: {
+          id: string;
+          email: string;
+          full_name: string | null;
+          role: string;
+          department_id: string | null;
+        };
+        Insert: {
+          id: string;
+          email: string;
+          full_name?: string | null;
+          role: string;
+          department_id: string | null;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          full_name?: string | null;
+          role?: string;
+          department_id?: string | null;
+        };
+        Relationships: [];
+      };
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
+  };
+};
+
 const EnvSchema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
@@ -13,6 +54,7 @@ const EnvSchema = z.object({
 });
 
 type Env = z.infer<typeof EnvSchema>;
+type SupabaseAdmin = ReturnType<typeof createClient<Database>>;
 
 function loadEnv(): Env {
   const parsed = EnvSchema.safeParse(process.env);
@@ -23,7 +65,7 @@ function loadEnv(): Env {
   return parsed.data;
 }
 
-async function ensureDepartmentId(supabase: ReturnType<typeof createClient>, env: Env) {
+async function ensureDepartmentId(supabase: SupabaseAdmin, env: Env) {
   if (env.SUPERADMIN_DEPARTMENT_ID) return env.SUPERADMIN_DEPARTMENT_ID;
 
   const { data: existing } = await supabase.from("departments").select("id,name").eq("name", "TI").maybeSingle();
@@ -38,7 +80,7 @@ async function ensureDepartmentId(supabase: ReturnType<typeof createClient>, env
   return inserted.id as string;
 }
 
-async function findUserIdByEmail(supabase: ReturnType<typeof createClient>, email: string) {
+async function findUserIdByEmail(supabase: SupabaseAdmin, email: string) {
   const perPage = 200;
   for (let page = 1; page <= 50; page++) {
     const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
@@ -52,7 +94,7 @@ async function findUserIdByEmail(supabase: ReturnType<typeof createClient>, emai
 
 async function main() {
   const env = loadEnv();
-  const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+  const supabase = createClient<Database>(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
@@ -98,4 +140,3 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
-

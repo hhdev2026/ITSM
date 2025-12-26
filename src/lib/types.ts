@@ -19,11 +19,16 @@ export type Ticket = {
   status: TicketStatus;
   priority: TicketPriority;
   category_id: string | null;
+  subcategory_id: string | null;
+  metadata: Record<string, unknown>;
   requester_id: string;
   assignee_id: string | null;
   created_at: string;
   updated_at: string;
+  response_deadline: string | null;
   sla_deadline: string | null;
+  ola_response_deadline: string | null;
+  ola_deadline: string | null;
   first_response_at: string | null;
   resolved_at: string | null;
   closed_at: string | null;
@@ -36,6 +41,41 @@ export type Category = {
   department_id: string;
 };
 
+export type Subcategory = {
+  id: string;
+  category_id: string;
+  name: string;
+  description: string | null;
+};
+
+export type ServiceCatalogItem = {
+  id: string;
+  department_id: string | null;
+  name: string;
+  description: string | null;
+  category_id: string | null;
+  subcategory_id: string | null;
+  ticket_type: TicketType;
+  default_priority: TicketPriority;
+  default_impact: "Alto" | "Medio" | "Bajo";
+  default_urgency: "Alta" | "Media" | "Baja";
+  icon_key: string | null;
+  is_active: boolean;
+};
+
+export type ServiceCatalogField = {
+  id: string;
+  service_id: string;
+  key: string;
+  label: string;
+  field_type: "text" | "textarea" | "select" | "boolean" | "date" | "number";
+  required: boolean;
+  placeholder: string | null;
+  help_text: string | null;
+  options: unknown | null;
+  sort_order: number;
+};
+
 export type Comment = {
   id: string;
   ticket_id: string;
@@ -44,4 +84,3 @@ export type Comment = {
   is_internal: boolean;
   created_at: string;
 };
-

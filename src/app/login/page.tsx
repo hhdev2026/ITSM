@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseBrowser";
 import { Logo } from "@/components/Logo";
 import { errorMessage } from "@/lib/error";
 import { isDemoMode } from "@/lib/demo";
-import { setDemoRole } from "@/lib/demoAuth";
+import { getDemoProfile, setDemoRole } from "@/lib/demoAuth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,7 +24,8 @@ export default function LoginPage() {
     setError(null);
     try {
       if (isDemoMode()) {
-        setDemoRole("admin");
+        const p = getDemoProfile();
+        if (!p) setDemoRole("user");
         router.replace("/app");
         return;
       }
@@ -71,6 +72,12 @@ export default function LoginPage() {
             </div>
           </div>
         )}
+
+        {isDemoMode() ? (
+          <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-6 text-sm text-zinc-300">
+            En DEMO no se usa email/contraseña. Selecciona un rol arriba para entrar.
+          </div>
+        ) : (
         <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-6">
           <div className="flex items-center gap-2">
             <button
@@ -127,6 +134,7 @@ export default function LoginPage() {
             </button>
           </div>
         </div>
+        )}
         <div className="text-xs text-zinc-500">
           Nota: el rol y el departamento se asignan en la tabla <code className="text-zinc-200">profiles</code> (admin).
         </div>
