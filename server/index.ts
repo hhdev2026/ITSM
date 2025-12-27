@@ -110,6 +110,7 @@ app.get("/api/tickets/export.csv", requireAuth, requireRole(["supervisor", "admi
       .select(
         [
           "id",
+          "ticket_number",
           "department_id",
           "type",
           "title",
@@ -211,6 +212,7 @@ app.get("/api/tickets/export.csv", requireAuth, requireRole(["supervisor", "admi
 
     const header = [
       "id",
+      "ticket_number",
       "title",
       "type",
       "status",
@@ -260,6 +262,7 @@ app.get("/api/tickets/export.csv", requireAuth, requireRole(["supervisor", "admi
 
       const row = [
         t.id,
+        (t as { ticket_number?: unknown }).ticket_number ?? "",
         t.title,
         t.type,
         t.status,

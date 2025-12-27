@@ -26,6 +26,7 @@ import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { InlineEmpty } from "@/components/feedback/InlineEmpty";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AppBootScreen } from "@/components/layout/AppStates";
+import { formatTicketNumber } from "@/lib/ticketNumber";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
@@ -127,7 +128,7 @@ export default function TicketDetailPage() {
     const { data: t, error: tErr } = await supabase
       .from("tickets_sla_live")
       .select(
-        "id,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,response_deadline,sla_deadline,ola_response_deadline,ola_deadline,solution_type,solution_notes,sla_excluded,sla_exclusion_reason,planned_at,planned_for_at,canceled_at,canceled_reason,sla_remaining_minutes,sla_traffic_light,sla_pct_used,response_remaining_minutes,response_traffic_light,response_pct_used,first_response_at,resolved_at,closed_at"
+        "id,ticket_number,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,response_deadline,sla_deadline,ola_response_deadline,ola_deadline,solution_type,solution_notes,sla_excluded,sla_exclusion_reason,planned_at,planned_for_at,canceled_at,canceled_reason,sla_remaining_minutes,sla_traffic_light,sla_pct_used,response_remaining_minutes,response_traffic_light,response_pct_used,first_response_at,resolved_at,closed_at"
       )
       .eq("id", ticketId)
       .single();
@@ -412,6 +413,11 @@ export default function TicketDetailPage() {
           meta={
             ticket ? (
               <>
+                {formatTicketNumber(ticket.ticket_number) ? (
+                  <Badge variant="outline" className="font-mono">
+                    {formatTicketNumber(ticket.ticket_number)}
+                  </Badge>
+                ) : null}
                 <TicketTypeBadge type={ticket.type} />
                 {statusBadge}
                 {priorityBadgeEl}
@@ -431,12 +437,13 @@ export default function TicketDetailPage() {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    void navigator.clipboard.writeText(ticketId);
-                    toast.success("ID copiado");
+                    const tracking = formatTicketNumber(ticket?.ticket_number);
+                    void navigator.clipboard.writeText(tracking ?? ticketId);
+                    toast.success(tracking ? "N° de ticket copiado" : "ID copiado");
                   }}
                 >
                   <Copy className="h-4 w-4" />
-                  Copiar ID
+                  Copiar N° ticket
                 </Button>
               ) : null}
             </>

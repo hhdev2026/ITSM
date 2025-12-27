@@ -14,6 +14,7 @@ import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { Ticket as TicketIcon } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { formatTicketNumber } from "@/lib/ticketNumber";
 
 export function UserDashboard({ profile }: { profile: Profile }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -31,7 +32,7 @@ export function UserDashboard({ profile }: { profile: Profile }) {
     const { data, error } = await supabase
       .from("tickets")
       .select(
-        "id,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,sla_deadline,first_response_at,resolved_at,closed_at"
+        "id,ticket_number,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,sla_deadline,first_response_at,resolved_at,closed_at"
       )
       .eq("requester_id", profile.id)
       .order("created_at", { ascending: false })
@@ -62,77 +63,81 @@ export function UserDashboard({ profile }: { profile: Profile }) {
         description="Crea solicitudes desde el catálogo y da seguimiento al estado."
         actions={
           <Button asChild>
-            <Link href="/app/catalog">Nuevo ticket</Link>
+            <Link href="/app/catalog">Crear ticket</Link>
           </Button>
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-        <Card className="tech-border tech-glow">
-          <CardHeader>
-            <CardTitle>Service Catalog</CardTitle>
-            <CardDescription>Selecciona una casuística y completa un formulario inteligente (campos por servicio).</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center">
-              <Input value={catalogQuery} onChange={(e) => setCatalogQuery(e.target.value)} placeholder="Buscar en el catálogo (vpn, permisos, software…)" />
-              <Button asChild variant="secondary" className="md:shrink-0">
-                <Link href={catalogHref}>Abrir catálogo</Link>
-              </Button>
-            </div>
-            <div className="mt-3 text-xs text-muted-foreground">
-              Tip: usa <code className="text-foreground">Ctrl/⌘K</code> para navegación rápida.
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="tech-border">
-          <CardHeader className="flex-row items-center justify-between">
-            <div>
-              <CardTitle>Recientes</CardTitle>
-              <CardDescription>Últimos tickets creados por ti.</CardDescription>
-            </div>
-            <Button variant="outline" onClick={() => void load()}>
-              Actualizar
+      <Card className="tech-border tech-glow">
+        <CardHeader>
+          <CardTitle>Crear un nuevo ticket</CardTitle>
+          <CardDescription>Busca tu problema o solicitud y te guiamos para crearlo.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <Input value={catalogQuery} onChange={(e) => setCatalogQuery(e.target.value)} placeholder="Buscar (impresora, wifi, office, bitdefender…)" />
+            <Button asChild className="md:shrink-0">
+              <Link href={catalogHref}>Abrir catálogo</Link>
             </Button>
-          </CardHeader>
-          <CardContent>
-            {error ? (
-              <InlineAlert variant="error" description={error} />
-            ) : null}
+          </div>
+          <div className="mt-3 text-xs text-muted-foreground">
+            Tip: usa <code className="text-foreground">Ctrl/⌘K</code> para navegación rápida.
+          </div>
+        </CardContent>
+      </Card>
 
-            {loading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-14 w-full" />
-                <Skeleton className="h-14 w-full" />
-                <Skeleton className="h-14 w-full" />
-              </div>
-            ) : tickets.length === 0 ? (
-              <EmptyState title="Aún no tienes tickets" description="Crea uno desde el catálogo para comenzar." icon={<TicketIcon className="h-5 w-5" />} />
-            ) : (
-              <MotionList className="divide-y divide-border">
-                {tickets.map((t) => (
+      <Card className="tech-border">
+        <CardHeader className="flex-row items-center justify-between">
+          <div>
+            <CardTitle>Mis tickets recientes</CardTitle>
+            <CardDescription>Últimos tickets creados por ti.</CardDescription>
+          </div>
+          <Button variant="outline" onClick={() => void load()}>
+            Actualizar
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {error ? <InlineAlert variant="error" description={error} /> : null}
+
+          {loading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+            </div>
+          ) : tickets.length === 0 ? (
+            <EmptyState title="Aún no tienes tickets" description="Crea uno desde el catálogo para comenzar." icon={<TicketIcon className="h-5 w-5" />} />
+          ) : (
+            <MotionList className="divide-y divide-border">
+              {tickets.map((t) => {
+                const tracking = formatTicketNumber(t.ticket_number);
+                return (
                   <MotionItem key={t.id} id={t.id}>
                     <Link href={`/app/tickets/${t.id}`} className="block rounded-lg py-3 transition-colors hover:bg-accent/40">
                       <div className="flex items-center justify-between gap-3 px-2">
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-medium">{t.title}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="truncate text-sm font-medium">{t.title}</div>
+                            {tracking ? <div className="shrink-0 rounded-md border border-border px-2 py-0.5 text-xs font-mono">{tracking}</div> : null}
+                          </div>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <TicketTypeBadge type={t.type} />
                             <TicketPriorityBadge priority={t.priority} />
                             <TicketStatusBadge status={t.status} />
                           </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString()}</div>
+                        <div className="text-right text-xs text-muted-foreground">
+                          <div>{new Date(t.created_at).toLocaleString()}</div>
+                        </div>
                       </div>
                     </Link>
                   </MotionItem>
-                ))}
-              </MotionList>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                );
+              })}
+            </MotionList>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

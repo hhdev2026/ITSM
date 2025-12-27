@@ -13,6 +13,7 @@ export type Profile = {
 
 export type Ticket = {
   id: string;
+  ticket_number?: number | string | null;
   department_id: string;
   type: TicketType;
   title: string;
