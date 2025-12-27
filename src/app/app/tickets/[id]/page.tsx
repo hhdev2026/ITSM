@@ -265,6 +265,10 @@ export default function TicketDetailPage() {
 
   async function setStatus(status: string) {
     if (!ticketId) return;
+    if (status === "Cerrado" && !solutionType) {
+      toast.error("Selecciona tipo de solución antes de cerrar");
+      return;
+    }
     const { error } = await supabase.from("tickets").update({ status }).eq("id", ticketId);
     if (error) toast.error("No se pudo actualizar estado", { description: error.message });
   }

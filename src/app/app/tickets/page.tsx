@@ -51,6 +51,27 @@ function tierPathFromMetadata(meta: unknown) {
   return parts.join(" → ");
 }
 
+function downloadCsv(filename: string, header: string[], rows: Array<Array<unknown>>) {
+  const escape = (value: unknown) => {
+    if (value == null) return "";
+    const str = String(value);
+    if (/[",\n\r]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
+    return str;
+  };
+  const lines: string[] = [];
+  lines.push(header.map(escape).join(","));
+  for (const row of rows) lines.push(row.map(escape).join(","));
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function computeTraffic(opts: {
   status?: unknown;
   excluded?: unknown;
@@ -253,10 +274,63 @@ export default function TicketsTrackingPage() {
           title="Seguimiento de tickets"
           description="Detalle por ticket con semáforo de SLA y tiempos restantes."
           actions={
-            <Button variant="outline" onClick={() => void load()} disabled={loading}>
-              <RefreshCcw className="h-4 w-4" />
-              Actualizar
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const header = [
+                    "ticket_number",
+                    "title",
+                    "type",
+                    "status",
+                    "priority",
+                    "sla_light",
+                    "response_light",
+                    "sla_remaining_minutes",
+                    "response_remaining_minutes",
+                    "created_at",
+                    "assignee",
+                    "requester",
+                    "category",
+                    "subcategory",
+                  ];
+                  const out = rows.map((t) => {
+                    const tracking = formatTicketNumber(t.ticket_number) ?? t.id.slice(0, 8).toUpperCase();
+                    const requester = t.requester_id ? profById.get(t.requester_id) ?? null : null;
+                    const assignee = t.assignee_id ? profById.get(t.assignee_id) ?? null : null;
+                    const cat = t.category_id ? catById.get(t.category_id) ?? "" : "";
+                    const sub = t.subcategory_id ? subById.get(t.subcategory_id) ?? "" : "";
+                    return [
+                      tracking,
+                      t.title,
+                      t.type,
+                      t.status,
+                      t.priority,
+                      t.sla_traffic_light ?? "",
+                      t.response_traffic_light ?? "",
+                      typeof t.sla_remaining_minutes === "number" ? Math.round(t.sla_remaining_minutes) : "",
+                      typeof t.response_remaining_minutes === "number" ? Math.round(t.response_remaining_minutes) : "",
+                      t.created_at,
+                      assignee ? profileLabel(assignee) : "",
+                      requester ? profileLabel(requester) : "",
+                      cat,
+                      sub,
+                    ];
+                  });
+                  downloadCsv(`tickets-seguimiento-${profile.department_id}.csv`, header, out);
+                }}
+                disabled={loading || rows.length === 0}
+              >
+                Descargar Excel (CSV)
+              </Button>
+              <Button variant="outline" onClick={() => window.print()}>
+                Descargar PDF (Imprimir)
+              </Button>
+              <Button variant="outline" onClick={() => void load()} disabled={loading}>
+                <RefreshCcw className="h-4 w-4" />
+                Actualizar
+              </Button>
+            </>
           }
         />
 
