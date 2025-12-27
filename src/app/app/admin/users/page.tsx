@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { UserAdmin } from "@/features/admin/UserAdmin";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { AppBootScreen, AppNoticeScreen } from "@/components/layout/AppStates";
 
 export default function AdminUsersPage() {
   const router = useRouter();
@@ -16,9 +17,9 @@ export default function AdminUsersPage() {
     if (!sessionLoading && !session) router.replace("/login");
   }, [sessionLoading, session, router]);
 
-  if (sessionLoading || profileLoading) return <div className="p-6 text-sm text-muted-foreground">Cargando…</div>;
+  if (sessionLoading || profileLoading) return <AppBootScreen label="Cargando administración…" />;
   if (!session) return null;
-  if (error) return <div className="p-6 text-sm text-destructive-foreground">No se pudo cargar el perfil: {error}</div>;
+  if (error) return <AppNoticeScreen variant="error" title="No se pudo cargar el perfil" description={error} />;
   if (!profile) return null;
 
   if (profile.role !== "admin") {

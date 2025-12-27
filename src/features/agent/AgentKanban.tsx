@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { InlineEmpty } from "@/components/feedback/InlineEmpty";
 import { RefreshCcw, UserCheck } from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 function groupByStatus(tickets: Ticket[]) {
   const map = new Map<KanbanStatus, Ticket[]>();
@@ -147,31 +148,30 @@ export function AgentKanban({ profile }: { profile: Profile }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="text-2xl font-semibold tracking-tight">Bandeja operativa</div>
-          <div className="mt-1 text-sm text-muted-foreground">Gestiona casos por estado y prioriza por SLA.</div>
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-2">
-            <Button variant={onlyMine ? "default" : "outline"} onClick={() => setOnlyMine(true)}>
-              <UserCheck className="h-4 w-4" />
-              Solo míos
-            </Button>
-            <Button variant={!onlyMine ? "default" : "outline"} onClick={() => setOnlyMine(false)}>
-              Equipo
-            </Button>
+      <PageHeader
+        title="Bandeja operativa"
+        description="Gestiona casos por estado y prioriza por SLA."
+        actions={
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-2">
+              <Button variant={onlyMine ? "default" : "outline"} onClick={() => setOnlyMine(true)}>
+                <UserCheck className="h-4 w-4" />
+                Solo míos
+              </Button>
+              <Button variant={!onlyMine ? "default" : "outline"} onClick={() => setOnlyMine(false)}>
+                Equipo
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filtrar por texto…" className="sm:w-72" />
+              <Button variant="outline" onClick={() => void load()}>
+                <RefreshCcw className="h-4 w-4" />
+                Actualizar
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filtrar por texto…" className="sm:w-72" />
-            <Button variant="outline" onClick={() => void load()}>
-              <RefreshCcw className="h-4 w-4" />
-              Actualizar
-            </Button>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {error && (
         <InlineAlert variant="error" description={error} />
@@ -234,8 +234,8 @@ export function AgentKanban({ profile }: { profile: Profile }) {
                             onDragStart={(e) => onDragStart(e, t.id)}
                             onDragEnd={onDragEnd}
                             className={cn(
-                              "rounded-xl border border-border bg-background p-3 shadow-sm",
-                              "transition-colors hover:bg-accent/40",
+                              "rounded-xl glass-surface p-3",
+                              "transition-colors hover:bg-accent/40 hover:border-[hsl(var(--brand-cyan))]/25",
                               draggingId === t.id && "opacity-60"
                             )}
                           >

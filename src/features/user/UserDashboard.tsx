@@ -15,6 +15,7 @@ import { TicketPriorityBadge, TicketStatusBadge, TicketTypeBadge } from "@/compo
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { Ticket as TicketIcon } from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export function UserDashboard({ profile }: { profile: Profile }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -65,15 +66,15 @@ export function UserDashboard({ profile }: { profile: Profile }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-end">
-        <div>
-          <div className="text-2xl font-semibold tracking-tight">Mis tickets</div>
-          <div className="mt-1 text-sm text-muted-foreground">Crea solicitudes desde el catálogo y da seguimiento al estado.</div>
-        </div>
-        <Button asChild>
-          <Link href="/app/catalog">Nuevo ticket</Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Mis tickets"
+        description="Crea solicitudes desde el catálogo y da seguimiento al estado."
+        actions={
+          <Button asChild>
+            <Link href="/app/catalog">Nuevo ticket</Link>
+          </Button>
+        }
+      />
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
         <Card className="tech-border tech-glow">

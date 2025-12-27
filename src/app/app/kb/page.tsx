@@ -20,6 +20,7 @@ import { MotionItem, MotionList } from "@/components/motion/MotionList";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { BookOpen } from "lucide-react";
+import { AppBootScreen } from "@/components/layout/AppStates";
 
 type Article = {
   id: string;
@@ -118,7 +119,7 @@ export default function KnowledgeBasePage() {
     }
   }
 
-  if (sessionLoading || profileLoading) return <div className="p-6 text-sm text-muted-foreground">Cargando…</div>;
+  if (sessionLoading || profileLoading) return <AppBootScreen label="Cargando base de conocimiento…" />;
   if (!session || !profile) return null;
 
   return (

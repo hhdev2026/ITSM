@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { AppBootScreen } from "@/components/layout/AppStates";
 
 type Article = {
   id: string;
@@ -109,7 +110,7 @@ export default function ArticlePage() {
     }
   }
 
-  if (sessionLoading || profileLoading) return <div className="p-6 text-sm text-muted-foreground">Cargando…</div>;
+  if (sessionLoading || profileLoading) return <AppBootScreen label="Cargando artículo…" />;
   if (!session || !profile) return null;
 
   return (

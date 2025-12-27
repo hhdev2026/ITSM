@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { Clock } from "lucide-react";
+import { AppBootScreen } from "@/components/layout/AppStates";
 
 type Sla = {
   id: string;
@@ -119,7 +120,7 @@ export default function SlasPage() {
     if (profile) await load(profile);
   }
 
-  if (sessionLoading || profileLoading) return <div className="p-6 text-sm text-muted-foreground">Cargando…</div>;
+  if (sessionLoading || profileLoading) return <AppBootScreen label="Cargando SLAs…" />;
   if (!session || !profile) return null;
 
   return (

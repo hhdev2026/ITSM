@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { UserDashboard } from "@/features/user/UserDashboard";
 import { AgentKanban } from "@/features/agent/AgentKanban";
 import { SupervisorDashboard } from "@/features/supervisor/SupervisorDashboard";
+import { AppBootScreen, AppNoticeScreen } from "@/components/layout/AppStates";
 
 export default function AppPage() {
   const router = useRouter();
@@ -18,20 +19,21 @@ export default function AppPage() {
   }, [sessionLoading, session, router]);
 
   if (sessionLoading || profileLoading) {
-    return <div className="p-6 text-sm text-muted-foreground">Cargando…</div>;
+    return <AppBootScreen label="Preparando tu sesión…" />;
   }
 
   if (!session) return null;
 
   if (error) {
-    return <div className="p-6 text-sm text-destructive-foreground">No se pudo cargar el perfil: {error}</div>;
+    return <AppNoticeScreen variant="error" title="No se pudo cargar el perfil" description={error} />;
   }
 
   if (!profile) {
     return (
-      <div className="p-6 text-sm text-muted-foreground">
-        Perfil no disponible todavía. Si acabas de registrarte, espera unos segundos y recarga.
-      </div>
+      <AppNoticeScreen
+        title="Perfil no disponible"
+        description="Si acabas de registrarte, espera unos segundos y recarga."
+      />
     );
   }
 

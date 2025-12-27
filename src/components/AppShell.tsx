@@ -41,9 +41,10 @@ function NavItem({
     <Link
       href={href}
       className={cn(
-        "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
-        "text-sidebar-muted-foreground hover:bg-sidebar-muted hover:text-sidebar-foreground",
-        active && "bg-sidebar-muted text-sidebar-foreground"
+        "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm",
+        "transition-[background,box-shadow,color] duration-200",
+        "text-sidebar-muted-foreground hover:bg-sidebar-muted/70 hover:text-sidebar-foreground hover:shadow-sm",
+        active && "bg-sidebar-muted/70 text-sidebar-foreground shadow-sm ring-1 ring-[hsl(var(--brand-cyan))]/15"
       )}
     >
       <span
@@ -153,8 +154,10 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
             animate={{ width: collapsed ? 84 : 300 }}
             transition={{ type: "spring", stiffness: 340, damping: 35 }}
             className={cn(
-              "relative hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar/70 backdrop-blur md:flex",
-              "px-3 py-4"
+              "relative hidden shrink-0 flex-col bg-sidebar/55 backdrop-blur-md md:flex",
+              "px-3 py-4",
+              "before:pointer-events-none before:absolute before:inset-y-8 before:right-0 before:w-px before:bg-gradient-to-b before:from-[hsl(var(--brand-cyan))]/35 before:via-[hsl(var(--brand-blue))]/15 before:to-transparent",
+              "after:pointer-events-none after:absolute after:inset-y-10 after:right-0 after:w-24 after:bg-gradient-to-l after:from-[hsl(var(--brand-cyan))]/10 after:to-transparent"
             )}
           >
             <div className={cn("flex items-center gap-3", collapsed ? "justify-center" : "justify-between")}>
@@ -190,7 +193,7 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
               </Button>
             </div>
 
-            <div className={cn("mt-4 rounded-2xl border border-sidebar-border bg-sidebar-muted/70", collapsed ? "p-2" : "p-3")}>
+            <div className={cn("mt-4 rounded-2xl glass-surface", collapsed ? "p-2" : "p-3")}>
               <div className={cn("flex items-center gap-3", collapsed ? "justify-center" : "justify-between")}>
                 <div className="flex items-center gap-3">
                   <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[hsl(var(--brand-cyan))] via-[hsl(var(--brand-blue))] to-[hsl(var(--brand-violet))] text-sm font-semibold text-white">
@@ -245,7 +248,8 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
           </motion.aside>
 
           <div className="flex min-w-0 flex-1 flex-col">
-            <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
+            <header className="sticky top-0 z-40 relative border-b border-border/60 bg-background/55 backdrop-blur-md">
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[hsl(var(--brand-cyan))]/25 to-transparent" />
               <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-6">
                 <div className="flex items-center gap-2 md:hidden">
                   <DropdownMenu>
@@ -303,7 +307,7 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onSelect={() => router.push("/app")}>
                         <IconTickets className="h-4 w-4" />
-                        Dashboard
+                        Inicio
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onSelect={onToggleTheme}>

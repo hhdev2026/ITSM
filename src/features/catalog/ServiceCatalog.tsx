@@ -39,6 +39,7 @@ import { TicketPriorityBadge, TicketTypeBadge } from "@/components/tickets/Ticke
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { InlineEmpty } from "@/components/feedback/InlineEmpty";
 import { SlidersHorizontal } from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 type Impact = "Alto" | "Medio" | "Bajo";
 type Urgency = "Alta" | "Media" | "Baja";
@@ -414,18 +415,18 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="text-2xl font-semibold tracking-tight">Catálogo de servicios</div>
-          <div className="mt-1 text-sm text-muted-foreground">Solicitudes e incidencias estandarizadas (Service Catalog).</div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar (vpn, permisos, software…)" className="md:w-96" />
-          <Button variant="outline" onClick={() => void load()}>
-            Actualizar
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Catálogo de servicios"
+        description="Solicitudes e incidencias estandarizadas (Service Catalog)."
+        actions={
+          <div className="flex items-center gap-2">
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar (vpn, permisos, software…)" className="md:w-96" />
+            <Button variant="outline" onClick={() => void load()}>
+              Actualizar
+            </Button>
+          </div>
+        }
+      />
 
       {error ? (
         <InlineAlert variant="error" description={error} />
@@ -519,7 +520,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                 </div>
 
                 <div className="tech-border rounded-2xl p-[1px]">
-                  <div className="rounded-2xl bg-background/80 p-4 backdrop-blur">
+                  <div className="glass-surface rounded-2xl p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="text-sm font-semibold">Flujo y tiempos</div>
@@ -529,7 +530,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                     </div>
 
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
-                      <div className="rounded-2xl border border-border bg-background/40 p-3">
+                      <div className="rounded-2xl glass-surface p-3">
                         <div className="text-xs text-muted-foreground">Aprobaciones</div>
                         {(() => {
                           const steps = selectedService ? approvalStepsByServiceId[selectedService.id] ?? [] : [];
@@ -539,7 +540,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                           return (
                             <div className="mt-2 space-y-2 text-sm">
                               {steps.map((s) => (
-                                <div key={s.id} className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background/50 px-3 py-2">
+                                <div key={s.id} className="flex items-center justify-between gap-2 rounded-xl glass-surface px-3 py-2">
                                   <div className="flex items-center gap-2">
                                     <Badge variant="outline">Paso {s.step_order}</Badge>
                                     <Badge variant="outline">{s.kind === "requester_manager" ? "Manager" : s.kind === "service_owner" ? "Owner" : s.kind}</Badge>
@@ -552,7 +553,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                         })()}
                       </div>
 
-                      <div className="rounded-2xl border border-border bg-background/40 p-3">
+                      <div className="rounded-2xl glass-surface p-3">
                         <div className="text-xs text-muted-foreground">SLA / OLA</div>
                         {(() => {
                           if (!selectedService) return null;
@@ -566,7 +567,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
 
                           return (
                             <div className="mt-2 space-y-2 text-sm">
-                              <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/50 px-3 py-2">
+                              <div className="flex items-center justify-between gap-3 rounded-xl glass-surface px-3 py-2">
                                 <div className="text-muted-foreground">SLA</div>
                                 <div className="text-right">
                                   <div>
@@ -577,7 +578,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                                   </div>
                                 </div>
                               </div>
-                              <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/50 px-3 py-2">
+                              <div className="flex items-center justify-between gap-3 rounded-xl glass-surface px-3 py-2">
                                 <div className="text-muted-foreground">OLA</div>
                                 {olaOverride ? (
                                   <div className="text-right">
@@ -606,7 +607,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                 </div>
 
                 <div className="tech-border rounded-2xl p-[1px]">
-                  <div className="rounded-2xl bg-background/80 p-4 backdrop-blur">
+                  <div className="glass-surface rounded-2xl p-4">
                     <div className="grid gap-3">
                       <label className="block">
                         <div className="text-xs text-muted-foreground">Título</div>
@@ -672,7 +673,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-border bg-background/50 p-4">
+                <div className="rounded-2xl glass-surface p-4">
                   <div className="text-sm font-semibold">Contexto</div>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <label className="block">
@@ -690,7 +691,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-border bg-background/50 p-4">
+                <div className="rounded-2xl glass-surface p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-sm font-semibold">Datos del servicio</div>

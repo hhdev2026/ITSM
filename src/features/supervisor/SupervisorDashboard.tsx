@@ -262,7 +262,7 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-2 text-sm">
                 {pendingRows.map((r) => (
-                  <div key={r.k} className="flex items-center justify-between rounded-xl border border-border bg-background/40 px-3 py-2">
+                  <div key={r.k} className="flex items-center justify-between rounded-xl glass-surface px-3 py-2">
                     <div className="text-muted-foreground">{r.k}</div>
                     <div className="font-semibold">{r.v}</div>
                   </div>
@@ -280,7 +280,7 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
                   <div className="text-sm text-muted-foreground">Sin agentes.</div>
                 ) : (
                   kpis.workload.slice(0, 10).map((w) => (
-                    <div key={w.agent_id} className="flex items-center justify-between rounded-xl border border-border bg-background/40 px-3 py-2">
+                    <div key={w.agent_id} className="flex items-center justify-between rounded-xl glass-surface px-3 py-2">
                       <div className="truncate text-sm text-muted-foreground">{w.agent_name}</div>
                       <Badge variant="outline">{w.open_assigned}</Badge>
                     </div>

@@ -22,6 +22,7 @@ import { TicketPriorityBadge, TicketStatusBadge, TicketTypeBadge } from "@/compo
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { Inbox } from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 type ApprovalRow = {
   id: string;
@@ -131,15 +132,15 @@ export function ApprovalsInbox({ profile }: { profile: Profile }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <div className="text-2xl font-semibold tracking-tight">Aprobaciones</div>
-          <div className="mt-1 text-sm text-muted-foreground">Solicitudes que requieren tu decisión.</div>
-        </div>
-        <Button variant="outline" onClick={() => void load()}>
-          Actualizar
-        </Button>
-      </div>
+      <PageHeader
+        title="Aprobaciones"
+        description="Solicitudes que requieren tu decisión."
+        actions={
+          <Button variant="outline" onClick={() => void load()}>
+            Actualizar
+          </Button>
+        }
+      />
 
       {error ? (
         <InlineAlert variant="error" description={error} />

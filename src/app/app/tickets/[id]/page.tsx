@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
 import { useProfile, useSession } from "@/lib/hooks";
 import { supabase } from "@/lib/supabaseBrowser";
@@ -36,6 +37,8 @@ import { TicketPriorityBadge, TicketStatusBadge, TicketTypeBadge } from "@/compo
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { InlineEmpty } from "@/components/feedback/InlineEmpty";
 import { MessageSquare } from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { AppBootScreen } from "@/components/layout/AppStates";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
@@ -303,7 +306,7 @@ export default function TicketDetailPage() {
     }
   }
 
-  if (sessionLoading || profileLoading) return <div className="p-6 text-sm text-muted-foreground">Cargando...</div>;
+  if (sessionLoading || profileLoading) return <AppBootScreen label="Cargando ticket…" />;
   if (!session || !profile) return null;
 
   const statusBadge = ticket ? <TicketStatusBadge status={ticket.status} /> : null;
@@ -335,50 +338,88 @@ export default function TicketDetailPage() {
   return (
     <AppShell profile={profile}>
       <div className="space-y-5">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
-            <div className="text-xs text-muted-foreground">
-              <Link href="/app" className="hover:underline">
-                ← Volver
-              </Link>
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <div className="truncate text-2xl font-semibold tracking-tight">{ticket?.title ?? "Ticket"}</div>
-              {statusBadge}
-              {priorityBadgeEl}
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              {ticket ? <TicketTypeBadge type={ticket.type} /> : null}
-              {categoryLabel ? <span>· {categoryLabel}</span> : null}
-              {subcategoryLabel ? <span>· {subcategoryLabel}</span> : null}
-              {slaBadgeEl ? <span>· {slaBadgeEl}</span> : null}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={() => void load()}>
-              <RefreshCcw className="h-4 w-4" />
-              Actualizar
-            </Button>
-            {ticketId ? (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  void navigator.clipboard.writeText(ticketId);
-                  toast.success("ID copiado");
-                }}
-              >
-                <Copy className="h-4 w-4" />
-                Copiar ID
+        <PageHeader
+          kicker={
+            <Link href="/app" className="hover:underline">
+              ← Volver
+            </Link>
+          }
+          title={ticket?.title ?? "Ticket"}
+          description="Detalle, actividad y aprobaciones."
+          meta={
+            ticket ? (
+              <>
+                <TicketTypeBadge type={ticket.type} />
+                {statusBadge}
+                {priorityBadgeEl}
+                {categoryLabel ? <Badge variant="outline">{categoryLabel}</Badge> : null}
+                {subcategoryLabel ? <Badge variant="outline">{subcategoryLabel}</Badge> : null}
+                {slaBadgeEl ? slaBadgeEl : null}
+              </>
+            ) : null
+          }
+          actions={
+            <>
+              <Button variant="outline" onClick={() => void load()}>
+                <RefreshCcw className="h-4 w-4" />
+                Actualizar
               </Button>
-            ) : null}
-          </div>
-        </div>
+              {ticketId ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(ticketId);
+                    toast.success("ID copiado");
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiar ID
+                </Button>
+              ) : null}
+            </>
+          }
+        />
 
         {error ? <InlineAlert variant="error" description={error} /> : null}
 
         {loading ? (
-          <div className="text-sm text-muted-foreground">Cargando…</div>
+          <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+            <div className="space-y-4">
+              <Card className="tech-border">
+                <CardHeader>
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-4 w-52" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-24 w-full" />
+                </CardContent>
+              </Card>
+              <Card className="tech-border">
+                <CardHeader>
+                  <Skeleton className="h-5 w-28" />
+                  <Skeleton className="h-4 w-48" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            <div className="space-y-4">
+              <Card className="tech-border">
+                <CardHeader>
+                  <Skeleton className="h-5 w-28" />
+                  <Skeleton className="h-4 w-40" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-32 w-full" />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         ) : !ticket ? (
           <div className="text-sm text-muted-foreground">No existe o no tienes acceso.</div>
         ) : (
@@ -407,7 +448,7 @@ export default function TicketDetailPage() {
                       <MotionList className="space-y-3">
                         {comments.map((c) => (
                           <MotionItem key={c.id} id={c.id}>
-                            <div className={cn("rounded-xl border border-border bg-background/40 p-3", c.is_internal && "bg-amber-500/10")}>
+                            <div className={cn("rounded-xl glass-surface p-3", c.is_internal && "bg-amber-500/10")}>
                               <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium">{c.author_id.slice(0, 8)}</span>
@@ -432,7 +473,7 @@ export default function TicketDetailPage() {
                     />
                     <div className="flex flex-col gap-2">
                       {canModerate ? (
-                        <label className="flex items-center gap-2 rounded-xl border border-border bg-background/40 px-3 py-2 text-sm text-muted-foreground">
+                        <label className="flex items-center gap-2 rounded-xl glass-surface px-3 py-2 text-sm text-muted-foreground">
                           <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
                           Nota interna
                         </label>
@@ -482,7 +523,7 @@ export default function TicketDetailPage() {
                       </div>
 
                       {canReassign ? (
-                        <div className="rounded-xl border border-border bg-background/40 p-3">
+                        <div className="rounded-xl glass-surface p-3">
                           <div className="text-xs text-muted-foreground">Reasignar</div>
                           <div className="mt-2">
                             <Combobox
@@ -520,7 +561,7 @@ export default function TicketDetailPage() {
                     <MotionList className="space-y-2">
                       {approvals.map((a) => (
                         <MotionItem key={a.id} id={a.id}>
-                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-background/40 px-3 py-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl glass-surface px-3 py-2">
                             <div className="flex flex-wrap items-center gap-2">
                               <Badge variant="outline">Paso {a.step_order}</Badge>
                               <Badge variant="outline">{approvalKindLabel(a.kind)}</Badge>
@@ -541,7 +582,7 @@ export default function TicketDetailPage() {
                     </MotionList>
 
                     {pendingForMe ? (
-                      <div className="rounded-2xl border border-border bg-background/40 p-3">
+                      <div className="rounded-2xl glass-surface p-3">
                         <div className="text-sm font-medium">Tu decisión</div>
                         <div className="mt-1 text-xs text-muted-foreground">
                           Pendiente en paso {pendingForMe.step_order} ({approvalKindLabel(pendingForMe.kind)}).
@@ -610,7 +651,7 @@ export default function TicketDetailPage() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {serviceMeta ? (
-                      <div className="rounded-xl border border-border bg-background/40 p-3">
+                      <div className="rounded-xl glass-surface p-3">
                         <div className="text-xs text-muted-foreground">Servicio</div>
                         <div className="mt-1 text-sm font-medium">{typeof serviceMeta["service_name"] === "string" ? serviceMeta["service_name"] : "—"}</div>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -621,7 +662,7 @@ export default function TicketDetailPage() {
                     ) : null}
 
                     {metaContext ? (
-                      <div className="rounded-xl border border-border bg-background/40 p-3">
+                      <div className="rounded-xl glass-surface p-3">
                         <div className="text-xs text-muted-foreground">Contexto</div>
                         <div className="mt-2 grid gap-2 text-sm">
                           {Object.entries(metaContext)
@@ -638,7 +679,7 @@ export default function TicketDetailPage() {
                     ) : null}
 
                     {metaFields ? (
-                      <div className="rounded-xl border border-border bg-background/40 p-3">
+                      <div className="rounded-xl glass-surface p-3">
                         <div className="text-xs text-muted-foreground">Campos</div>
                         <div className="mt-2 grid gap-2 text-sm">
                           {Object.entries(metaFields)

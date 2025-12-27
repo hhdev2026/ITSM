@@ -21,6 +21,7 @@ import { MotionItem, MotionList } from "@/components/motion/MotionList";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { Users } from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 type Role = "user" | "agent" | "supervisor" | "admin";
 const Roles: Role[] = ["user", "agent", "supervisor", "admin"];
@@ -288,25 +289,24 @@ export function UserAdmin({ adminProfile }: { adminProfile: Profile }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="text-2xl font-semibold tracking-tight">Usuarios</div>
-          <div className="mt-1 text-sm text-muted-foreground">Crear, asignar roles/niveles y habilitar/deshabilitar cuentas.</div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => void load()} disabled={loading || !token}>
-            <RefreshCcw className="h-4 w-4" />
-            Actualizar
-          </Button>
+      <PageHeader
+        title="Usuarios"
+        description="Crear, asignar roles/niveles y habilitar/deshabilitar cuentas."
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => void load()} disabled={loading || !token}>
+              <RefreshCcw className="h-4 w-4" />
+              Actualizar
+            </Button>
 
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4" />
-                Nuevo usuario
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4" />
+                  Nuevo usuario
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
               <div className="space-y-4">
                 <div>
                   <div className="text-lg font-semibold">Crear usuario</div>
@@ -381,7 +381,7 @@ export function UserAdmin({ adminProfile }: { adminProfile: Profile }) {
                   </label>
                 </div>
 
-                <div className="rounded-2xl border border-border bg-background/40 p-3">
+                <div className="rounded-2xl glass-surface p-3">
                   <label className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={createInvite} onChange={(e) => setCreateInvite(e.target.checked)} />
                     <span className="text-muted-foreground">Enviar invitación por email (recomendado)</span>
@@ -403,10 +403,11 @@ export function UserAdmin({ adminProfile }: { adminProfile: Profile }) {
                   </Button>
                 </div>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        }
+      />
 
       {error ? <InlineAlert variant="error" description={error} /> : null}
 
@@ -601,7 +602,7 @@ export function UserAdmin({ adminProfile }: { adminProfile: Profile }) {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-border bg-background/40 p-4">
+                <div className="rounded-2xl glass-surface p-4">
                   <div className="text-sm font-semibold">Reset password</div>
                   <div className="mt-1 text-xs text-muted-foreground">Opcional. Define un password nuevo (mín. 8) y guarda.</div>
                   <div className="mt-3">

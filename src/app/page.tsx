@@ -98,7 +98,7 @@ export default function HomePage() {
               ].map((k) => {
                 const Icon = k.icon;
                 return (
-                  <div key={k.label} className="rounded-2xl border border-border bg-card/50 p-4">
+                  <div key={k.label} className="rounded-2xl glass-surface p-4">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <span className="grid h-8 w-8 place-items-center rounded-xl bg-[hsl(var(--brand-cyan))]/10 text-[hsl(var(--brand-cyan))]">
                         <Icon className="h-4 w-4" />
@@ -113,13 +113,13 @@ export default function HomePage() {
           </div>
 
           <div className="tech-border rounded-3xl p-[1px]">
-            <div className="relative overflow-hidden rounded-3xl bg-background/70 p-5 backdrop-blur">
+            <div className="relative overflow-hidden rounded-3xl glass-surface p-5">
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold">Vista ejecutiva</div>
                 <Badge variant="outline">Live</Badge>
               </div>
               <div className="mt-4 space-y-3">
-                <div className="rounded-2xl border border-border bg-background/40 p-4">
+                <div className="rounded-2xl glass-surface p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">VPN no conecta · Incidente</div>
@@ -145,7 +145,7 @@ export default function HomePage() {
                   ].map((x) => {
                     const Icon = x.icon;
                     return (
-                      <div key={x.title} className="rounded-2xl border border-border bg-background/40 p-4">
+                      <div key={x.title} className="rounded-2xl glass-surface p-4">
                         <div className="flex items-center gap-2 text-sm font-medium">
                           <Icon className="h-4 w-4 text-[hsl(var(--brand-cyan))]" />
                           {x.title}
@@ -226,7 +226,7 @@ export default function HomePage() {
                 { k: "Audit", v: "Decisiones y timestamps." },
                 { k: "Supabase", v: "Auth + DB + Storage." },
               ].map((x) => (
-                <div key={x.k} className="rounded-2xl border border-border bg-background/40 p-4">
+                <div key={x.k} className="rounded-2xl glass-surface p-4">
                   <div className="text-sm font-semibold">{x.k}</div>
                   <div className="mt-1 text-xs text-muted-foreground">{x.v}</div>
                 </div>
