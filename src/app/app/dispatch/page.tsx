@@ -245,10 +245,11 @@ export default function DispatchPage() {
   }, [filtered]);
 
   const columns = useMemo(() => {
-    const base = showClosed ? [...TicketStatuses] : TicketStatuses.filter((s) => s !== "Cerrado" && s !== "Cancelado");
-    if (status) return base.filter((s) => s === status);
-    return base;
-  }, [showClosed, status]);
+    // Always render official status columns for consistency across the app.
+    // The `showClosed` toggle controls whether closed/canceled tickets are included in the lists.
+    if (status) return TicketStatuses.filter((s) => s === status);
+    return [...TicketStatuses];
+  }, [status]);
 
   const byStatus = useMemo(() => {
     const map = new Map<string, TicketLiveRow[]>();
