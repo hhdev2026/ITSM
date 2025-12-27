@@ -11,6 +11,11 @@ import { useRouter } from "next/navigation";
 import { errorMessage } from "@/lib/error";
 import { isDemoMode } from "@/lib/demo";
 import { createSla as demoCreateSla, listSlas as demoListSlas, toggleSla as demoToggleSla } from "@/lib/demoStore";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 type Sla = {
   id: string;
@@ -111,35 +116,43 @@ export default function SlasPage() {
     if (profile) await load(profile);
   }
 
-  if (sessionLoading || profileLoading) return <div className="p-6 text-sm text-zinc-300">Cargando...</div>;
+  if (sessionLoading || profileLoading) return <div className="p-6 text-sm text-muted-foreground">Cargando…</div>;
   if (!session || !profile) return null;
 
   return (
     <AppShell profile={profile}>
       <div className="space-y-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-xl font-semibold">SLAs</div>
-            <div className="mt-1 text-sm text-zinc-400">Definición de tiempos de respuesta y resolución por prioridad.</div>
-          </div>
-          <Link href="/app" className="rounded-xl bg-white/5 px-3 py-2 text-sm text-white ring-1 ring-white/10 hover:bg-white/10">
-            Volver
-          </Link>
-        </div>
+        <PageHeader
+          title="SLAs"
+          description="Definición de tiempos de respuesta y resolución por prioridad."
+          actions={
+            <Button asChild variant="outline">
+              <Link href="/app">Volver</Link>
+            </Button>
+          }
+        />
 
-        {!canWrite && (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-300">
-            Solo <code className="text-zinc-100">supervisor</code> o <code className="text-zinc-100">admin</code> puede modificar SLAs.
-          </div>
-        )}
-
-        {canWrite && (
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-            <div className="text-sm font-medium">Nuevo SLA (por departamento)</div>
-            <div className="mt-3 grid gap-3 md:grid-cols-4">
+        {!canWrite ? (
+          <Card className="tech-border">
+            <CardHeader>
+              <CardTitle>Solo lectura</CardTitle>
+              <CardDescription>Solo supervisor/admin puede modificar SLAs.</CardDescription>
+            </CardHeader>
+          </Card>
+        ) : (
+          <Card className="tech-border tech-glow">
+            <CardHeader>
+              <CardTitle>Nuevo SLA</CardTitle>
+              <CardDescription>Configura tiempos para tu departamento (o usa global).</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-4">
               <label className="block">
-                <div className="text-xs text-zinc-400">Prioridad</div>
-                <select value={priority} onChange={(e) => setPriority(e.target.value as (typeof TicketPriorities)[number])} className="mt-1 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20">
+                <div className="text-xs text-muted-foreground">Prioridad</div>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as (typeof TicketPriorities)[number])}
+                  className="mt-1 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+                >
                   {TicketPriorities.map((p) => (
                     <option key={p} value={p}>
                       {p}
@@ -148,66 +161,69 @@ export default function SlasPage() {
                 </select>
               </label>
               <label className="block">
-                <div className="text-xs text-zinc-400">Respuesta (hrs)</div>
-                <input type="number" min={0} value={response} onChange={(e) => setResponse(Number(e.target.value))} className="mt-1 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20" />
+                <div className="text-xs text-muted-foreground">Respuesta (hrs)</div>
+                <Input type="number" min={0} value={response} onChange={(e) => setResponse(Number(e.target.value))} />
               </label>
               <label className="block">
-                <div className="text-xs text-zinc-400">Resolución (hrs)</div>
-                <input type="number" min={0} value={resolution} onChange={(e) => setResolution(Number(e.target.value))} className="mt-1 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20" />
+                <div className="text-xs text-muted-foreground">Resolución (hrs)</div>
+                <Input type="number" min={0} value={resolution} onChange={(e) => setResolution(Number(e.target.value))} />
               </label>
-              <label className="flex items-center gap-2 text-xs text-zinc-300 md:mt-6">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground md:mt-6">
                 <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
                 Activo
               </label>
-              {error && <div className="rounded-xl bg-rose-500/15 px-3 py-2 text-xs text-rose-200 ring-1 ring-rose-500/25 md:col-span-4">{error}</div>}
+              {error ? (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground md:col-span-4">{error}</div>
+              ) : null}
               <div className="md:col-span-4">
-                <button disabled={!canCreate || saving} onClick={() => void create(profile)} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50">
-                  {saving ? "Guardando..." : "Crear SLA"}
-                </button>
+                <Button disabled={!canCreate || saving} onClick={() => void create(profile)}>
+                  {saving ? "Guardando…" : "Crear SLA"}
+                </Button>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         )}
 
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-medium">Lista</div>
-            <button onClick={() => void load(profile)} className="rounded-xl bg-white/5 px-3 py-2 text-xs text-white ring-1 ring-white/10 hover:bg-white/10">
-              Actualizar
-            </button>
-          </div>
-          {loading ? (
-            <div className="mt-4 text-sm text-zinc-400">Cargando...</div>
-          ) : slas.length === 0 ? (
-            <div className="mt-4 text-sm text-zinc-400">No hay SLAs.</div>
-          ) : (
-            <div className="mt-4 divide-y divide-white/10">
-              {slas.map((s) => (
-                <div key={s.id} className="flex flex-col gap-2 py-3 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <div className="text-sm font-medium">
-                      {s.priority} {s.department_id ? "" : "(Global)"}
-                    </div>
-                    <div className="mt-1 text-xs text-zinc-400">
-                      Respuesta: {s.response_time_hours}h · Resolución: {s.resolution_time_hours}h
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-white/5 px-2 py-1 text-xs text-zinc-300 ring-1 ring-white/10">{s.is_active ? "Activo" : "Inactivo"}</span>
-                    {canWrite && (
-                      <button
-                        onClick={() => void toggleActive(s.id, !s.is_active)}
-                        className="rounded-xl bg-white/5 px-3 py-2 text-xs text-white ring-1 ring-white/10 hover:bg-white/10"
-                      >
-                        {s.is_active ? "Desactivar" : "Activar"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+        <Card className="tech-border">
+          <CardHeader className="flex-row items-center justify-between">
+            <div>
+              <CardTitle>Lista</CardTitle>
+              <CardDescription>SLAs globales y de departamento.</CardDescription>
             </div>
-          )}
-        </div>
+            <Button variant="outline" onClick={() => void load(profile)}>
+              Actualizar
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="text-sm text-muted-foreground">Cargando…</div>
+            ) : slas.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No hay SLAs.</div>
+            ) : (
+              <div className="divide-y divide-border">
+                {slas.map((s) => (
+                  <div key={s.id} className="flex flex-col gap-2 py-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                        <span>{s.priority}</span>
+                        <Badge variant="outline">{s.department_id ? "Depto" : "Global"}</Badge>
+                        <Badge variant="outline">{s.is_active ? "Activo" : "Inactivo"}</Badge>
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Respuesta: {s.response_time_hours}h · Resolución: {s.resolution_time_hours}h
+                      </div>
+                    </div>
+                    {canWrite ? (
+                      <Button variant="outline" onClick={() => void toggleActive(s.id, !s.is_active)}>
+                        {s.is_active ? "Desactivar" : "Activar"}
+                      </Button>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </AppShell>
   );

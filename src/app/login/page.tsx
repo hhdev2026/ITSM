@@ -7,6 +7,11 @@ import { Logo } from "@/components/Logo";
 import { errorMessage } from "@/lib/error";
 import { isDemoMode } from "@/lib/demo";
 import { getDemoProfile, setDemoRole } from "@/lib/demoAuth";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/cn";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -49,94 +54,82 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-zinc-950 text-zinc-50">
-      <div className="mx-auto flex max-w-md flex-col gap-6 px-6 py-16">
-        <Logo />
-        {isDemoMode() && (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-sm font-medium">Modo DEMO (sin Supabase)</div>
-            <div className="mt-2 text-xs text-zinc-400">Entra con un rol para probar la UI. Datos guardados en localStorage.</div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button onClick={() => (setDemoRole("user"), router.replace("/app"))} className="rounded-xl bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10 hover:bg-white/10">
-                User
-              </button>
-              <button onClick={() => (setDemoRole("agent"), router.replace("/app"))} className="rounded-xl bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10 hover:bg-white/10">
-                Agent
-              </button>
-              <button onClick={() => (setDemoRole("supervisor"), router.replace("/app"))} className="rounded-xl bg-white/5 px-3 py-2 text-sm ring-1 ring-white/10 hover:bg-white/10">
-                Supervisor
-              </button>
-              <button onClick={() => (setDemoRole("admin"), router.replace("/app"))} className="rounded-xl bg-white px-3 py-2 text-sm font-medium text-zinc-900">
-                Admin
-              </button>
-            </div>
-          </div>
-        )}
+    <div className="min-h-dvh tech-app-bg">
+      <div className="mx-auto flex max-w-md flex-col gap-6 px-6 py-14">
+        <div className="flex items-center justify-between">
+          <Logo />
+          <Badge variant="outline">Acceso</Badge>
+        </div>
 
         {isDemoMode() ? (
-          <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-6 text-sm text-zinc-300">
-            En DEMO no se usa email/contraseña. Selecciona un rol arriba para entrar.
-          </div>
+          <Card className="tech-border tech-glow">
+            <CardHeader>
+              <CardTitle>Modo DEMO</CardTitle>
+              <CardDescription>Selecciona un rol para probar la UI (sin Supabase).</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" onClick={() => (setDemoRole("user"), router.replace("/app"))}>
+                  Usuario
+                </Button>
+                <Button variant="outline" onClick={() => (setDemoRole("agent"), router.replace("/app"))}>
+                  Agente
+                </Button>
+                <Button variant="outline" onClick={() => (setDemoRole("supervisor"), router.replace("/app"))}>
+                  Supervisor
+                </Button>
+                <Button onClick={() => (setDemoRole("admin"), router.replace("/app"))}>Admin</Button>
+              </div>
+              <div className="text-xs text-muted-foreground">Datos guardados en localStorage.</div>
+            </CardContent>
+          </Card>
         ) : (
-        <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-6">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setMode("login")}
-              className={["flex-1 rounded-xl px-3 py-2 text-sm", mode === "login" ? "bg-white text-zinc-900" : "bg-white/5 text-white ring-1 ring-white/10 hover:bg-white/10"].join(" ")}
-            >
-              Ingresar
-            </button>
-            <button
-              onClick={() => setMode("signup")}
-              className={["flex-1 rounded-xl px-3 py-2 text-sm", mode === "signup" ? "bg-white text-zinc-900" : "bg-white/5 text-white ring-1 ring-white/10 hover:bg-white/10"].join(" ")}
-            >
-              Crear cuenta
-            </button>
-          </div>
+          <Card className="tech-border tech-glow">
+            <CardHeader>
+              <CardTitle>Iniciar sesión</CardTitle>
+              <CardDescription>Accede a tu mesa de servicios.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant={mode === "login" ? "default" : "outline"} onClick={() => setMode("login")}>
+                  Ingresar
+                </Button>
+                <Button variant={mode === "signup" ? "default" : "outline"} onClick={() => setMode("signup")}>
+                  Crear cuenta
+                </Button>
+              </div>
 
-          <div className="mt-5 space-y-3">
-            {mode === "signup" && (
-              <label className="block">
-                <div className="text-xs text-zinc-400">Nombre completo</div>
-                <input
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="mt-1 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20"
-                />
-              </label>
-            )}
-            <label className="block">
-              <div className="text-xs text-zinc-400">Email</div>
-              <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                type="email"
-                className="mt-1 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20"
-              />
-            </label>
-            <label className="block">
-              <div className="text-xs text-zinc-400">Contraseña</div>
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                className="mt-1 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20"
-              />
-              <div className="mt-1 text-xs text-zinc-500">Mínimo 6 caracteres.</div>
-            </label>
-            {error && <div className="rounded-xl bg-rose-500/15 px-3 py-2 text-xs text-rose-200 ring-1 ring-rose-500/25">{error}</div>}
-            <button
-              disabled={!canSubmit || busy}
-              onClick={submit}
-              className="w-full rounded-xl bg-white px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
-            >
-              {busy ? "Procesando..." : mode === "login" ? "Ingresar" : "Crear cuenta"}
-            </button>
-          </div>
-        </div>
+              <div className="grid gap-3">
+                {mode === "signup" ? (
+                  <label className="block">
+                    <div className="text-xs text-muted-foreground">Nombre completo</div>
+                    <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                  </label>
+                ) : null}
+                <label className="block">
+                  <div className="text-xs text-muted-foreground">Email</div>
+                  <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
+                </label>
+                <label className="block">
+                  <div className="text-xs text-muted-foreground">Contraseña</div>
+                  <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" />
+                  <div className="mt-1 text-xs text-muted-foreground">Mínimo 6 caracteres.</div>
+                </label>
+
+                {error ? (
+                  <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div>
+                ) : null}
+
+                <Button disabled={!canSubmit || busy} onClick={submit} className={cn("w-full", busy && "opacity-90")}>
+                  {busy ? "Procesando…" : mode === "login" ? "Ingresar" : "Crear cuenta"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
-        <div className="text-xs text-zinc-500">
-          Nota: el rol y el departamento se asignan en la tabla <code className="text-zinc-200">profiles</code> (admin).
+
+        <div className="text-xs text-muted-foreground">
+          Nota: rol y departamento se administran en <code className="text-foreground">profiles</code>.
         </div>
       </div>
     </div>

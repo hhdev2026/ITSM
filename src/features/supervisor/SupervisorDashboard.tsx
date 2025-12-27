@@ -7,6 +7,10 @@ import Link from "next/link";
 import { isDemoMode } from "@/lib/demo";
 import { listCategories as demoListCategories, computeKpis as demoComputeKpis } from "@/lib/demoStore";
 import { listDemoAgents } from "@/lib/demoAuth";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 type KpiData = {
   range: { start: string; end: string };
@@ -115,34 +119,36 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
-        <div>
-          <div className="text-xl font-semibold">Panel (Supervisor)</div>
-          <div className="mt-1 text-sm text-zinc-400">KPIs operativos con filtros por agente, categoría y periodo.</div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/app/slas"
-            className="rounded-xl bg-white/5 px-3 py-2 text-sm text-white ring-1 ring-white/10 hover:bg-white/10"
-          >
-            Configurar SLAs
-          </Link>
-          <Link
-            href="/app/kb"
-            className="rounded-xl bg-white/5 px-3 py-2 text-sm text-white ring-1 ring-white/10 hover:bg-white/10"
-          >
-            Base de conocimiento
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Panel (Supervisor)"
+        description="KPIs operativos con filtros por agente, categoría y periodo."
+        actions={
+          <>
+            <Button asChild variant="outline">
+              <Link href="/app/slas">SLAs</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/app/kb">Base de conocimiento</Link>
+            </Button>
+            <Button variant="outline" onClick={() => void loadKpis()}>
+              Actualizar
+            </Button>
+          </>
+        }
+      />
 
-      <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 md:grid-cols-3">
+      <Card className="tech-border">
+        <CardHeader>
+          <CardTitle>Filtros</CardTitle>
+          <CardDescription>Restringe KPIs por periodo, agente y categoría.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
         <label className="block">
-          <div className="text-xs text-zinc-400">Periodo</div>
+          <div className="text-xs text-muted-foreground">Periodo</div>
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value as (typeof Periods)[number]["value"])}
-            className="mt-1 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20"
+            className="mt-1 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
           >
             {Periods.map((p) => (
               <option key={p.value} value={p.value}>
@@ -152,11 +158,11 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
           </select>
         </label>
         <label className="block">
-          <div className="text-xs text-zinc-400">Agente</div>
+          <div className="text-xs text-muted-foreground">Agente</div>
           <select
             value={agentId}
             onChange={(e) => setAgentId(e.target.value)}
-            className="mt-1 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20"
+            className="mt-1 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
           >
             <option value="">Todos</option>
             {agents.map((a) => (
@@ -167,11 +173,11 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
           </select>
         </label>
         <label className="block">
-          <div className="text-xs text-zinc-400">Categoría</div>
+          <div className="text-xs text-muted-foreground">Categoría</div>
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
-            className="mt-1 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20"
+            className="mt-1 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
           >
             <option value="">Todas</option>
             {categories.map((c) => (
@@ -181,73 +187,108 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
             ))}
           </select>
         </label>
-      </div>
+        </CardContent>
+      </Card>
 
-      {error && <div className="rounded-xl bg-rose-500/15 px-3 py-2 text-xs text-rose-200 ring-1 ring-rose-500/25">{error}</div>}
+      {error ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div>
+      ) : null}
 
       {loading ? (
-        <div className="text-sm text-zinc-400">Cargando...</div>
+        <div className="text-sm text-muted-foreground">Cargando…</div>
       ) : !kpis ? (
-        <div className="text-sm text-zinc-400">No hay datos.</div>
+        <Card className="tech-border">
+          <CardHeader>
+            <CardTitle>Sin datos</CardTitle>
+            <CardDescription>No hay KPIs disponibles para este filtro.</CardDescription>
+          </CardHeader>
+        </Card>
       ) : (
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-5">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs text-zinc-400">Tickets (creados vs cerrados)</div>
-              <div className="mt-2 text-2xl font-semibold">
-                {kpis.volume.created} / {kpis.volume.closed}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs text-zinc-400">MTTR (hrs)</div>
-              <div className="mt-2 text-2xl font-semibold">{kpis.mttr_hours.toFixed(1)}</div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs text-zinc-400">Cumplimiento SLA</div>
-              <div className="mt-2 text-2xl font-semibold">
-                {kpis.sla_compliance_pct === null ? "n/a" : `${kpis.sla_compliance_pct}%`}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs text-zinc-400">FCR (aprox.)</div>
-              <div className="mt-2 text-2xl font-semibold">{kpis.fcr_pct === null ? "n/a" : `${kpis.fcr_pct}%`}</div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs text-zinc-400">Rango</div>
-              <div className="mt-2 text-xs text-zinc-300">
+            <Card className="tech-border">
+              <CardHeader className="gap-2">
+                <CardTitle>Tickets</CardTitle>
+                <CardDescription>Creados / cerrados</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-2xl font-semibold">
+                  {kpis.volume.created} / {kpis.volume.closed}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="tech-border">
+              <CardHeader className="gap-2">
+                <CardTitle>MTTR</CardTitle>
+                <CardDescription>Horas</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-2xl font-semibold">{kpis.mttr_hours.toFixed(1)}</div>
+              </CardContent>
+            </Card>
+            <Card className="tech-border">
+              <CardHeader className="gap-2">
+                <CardTitle>SLA</CardTitle>
+                <CardDescription>Cumplimiento</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-2xl font-semibold">{kpis.sla_compliance_pct === null ? "n/a" : `${kpis.sla_compliance_pct}%`}</div>
+              </CardContent>
+            </Card>
+            <Card className="tech-border">
+              <CardHeader className="gap-2">
+                <CardTitle>FCR</CardTitle>
+                <CardDescription>Aprox.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-2xl font-semibold">{kpis.fcr_pct === null ? "n/a" : `${kpis.fcr_pct}%`}</div>
+              </CardContent>
+            </Card>
+            <Card className="tech-border">
+              <CardHeader className="gap-2">
+                <CardTitle>Rango</CardTitle>
+                <CardDescription>Ventana</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0 text-xs text-muted-foreground">
                 {new Date(kpis.range.start).toLocaleString()} → {new Date(kpis.range.end).toLocaleString()}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="text-sm font-medium">Tickets pendientes (snapshot)</div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <Card className="tech-border">
+              <CardHeader>
+                <CardTitle>Pendientes</CardTitle>
+                <CardDescription>Snapshot por prioridad.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-2 text-sm">
                 {pendingRows.map((r) => (
-                  <div key={r.k} className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2 ring-1 ring-white/10">
-                    <div className="text-zinc-300">{r.k}</div>
+                  <div key={r.k} className="flex items-center justify-between rounded-xl border border-border bg-background/40 px-3 py-2">
+                    <div className="text-muted-foreground">{r.k}</div>
                     <div className="font-semibold">{r.v}</div>
                   </div>
                 ))}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="text-sm font-medium">Carga de trabajo (asignados abiertos)</div>
-              <div className="mt-3 space-y-2">
+            <Card className="tech-border">
+              <CardHeader>
+                <CardTitle>Carga de trabajo</CardTitle>
+                <CardDescription>Asignados abiertos (top 10).</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
                 {kpis.workload.length === 0 ? (
-                  <div className="text-sm text-zinc-400">Sin agentes.</div>
+                  <div className="text-sm text-muted-foreground">Sin agentes.</div>
                 ) : (
                   kpis.workload.slice(0, 10).map((w) => (
-                    <div key={w.agent_id} className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2 ring-1 ring-white/10">
-                      <div className="truncate text-sm text-zinc-300">{w.agent_name}</div>
-                      <div className="text-sm font-semibold">{w.open_assigned}</div>
+                    <div key={w.agent_id} className="flex items-center justify-between rounded-xl border border-border bg-background/40 px-3 py-2">
+                      <div className="truncate text-sm text-muted-foreground">{w.agent_name}</div>
+                      <Badge variant="outline">{w.open_assigned}</Badge>
                     </div>
                   ))
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       )}

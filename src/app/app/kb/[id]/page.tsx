@@ -9,6 +9,12 @@ import { useParams, useRouter } from "next/navigation";
 import { errorMessage } from "@/lib/error";
 import { isDemoMode } from "@/lib/demo";
 import { getArticle as demoGetArticle, updateArticle as demoUpdateArticle } from "@/lib/demoStore";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 
 type Article = {
   id: string;
@@ -102,66 +108,90 @@ export default function ArticlePage() {
     }
   }
 
-  if (sessionLoading || profileLoading) return <div className="p-6 text-sm text-zinc-300">Cargando...</div>;
+  if (sessionLoading || profileLoading) return <div className="p-6 text-sm text-muted-foreground">Cargando…</div>;
   if (!session || !profile) return null;
 
   return (
     <AppShell profile={profile}>
       <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-xs text-zinc-500">
-              <Link href="/app/kb" className="hover:text-zinc-300">
-                ← Volver a KB
-              </Link>
-            </div>
-            <div className="truncate text-xl font-semibold">{article?.title ?? "Artículo"}</div>
-            {article && <div className="mt-1 text-sm text-zinc-400">{article.is_published ? "Publicado" : "Borrador"}</div>}
-          </div>
-          <button onClick={() => void load()} className="rounded-xl bg-white/5 px-3 py-2 text-xs text-white ring-1 ring-white/10 hover:bg-white/10">
-            Actualizar
-          </button>
-        </div>
+        <PageHeader
+          title={article?.title ?? "Artículo"}
+          description={article ? (article.is_published ? "Publicado" : "Borrador") : "—"}
+          actions={
+            <>
+              <Button asChild variant="outline">
+                <Link href="/app/kb">Volver</Link>
+              </Button>
+              <Button variant="outline" onClick={() => void load()}>
+                Actualizar
+              </Button>
+            </>
+          }
+        />
 
-        {error && <div className="rounded-xl bg-rose-500/15 px-3 py-2 text-xs text-rose-200 ring-1 ring-rose-500/25">{error}</div>}
+        {error ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div>
+        ) : null}
         {loading ? (
-          <div className="text-sm text-zinc-400">Cargando...</div>
+          <div className="text-sm text-muted-foreground">Cargando…</div>
         ) : !article ? (
-          <div className="text-sm text-zinc-400">No existe o no tienes acceso.</div>
+          <Card className="tech-border">
+            <CardHeader>
+              <CardTitle>No disponible</CardTitle>
+              <CardDescription>No existe o no tienes acceso.</CardDescription>
+            </CardHeader>
+          </Card>
         ) : canEdit ? (
-          <div className="grid gap-3">
-            <label className="block">
-              <div className="text-xs text-zinc-400">Título</div>
-              <input
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                className="mt-1 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20"
-              />
-            </label>
-            <label className="block">
-              <div className="text-xs text-zinc-400">Contenido (Markdown)</div>
-              <textarea
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                className="mt-1 min-h-80 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20"
-              />
-            </label>
-            <label className="flex items-center gap-2 text-xs text-zinc-300">
-              <input type="checkbox" checked={editPublished} onChange={(e) => setEditPublished(e.target.checked)} />
-              Publicar
-            </label>
-            <button disabled={saving} onClick={() => void save()} className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50">
-              {saving ? "Guardando..." : "Guardar"}
-            </button>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-sm font-medium">Vista (texto)</div>
-              <div className="mt-2 whitespace-pre-wrap text-sm text-zinc-200">{editContent}</div>
-            </div>
+          <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+            <Card className="tech-border tech-glow">
+              <CardHeader>
+                <CardTitle>Edición</CardTitle>
+                <CardDescription>Markdown en texto plano.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                <label className="block">
+                  <div className="text-xs text-muted-foreground">Título</div>
+                  <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                </label>
+                <label className="block">
+                  <div className="text-xs text-muted-foreground">Contenido</div>
+                  <Textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} className="min-h-80" />
+                </label>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <input type="checkbox" checked={editPublished} onChange={(e) => setEditPublished(e.target.checked)} />
+                  Publicar
+                </label>
+                <div className="flex items-center justify-between gap-3">
+                  <Badge variant="outline">{editPublished ? "Publicado" : "Borrador"}</Badge>
+                  <Button disabled={saving} onClick={() => void save()}>
+                    {saving ? "Guardando…" : "Guardar"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="tech-border">
+              <CardHeader>
+                <CardTitle>Vista previa</CardTitle>
+                <CardDescription>Render simple (texto) para revisar rápido.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="whitespace-pre-wrap text-sm text-foreground/90">{editContent}</div>
+              </CardContent>
+            </Card>
           </div>
         ) : (
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-            <div className="whitespace-pre-wrap text-sm text-zinc-200">{article.content}</div>
-          </div>
+          <Card className="tech-border">
+            <CardHeader>
+              <CardTitle>Contenido</CardTitle>
+              <CardDescription>
+                <Badge variant="outline">{article.is_published ? "Publicado" : "Borrador"}</Badge>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="whitespace-pre-wrap text-sm text-foreground/90">{article.content}</div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </AppShell>

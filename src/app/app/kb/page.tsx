@@ -10,6 +10,12 @@ import { useRouter } from "next/navigation";
 import { errorMessage } from "@/lib/error";
 import { isDemoMode } from "@/lib/demo";
 import { createArticle as demoCreateArticle, listArticles as demoListArticles } from "@/lib/demoStore";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 
 type Article = {
   id: string;
@@ -108,86 +114,94 @@ export default function KnowledgeBasePage() {
     }
   }
 
-  if (sessionLoading || profileLoading) return <div className="p-6 text-sm text-zinc-300">Cargando...</div>;
+  if (sessionLoading || profileLoading) return <div className="p-6 text-sm text-muted-foreground">Cargando…</div>;
   if (!session || !profile) return null;
 
   return (
     <AppShell profile={profile}>
       <div className="space-y-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-xl font-semibold">Knowledge Base</div>
-            <div className="mt-1 text-sm text-zinc-400">Artículos de autoservicio (Markdown en texto plano).</div>
-          </div>
-          <Link href="/app" className="rounded-xl bg-white/5 px-3 py-2 text-sm text-white ring-1 ring-white/10 hover:bg-white/10">
-            Volver
-          </Link>
-        </div>
+        <PageHeader
+          title="Base de conocimiento"
+          description="Artículos de autoservicio (Markdown en texto plano)."
+          actions={
+            <Button asChild variant="outline">
+              <Link href="/app">Volver</Link>
+            </Button>
+          }
+        />
 
-        {canWrite && (
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-            <div className="text-sm font-medium">Nuevo artículo</div>
-            <div className="mt-3 grid gap-3">
+        {canWrite ? (
+          <Card className="tech-border tech-glow">
+            <CardHeader>
+              <CardTitle>Nuevo artículo</CardTitle>
+              <CardDescription>Publica guías y soluciones para reducir tickets.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
               <label className="block">
-                <div className="text-xs text-zinc-400">Título</div>
-                <input
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="mt-1 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20"
-                />
+                <div className="text-xs text-muted-foreground">Título</div>
+                <Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Ej: VPN: diagnóstico rápido" />
               </label>
               <label className="block">
-                <div className="text-xs text-zinc-400">Contenido (Markdown)</div>
-                <textarea
+                <div className="text-xs text-muted-foreground">Contenido (Markdown)</div>
+                <Textarea
                   value={newContent}
                   onChange={(e) => setNewContent(e.target.value)}
-                  className="mt-1 min-h-40 w-full rounded-xl bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-white/20"
+                  className="min-h-44"
                   placeholder={"# Título\n\nPasos...\n- Item\n\n```bash\ncomando\n```"}
                 />
               </label>
-              <label className="flex items-center gap-2 text-xs text-zinc-300">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 <input type="checkbox" checked={newPublished} onChange={(e) => setNewPublished(e.target.checked)} />
                 Publicar
               </label>
-              {error && <div className="rounded-xl bg-rose-500/15 px-3 py-2 text-xs text-rose-200 ring-1 ring-rose-500/25">{error}</div>}
-              <button
-                disabled={!canCreate || creating}
-                onClick={() => void createArticle(profile)}
-                className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-50"
-              >
-                {creating ? "Creando..." : "Crear artículo"}
-              </button>
-            </div>
-          </div>
-        )}
+              {error ? (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div>
+              ) : null}
+              <Button disabled={!canCreate || creating} onClick={() => void createArticle(profile)}>
+                {creating ? "Creando…" : "Crear"}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
 
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-medium">Artículos</div>
-            <button onClick={() => void load(profile)} className="rounded-xl bg-white/5 px-3 py-2 text-xs text-white ring-1 ring-white/10 hover:bg-white/10">
-              Actualizar
-            </button>
-          </div>
-          {loading ? (
-            <div className="mt-4 text-sm text-zinc-400">Cargando...</div>
-          ) : articles.length === 0 ? (
-            <div className="mt-4 text-sm text-zinc-400">No hay artículos.</div>
-          ) : (
-            <div className="mt-4 divide-y divide-white/10">
-              {articles.map((a) => (
-                <Link key={a.id} href={`/app/kb/${a.id}`} className="block py-3 hover:bg-white/5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">{a.title}</div>
-                      <div className="mt-1 text-xs text-zinc-400">{a.is_published ? "Publicado" : "Borrador"}</div>
-                    </div>
-                    <div className="text-xs text-zinc-500">{new Date(a.updated_at).toLocaleString()}</div>
-                  </div>
-                </Link>
-              ))}
+        <Card className="tech-border">
+          <CardHeader className="flex-row items-center justify-between">
+            <div>
+              <CardTitle>Artículos</CardTitle>
+              <CardDescription>Lista y estado de publicación.</CardDescription>
             </div>
-          )}
-        </div>
+            <Button variant="outline" onClick={() => void load(profile)}>
+              Actualizar
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {error ? (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div>
+            ) : null}
+            {loading ? (
+              <div className="text-sm text-muted-foreground">Cargando…</div>
+            ) : articles.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">No hay artículos.</div>
+            ) : (
+              <div className="divide-y divide-border">
+                {articles.map((a) => (
+                  <Link key={a.id} href={`/app/kb/${a.id}`} className="block rounded-lg py-3 transition-colors hover:bg-accent/40">
+                    <div className="flex items-center justify-between gap-3 px-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium">{a.title}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <Badge variant="outline">{a.is_published ? "Publicado" : "Borrador"}</Badge>
+                          <span>{new Date(a.updated_at).toLocaleString()}</span>
+                        </div>
+                      </div>
+                      <span className="text-xs text-muted-foreground">Abrir</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </AppShell>
   );

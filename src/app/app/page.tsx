@@ -18,18 +18,18 @@ export default function AppPage() {
   }, [sessionLoading, session, router]);
 
   if (sessionLoading || profileLoading) {
-    return <div className="p-6 text-sm text-zinc-300">Cargando...</div>;
+    return <div className="p-6 text-sm text-muted-foreground">Cargando…</div>;
   }
 
   if (!session) return null;
 
   if (error) {
-    return <div className="p-6 text-sm text-rose-200">No se pudo cargar el perfil: {error}</div>;
+    return <div className="p-6 text-sm text-destructive-foreground">No se pudo cargar el perfil: {error}</div>;
   }
 
   if (!profile) {
     return (
-      <div className="p-6 text-sm text-zinc-300">
+      <div className="p-6 text-sm text-muted-foreground">
         Perfil no disponible todavía. Si acabas de registrarte, espera unos segundos y recarga.
       </div>
     );
@@ -38,11 +38,13 @@ export default function AppPage() {
   if (!profile.department_id && profile.role !== "admin") {
     return (
       <AppShell profile={profile}>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <div className="text-lg font-semibold">Falta asignar departamento</div>
-          <div className="mt-2 text-sm text-zinc-300">
-            Tu usuario no tiene <code className="text-zinc-100">department_id</code>. Un admin debe asignarlo en la tabla{" "}
-            <code className="text-zinc-100">profiles</code>.
+        <div className="tech-border rounded-2xl p-[1px]">
+          <div className="glass-surface rounded-2xl p-6">
+            <div className="text-lg font-semibold">Falta asignar departamento</div>
+            <div className="mt-2 text-sm text-muted-foreground">
+              Tu usuario no tiene <code className="text-foreground">department_id</code>. Un admin debe asignarlo en la tabla{" "}
+              <code className="text-foreground">profiles</code>.
+            </div>
           </div>
         </div>
       </AppShell>
