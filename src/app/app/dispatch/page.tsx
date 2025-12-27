@@ -323,7 +323,7 @@ export default function DispatchPage() {
   }
 
   return (
-    <AppShell profile={profile}>
+    <AppShell profile={profile} wide>
       <div className="space-y-5">
         <PageHeader
           kicker={
@@ -448,9 +448,9 @@ export default function DispatchPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex gap-3 overflow-x-auto pb-2">
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="w-[360px] shrink-0 rounded-xl border border-border bg-background/20 p-3">
+                  <div key={i} className="min-w-0 rounded-xl border border-border bg-background/20 p-2">
                     <div className="flex items-center justify-between">
                       <Skeleton className="h-4 w-28" />
                       <Skeleton className="h-5 w-10 rounded-full" />
@@ -463,18 +463,19 @@ export default function DispatchPage() {
                 ))}
               </div>
             ) : (
-              <div className="flex gap-3 overflow-x-auto pb-2">
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
                 {lanes.map(([k, list]) => (
-                  <div key={k} className="w-[360px] shrink-0 rounded-xl border border-border bg-background/20 p-3">
+                  <div key={k} className="min-w-0 rounded-xl border border-border bg-background/20 p-2">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm font-semibold">{laneLabel(k)}</div>
+                      <div className="text-xs font-semibold">{laneLabel(k)}</div>
                       <Badge variant="outline">{list.length}</Badge>
                     </div>
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-2 space-y-2">
                       {list.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">Sin tickets</div>
+                        <div className="rounded-xl border border-dashed border-border p-4 text-xs text-muted-foreground">Sin tickets</div>
                       ) : (
-                        list.map((t) => {
+                        <div className="space-y-2">
+                          {list.map((t) => {
                           const tracking = formatTicketNumber(t.ticket_number) ?? t.id.slice(0, 8).toUpperCase();
                           const who = t.assignee_id ? profById.get(t.assignee_id) ?? null : null;
 
@@ -514,14 +515,14 @@ export default function DispatchPage() {
                                 : "border-border";
 
                           return (
-                            <div key={t.id} className={cn("rounded-xl border bg-background/30 p-3 hover:bg-accent/20", cardTone)}>
+                            <div key={t.id} className={cn("rounded-xl border bg-background/30 p-2 hover:bg-accent/20", cardTone)}>
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
-                                  <Link href={`/app/tickets/${t.id}`} className="block truncate text-sm font-medium hover:underline">
+                                  <Link href={`/app/tickets/${t.id}`} className="block truncate text-[13px] font-medium hover:underline">
                                     {t.title}
                                   </Link>
-                                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                                    <Badge variant="outline" className="font-mono text-[11px]">
+                                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                    <Badge variant="outline" className="font-mono text-[10px]">
                                       {tracking}
                                     </Badge>
                                     <TicketTypeBadge type={t.type} />
@@ -531,28 +532,28 @@ export default function DispatchPage() {
                                 </div>
                               </div>
 
-                              <div className="mt-2 flex flex-wrap items-center gap-2">
-                                <Badge variant="outline" className={cn("text-[11px]", slaBadgeFromTrafficLight(t.sla_traffic_light))}>
+                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                <Badge variant="outline" className={cn("text-[10px]", slaBadgeFromTrafficLight(t.sla_traffic_light))}>
                                   SLA: {slaLabel}
                                 </Badge>
-                                <Badge variant="outline" className={cn("text-[11px]", slaBadgeFromTrafficLight(t.response_traffic_light))}>
+                                <Badge variant="outline" className={cn("text-[10px]", slaBadgeFromTrafficLight(t.response_traffic_light))}>
                                   Resp: {respLabel}
                                 </Badge>
                               </div>
 
-                              <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                                <div>
+                              <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                                <div className="space-y-0.5">
                                   {typeof t.sla_remaining_minutes === "number" ? <div>SLA: {Math.max(0, Math.round(t.sla_remaining_minutes))}m</div> : null}
                                   {typeof t.response_remaining_minutes === "number" ? <div>Resp: {Math.max(0, Math.round(t.response_remaining_minutes))}m</div> : null}
                                 </div>
-                                <div className="text-right">
+                                <div className="space-y-0.5 text-right">
                                   {slaUse ? <div>Consumo SLA: {slaUse}</div> : null}
                                   {respUse ? <div>Consumo Resp: {respUse}</div> : null}
                                 </div>
                               </div>
 
                               <div className="mt-3 grid gap-2">
-                                <div className="text-[11px] text-muted-foreground">Asignado</div>
+                                <div className="text-[10px] text-muted-foreground">Asignado</div>
                                 <Combobox
                                   value={t.assignee_id ?? "__unassigned__"}
                                   onValueChange={(v) => {
@@ -572,7 +573,8 @@ export default function DispatchPage() {
                               </div>
                             </div>
                           );
-                        })
+                          })}
+                        </div>
                       )}
                     </div>
                   </div>

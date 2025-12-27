@@ -75,7 +75,7 @@ function NavItem({
   );
 }
 
-export function AppShell({ profile, children }: { profile: Profile; children: React.ReactNode }) {
+export function AppShell({ profile, children, wide }: { profile: Profile; children: React.ReactNode; wide?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
@@ -162,7 +162,12 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
   return (
     <TooltipProvider>
       <div className="min-h-dvh bg-background tech-app-bg">
-        <div className="mx-auto grid min-h-dvh max-w-7xl grid-cols-1 md:grid-cols-[auto_1fr]">
+        <div
+          className={cn(
+            "mx-auto grid min-h-dvh w-full grid-cols-1 md:grid-cols-[auto_1fr]",
+            wide ? "max-w-none" : "max-w-7xl"
+          )}
+        >
           <motion.aside
             initial={false}
             animate={{ width: collapsed ? 84 : 300 }}
