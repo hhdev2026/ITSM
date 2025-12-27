@@ -117,7 +117,7 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
     <div className="space-y-6">
       <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
         <div>
-          <div className="text-xl font-semibold">Analytics (Supervisor)</div>
+          <div className="text-xl font-semibold">Panel (Supervisor)</div>
           <div className="mt-1 text-sm text-zinc-400">KPIs operativos con filtros por agente, categoría y periodo.</div>
         </div>
         <div className="flex items-center gap-2">
@@ -131,7 +131,7 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
             href="/app/kb"
             className="rounded-xl bg-white/5 px-3 py-2 text-sm text-white ring-1 ring-white/10 hover:bg-white/10"
           >
-            Knowledge Base
+            Base de conocimiento
           </Link>
         </div>
       </div>

@@ -129,8 +129,8 @@ export function createAppCommandPaletteItems({
     },
     {
       id: "nav-kb",
-      title: "Knowledge Base",
-      subtitle: "Autoservicio / artículos",
+      title: "Base de conocimiento",
+      subtitle: "Autoservicio · artículos",
       keywords: "kb autoservicio articulos",
       onSelect: () => onNavigate("/app/kb"),
     },

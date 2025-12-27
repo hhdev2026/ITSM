@@ -147,8 +147,8 @@ export function AgentKanban({ profile }: { profile: Profile }) {
     <div className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="text-2xl font-semibold tracking-tight">Kanban</div>
-          <div className="mt-1 text-sm text-muted-foreground">Arrastra tickets entre estados y prioriza por SLA.</div>
+          <div className="text-2xl font-semibold tracking-tight">Bandeja operativa</div>
+          <div className="mt-1 text-sm text-muted-foreground">Gestiona casos por estado y prioriza por SLA.</div>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

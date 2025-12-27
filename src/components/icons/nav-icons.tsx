@@ -36,7 +36,7 @@ export function IconTickets(props: Props) {
 
 export function IconKanban(props: Props) {
   return (
-    <Svg title="Kanban" {...props}>
+    <Svg title="Bandeja" {...props}>
       <path d="M5 6.5h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2Z" />
       <path d="M8 9v8" />
       <path d="M12 9v6" />
@@ -48,7 +48,7 @@ export function IconKanban(props: Props) {
 
 export function IconKb(props: Props) {
   return (
-    <Svg title="Knowledge Base" {...props}>
+    <Svg title="Base de conocimiento" {...props}>
       <path d="M5.5 5.5h6.5a2 2 0 0 1 2 2V19a2 2 0 0 0-2-2H5.5a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1Z" />
       <path d="M18.5 5.5H12a2 2 0 0 0-2 2V19a2 2 0 0 1 2-2h6.5a1 1 0 0 0 1-1V6.5a1 1 0 0 0-1-1Z" />
       <path d="M8 9h3" />
@@ -59,7 +59,7 @@ export function IconKb(props: Props) {
 
 export function IconAnalytics(props: Props) {
   return (
-    <Svg title="Analytics" {...props}>
+    <Svg title="Panel" {...props}>
       <path d="M5 19V6.5a1.5 1.5 0 0 1 1.5-1.5H19" />
       <path d="M7.5 16l3.5-4 3 2 4-6" />
       <path d="M18 8v2h-2" />
