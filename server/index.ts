@@ -140,7 +140,6 @@ app.post("/api/assets/heartbeat", requireAuthOrAssetsSecret, async (req, res) =>
 
     const client = isSecret ? supabaseAdmin! : (req as AuthedRequest).supabase;
     const deptId = isSecret ? null : (req as AuthedRequest).auth.departmentId;
-    const deptFilter = deptId ? (q: any) => q.eq("department_id", deptId) : (q: any) => q;
 
     let assetQuery = client.from("assets").select("id,asset_tag,department_id").limit(2);
     if (findByTag) {
@@ -150,7 +149,7 @@ app.post("/api/assets/heartbeat", requireAuthOrAssetsSecret, async (req, res) =>
     } else {
       assetQuery = assetQuery.eq("serial_number", String(serialRaw).trim());
     }
-    assetQuery = deptFilter(assetQuery);
+    if (deptId) assetQuery = assetQuery.eq("department_id", deptId);
 
     const { data: found, error: fErr } = await assetQuery;
     if (fErr) throw fErr;
