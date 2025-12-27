@@ -107,40 +107,8 @@ app.get("/api/tickets/export.csv", requireAuth, requireRole(["supervisor", "admi
 
     let q = authed.supabase
       .from("tickets_sla_live")
-      .select(
-        [
-          "id",
-          "ticket_number",
-          "department_id",
-          "type",
-          "title",
-          "status",
-          "priority",
-          "metadata",
-          "category_id",
-          "subcategory_id",
-          "requester_id",
-          "assignee_id",
-          "created_at",
-          "updated_at",
-          "first_response_at",
-          "resolved_at",
-          "closed_at",
-          "solution_type",
-          "solution_notes",
-          "response_deadline",
-          "sla_deadline",
-          "sla_remaining_minutes",
-          "sla_pct_used",
-          "sla_traffic_light",
-          "sla_excluded",
-          "sla_exclusion_reason",
-          "planned_at",
-          "planned_for_at",
-          "canceled_at",
-          "canceled_reason",
-        ].join(",")
-      )
+      // Use `*` so exports don't break on DBs that haven't applied optional columns yet (e.g. `ticket_number`).
+      .select("*")
       .eq("department_id", deptId)
       .order("created_at", { ascending: false })
       .limit(5000);

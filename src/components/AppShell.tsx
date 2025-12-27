@@ -193,18 +193,20 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
               </div>
             </div>
 
-            <div className="mt-4">
-              <Button onClick={onCreate} className={cn("w-full justify-start", collapsed && "justify-center")}>
-                <Plus className="h-4 w-4" />
-                <AnimatePresence initial={false}>
-                  {!collapsed && (
-                    <motion.span initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }}>
-                      {createLabel}
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </Button>
-            </div>
+            {profile.role !== "user" ? (
+              <div className="mt-4">
+                <Button onClick={onCreate} className={cn("w-full justify-start", collapsed && "justify-center")}>
+                  <Plus className="h-4 w-4" />
+                  <AnimatePresence initial={false}>
+                    {!collapsed && (
+                      <motion.span initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }}>
+                        {createLabel}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </Button>
+              </div>
+            ) : null}
 
             <div className={cn("mt-4 rounded-2xl glass-surface", collapsed ? "p-2" : "p-3")}>
               <div className={cn("flex items-center gap-3", collapsed ? "justify-center" : "justify-between")}>
@@ -310,10 +312,12 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
                 </Button>
 
                 <div className="flex items-center gap-2">
-                  <Button className="hidden md:inline-flex" onClick={onCreate}>
-                    <Plus className="h-4 w-4" />
-                    {profile.role === "user" ? "Crear" : "Nuevo"}
-                  </Button>
+                  {profile.role !== "user" ? (
+                    <Button className="hidden md:inline-flex" onClick={onCreate}>
+                      <Plus className="h-4 w-4" />
+                      Nuevo
+                    </Button>
+                  ) : null}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="hidden max-w-[220px] justify-start md:inline-flex">

@@ -127,9 +127,8 @@ export default function TicketDetailPage() {
     setError(null);
     const { data: t, error: tErr } = await supabase
       .from("tickets_sla_live")
-      .select(
-        "id,ticket_number,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,response_deadline,sla_deadline,ola_response_deadline,ola_deadline,solution_type,solution_notes,sla_excluded,sla_exclusion_reason,planned_at,planned_for_at,canceled_at,canceled_reason,sla_remaining_minutes,sla_traffic_light,sla_pct_used,response_remaining_minutes,response_traffic_light,response_pct_used,first_response_at,resolved_at,closed_at"
-      )
+      // Use `*` to stay backward-compatible with DBs missing newer columns (e.g. `ticket_number`).
+      .select("*")
       .eq("id", ticketId)
       .single();
     if (tErr) setError(tErr.message);

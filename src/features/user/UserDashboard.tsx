@@ -31,9 +31,8 @@ export function UserDashboard({ profile }: { profile: Profile }) {
 
     const { data, error } = await supabase
       .from("tickets")
-      .select(
-        "id,ticket_number,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,sla_deadline,first_response_at,resolved_at,closed_at"
-      )
+      // Use `*` to stay backward-compatible with DBs that haven't applied the `ticket_number` migration yet.
+      .select("*")
       .eq("requester_id", profile.id)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -61,11 +60,6 @@ export function UserDashboard({ profile }: { profile: Profile }) {
       <PageHeader
         title="Mis tickets"
         description="Crea solicitudes desde el catálogo y da seguimiento al estado."
-        actions={
-          <Button asChild>
-            <Link href="/app/catalog">Crear ticket</Link>
-          </Button>
-        }
       />
 
       <Card className="tech-border tech-glow">
