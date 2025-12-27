@@ -1,18 +1,13 @@
 export const TicketStatuses = [
-  "Pendiente Aprobación",
-  "Nuevo",
-  "Asignado",
-  "En Progreso",
-  "Pendiente Info",
-  "Planificado",
-  "Resuelto",
-  "Cerrado",
-  "Rechazado",
+  "En Curso",
+  "Planificado o Coordinado",
+  "En Espera",
   "Cancelado",
+  "Cerrado",
 ] as const;
 export type TicketStatus = (typeof TicketStatuses)[number];
 
-export const KanbanStatuses = ["Nuevo", "Asignado", "En Progreso", "Pendiente Info", "Planificado", "Resuelto"] as const;
+export const KanbanStatuses = ["En Espera", "En Curso", "Planificado o Coordinado"] as const;
 export type KanbanStatus = (typeof KanbanStatuses)[number];
 
 export const TicketPriorities = ["Crítica", "Alta", "Media", "Baja"] as const;

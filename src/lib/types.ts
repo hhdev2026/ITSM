@@ -30,6 +30,8 @@ export type Ticket = {
   sla_deadline: string | null;
   ola_response_deadline: string | null;
   ola_deadline: string | null;
+  solution_type?: "Instrucción al usuario" | "Soporte Remoto" | "Soporte Terreno" | "Implementación" | null;
+  solution_notes?: string | null;
   sla_excluded?: boolean;
   sla_exclusion_reason?: string | null;
   sla_excluded_by?: string | null;

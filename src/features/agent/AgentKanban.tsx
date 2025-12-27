@@ -55,7 +55,7 @@ export function AgentKanban({ profile }: { profile: Profile }) {
         "id,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,sla_deadline,sla_remaining_minutes,sla_traffic_light,sla_pct_used,first_response_at,resolved_at,closed_at"
       )
       .eq("department_id", profile.department_id!)
-      .in("status", ["Nuevo", "Asignado", "En Progreso", "Pendiente Info", "Planificado", "Resuelto"])
+      .in("status", ["En Espera", "En Curso", "Planificado o Coordinado"])
       .order("created_at", { ascending: false })
       .limit(200);
     if (onlyMine) q.eq("assignee_id", profile.id);
@@ -89,8 +89,8 @@ export function AgentKanban({ profile }: { profile: Profile }) {
 
   async function assignToMe(ticketId: string) {
     const prev = tickets;
-    setTickets((cur) => cur.map((t) => (t.id === ticketId ? { ...t, assignee_id: profile.id, status: "Asignado" } : t)));
-    const { error } = await supabase.from("tickets").update({ assignee_id: profile.id, status: "Asignado" }).eq("id", ticketId);
+    setTickets((cur) => cur.map((t) => (t.id === ticketId ? { ...t, assignee_id: profile.id, status: "En Curso" } : t)));
+    const { error } = await supabase.from("tickets").update({ assignee_id: profile.id, status: "En Curso" }).eq("id", ticketId);
     if (error) {
       setTickets(prev);
       toast.error("No se pudo asignar el ticket", { description: error.message });

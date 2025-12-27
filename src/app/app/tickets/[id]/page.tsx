@@ -109,6 +109,8 @@ export default function TicketDetailPage() {
   const [approvalComment, setApprovalComment] = useState("");
   const [approvalsActing, setApprovalsActing] = useState<null | "approve" | "reject">(null);
   const [events, setEvents] = useState<TicketEvent[]>([]);
+  const [solutionType, setSolutionType] = useState<Ticket["solution_type"]>(null);
+  const [solutionNotes, setSolutionNotes] = useState<string>("");
 
   const canModerate = profile?.role === "agent" || profile?.role === "supervisor" || profile?.role === "admin";
   const canReassign = profile?.role === "supervisor" || profile?.role === "admin";
@@ -125,7 +127,7 @@ export default function TicketDetailPage() {
     const { data: t, error: tErr } = await supabase
       .from("tickets_sla_live")
       .select(
-        "id,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,response_deadline,sla_deadline,ola_response_deadline,ola_deadline,sla_excluded,sla_exclusion_reason,planned_at,planned_for_at,canceled_at,canceled_reason,sla_remaining_minutes,sla_traffic_light,sla_pct_used,response_remaining_minutes,response_traffic_light,response_pct_used,first_response_at,resolved_at,closed_at"
+        "id,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,response_deadline,sla_deadline,ola_response_deadline,ola_deadline,solution_type,solution_notes,sla_excluded,sla_exclusion_reason,planned_at,planned_for_at,canceled_at,canceled_reason,sla_remaining_minutes,sla_traffic_light,sla_pct_used,response_remaining_minutes,response_traffic_light,response_pct_used,first_response_at,resolved_at,closed_at"
       )
       .eq("id", ticketId)
       .single();
@@ -133,6 +135,8 @@ export default function TicketDetailPage() {
     const parsed = ((t ?? null) as unknown) as Ticket | null;
     setTicket(parsed);
     setAssigneeId(parsed?.assignee_id ?? "");
+    setSolutionType(parsed?.solution_type ?? null);
+    setSolutionNotes(String(parsed?.solution_notes ?? ""));
 
     if (parsed?.category_id) {
       const { data: cat } = await supabase.from("categories").select("id,name").eq("id", parsed.category_id).maybeSingle();
@@ -212,13 +216,11 @@ export default function TicketDetailPage() {
   const statusActions = useMemo(() => {
     if (!ticket) return [];
     return [
-      { label: "Asignado", value: "Asignado" },
-      { label: "En Progreso", value: "En Progreso" },
-      { label: "Pendiente Info", value: "Pendiente Info" },
-      { label: "Planificado", value: "Planificado" },
-      { label: "Resuelto", value: "Resuelto" },
-      { label: "Cerrado", value: "Cerrado" },
+      { label: "En Curso", value: "En Curso" },
+      { label: "En Espera", value: "En Espera" },
+      { label: "Planificado o Coordinado", value: "Planificado o Coordinado" },
       { label: "Cancelado", value: "Cancelado" },
+      { label: "Cerrado", value: "Cerrado" },
     ].filter((a) => TicketStatuses.includes(a.value as (typeof TicketStatuses)[number]));
   }, [ticket]);
 
@@ -250,13 +252,13 @@ export default function TicketDetailPage() {
 
   async function assignToMe() {
     if (!profile || !ticketId) return;
-    const { error } = await supabase.from("tickets").update({ assignee_id: profile.id, status: "Asignado" }).eq("id", ticketId);
+    const { error } = await supabase.from("tickets").update({ assignee_id: profile.id, status: "En Curso" }).eq("id", ticketId);
     if (error) toast.error("No se pudo asignar", { description: error.message });
   }
 
   async function reassign(id: string) {
     if (!ticketId) return;
-    const { error } = await supabase.from("tickets").update({ assignee_id: id || null, status: id ? "Asignado" : "Nuevo" }).eq("id", ticketId);
+    const { error } = await supabase.from("tickets").update({ assignee_id: id || null, status: "En Curso" }).eq("id", ticketId);
     if (error) toast.error("No se pudo reasignar", { description: error.message });
   }
 
@@ -264,6 +266,16 @@ export default function TicketDetailPage() {
     if (!ticketId) return;
     const { error } = await supabase.from("tickets").update({ status }).eq("id", ticketId);
     if (error) toast.error("No se pudo actualizar estado", { description: error.message });
+  }
+
+  async function saveSolution() {
+    if (!ticketId || !canModerate) return;
+    const { error } = await supabase
+      .from("tickets")
+      .update({ solution_type: solutionType, solution_notes: solutionNotes.trim() || null })
+      .eq("id", ticketId);
+    if (error) toast.error("No se pudo guardar solución", { description: error.message });
+    else toast.success("Solución guardada");
   }
 
   async function decideApproval(action: "approve" | "reject") {
@@ -580,7 +592,7 @@ export default function TicketDetailPage() {
                       value={body}
                       onChange={(e) => setBody(e.target.value)}
                       placeholder={
-                        ticket.status === "Pendiente Info"
+                        ticket.status === "En Espera"
                           ? "Provee la información solicitada…"
                           : isEndUser
                             ? "Escribe un mensaje para soporte…"
@@ -637,6 +649,31 @@ export default function TicketDetailPage() {
                             Asignarme
                           </Button>
                         ) : null}
+                      </div>
+
+                      <div className="rounded-xl glass-surface p-3">
+                        <div className="text-xs text-muted-foreground">Tipo de solución</div>
+                        <div className="mt-2 grid gap-2">
+                          <select
+                            value={solutionType ?? ""}
+                            onChange={(e) => setSolutionType((e.target.value || null) as Ticket["solution_type"])}
+                            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+                          >
+                            <option value="">(Seleccionar)</option>
+                            <option value="Instrucción al usuario">Instrucción al usuario</option>
+                            <option value="Soporte Remoto">Soporte Remoto</option>
+                            <option value="Soporte Terreno">Soporte Terreno</option>
+                            <option value="Implementación">Implementación</option>
+                          </select>
+                          <Input
+                            value={solutionNotes}
+                            onChange={(e) => setSolutionNotes(e.target.value)}
+                            placeholder="Detalle / observación (opcional)"
+                          />
+                          <Button variant="outline" onClick={() => void saveSolution()}>
+                            Guardar solución
+                          </Button>
+                        </div>
                       </div>
 
                       {canReassign ? (
@@ -740,6 +777,14 @@ export default function TicketDetailPage() {
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Asignado</span>
                     <span>{ticket.assignee_id ? ticket.assignee_id.slice(0, 8) : "—"}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Tipo de solución</span>
+                    <span>{ticket.solution_type ?? "—"}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Detalle solución</span>
+                    <span className="truncate">{ticket.solution_notes ? ticket.solution_notes : "—"}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">SLA</span>

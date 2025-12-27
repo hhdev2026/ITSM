@@ -91,6 +91,11 @@ function serviceIdFromMetadata(meta: unknown) {
   return typeof sid === "string" ? sid : null;
 }
 
+function getStringField(row: Record<string, unknown>, key: string) {
+  const v = row[key];
+  return typeof v === "string" ? v : "";
+}
+
 app.get("/api/tickets/export.csv", requireAuth, requireRole(["supervisor", "admin"]), async (req, res) => {
   try {
     const authed = req as AuthedRequest;
@@ -120,6 +125,8 @@ app.get("/api/tickets/export.csv", requireAuth, requireRole(["supervisor", "admi
           "first_response_at",
           "resolved_at",
           "closed_at",
+          "solution_type",
+          "solution_notes",
           "response_deadline",
           "sla_deadline",
           "sla_remaining_minutes",
@@ -219,6 +226,8 @@ app.get("/api/tickets/export.csv", requireAuth, requireRole(["supervisor", "admi
       "first_response_at",
       "resolved_at",
       "closed_at",
+      "solution_type",
+      "solution_notes",
       "response_deadline",
       "sla_deadline",
       "sla_traffic_light",
@@ -266,6 +275,8 @@ app.get("/api/tickets/export.csv", requireAuth, requireRole(["supervisor", "admi
         t.first_response_at,
         t.resolved_at,
         t.closed_at,
+        getStringField(t, "solution_type"),
+        getStringField(t, "solution_notes"),
         t.response_deadline,
         t.sla_deadline,
         t.sla_traffic_light,

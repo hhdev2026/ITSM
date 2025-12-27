@@ -36,7 +36,7 @@ async function pickLeastLoadedAgent(supabase: ReturnType<typeof createSupabaseAd
     .from("tickets")
     .select("assignee_id")
     .eq("department_id", departmentId)
-    .in("status", ["Nuevo", "Asignado", "En Progreso", "Pendiente Info", "Planificado"]);
+    .in("status", ["En Curso", "En Espera", "Planificado o Coordinado"]);
   if (openErr) throw openErr;
 
   const loadByAgent = new Map<string, number>();
@@ -59,10 +59,7 @@ async function runWorkflowAction(supabase: ReturnType<typeof createSupabaseAdmin
     if (ticket.assignee_id) return;
     const agentId = await pickLeastLoadedAgent(supabase, workflow.department_id);
     if (!agentId) return;
-    await supabase
-      .from("tickets")
-      .update({ assignee_id: agentId, status: ticket.status === "Nuevo" ? "Asignado" : ticket.status })
-      .eq("id", ticket.id as string);
+    await supabase.from("tickets").update({ assignee_id: agentId, status: "En Curso" }).eq("id", ticket.id as string);
     return;
   }
 

@@ -137,7 +137,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
   const isEndUser = profile.role === "user";
 
   const tierTitleFor = React.useCallback((service: ServiceCatalogItem) => {
-    const parts = [service.tier1, service.tier2, service.tier3, service.tier4].filter((p) => typeof p === "string" && p.trim().length > 0) as string[];
+    const parts = [service.tier2, service.tier3, service.tier4].filter((p) => typeof p === "string" && p.trim().length > 0) as string[];
     if (parts.length >= 2) return parts.join(" · ");
     const v = typeof service.user_name === "string" ? service.user_name.trim() : "";
     return v ? v : service.name;
@@ -432,7 +432,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
         metadata,
       });
       if (error) throw error;
-      toast.success(needsApproval ? "Ticket creado (Pendiente Aprobación)" : "Ticket creado");
+      toast.success(needsApproval ? "Ticket creado (En espera)" : "Ticket creado");
       setOpen(false);
     } catch (e: unknown) {
       const msg = errorMessage(e) ?? "No se pudo crear el ticket";
@@ -517,13 +517,13 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
           {isEndUser ? (
             <Card className="tech-border">
               <CardHeader>
-                <CardTitle>Selección guiada</CardTitle>
-                <CardDescription>Si prefieres, elige por niveles (Tipo de ticket → Tier 1…4).</CardDescription>
+                <CardTitle>Clasificación del ticket</CardTitle>
+                <CardDescription>Selecciona una ruta lógica para que el equipo técnico lo atienda y se mida correctamente.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="md:col-span-2 text-xs text-muted-foreground">
-                    Tu solicitud quedará clasificada con estos niveles para el equipo técnico y reportería.
+                    Esta clasificación se guarda automáticamente en el ticket para reportería y dashboards.
                   </div>
                   {(() => {
                     const catalog = services.filter((s) => Boolean(s.tier1 && s.tier2 && s.tier3 && s.tier4));
@@ -579,7 +579,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                           />
                         </label>
                         <label className="block">
-                          <div className="text-xs text-muted-foreground">Tier 1</div>
+                          <div className="text-xs text-muted-foreground">Categoría</div>
                           <Combobox
                             value={tier1}
                             onValueChange={(v) => {
@@ -594,7 +594,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                           />
                         </label>
                         <label className="block">
-                          <div className="text-xs text-muted-foreground">Tier 2</div>
+                          <div className="text-xs text-muted-foreground">Servicio</div>
                           <Combobox
                             value={tier2}
                             onValueChange={(v) => {
@@ -608,7 +608,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                           />
                         </label>
                         <label className="block">
-                          <div className="text-xs text-muted-foreground">Tier 3</div>
+                          <div className="text-xs text-muted-foreground">Detalle</div>
                           <Combobox
                             value={tier3}
                             onValueChange={(v) => {
@@ -621,7 +621,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                           />
                         </label>
                         <label className="block">
-                          <div className="text-xs text-muted-foreground">Tier 4</div>
+                          <div className="text-xs text-muted-foreground">Motivo</div>
                           <Combobox
                             value={tier4}
                             onValueChange={(v) => setTier4(v)}
@@ -637,7 +637,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                                 Seleccionado: <span className="text-foreground">{tierPathLabelFor(leaf)}</span>
                               </>
                             ) : (
-                              "Completa los 4 niveles para continuar."
+                              "Completa la clasificación para continuar."
                             )}
                           </div>
                           <Button disabled={!leaf} onClick={() => leaf && openService(leaf)}>
@@ -740,6 +740,12 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                     <Badge variant="outline">Prioridad: {priority}</Badge>
                     {!isEndUser && userNameFor(selectedService) ? <Badge variant="outline">Vista usuario: {userNameFor(selectedService)}</Badge> : null}
                   </div>
+                  {isEndUser && selectedService.tier1 && selectedService.tier2 && selectedService.tier3 && selectedService.tier4 ? (
+                    <div className="mt-3 rounded-2xl glass-surface px-3 py-2 text-sm">
+                      <div className="text-xs text-muted-foreground">Clasificación</div>
+                      <div className="mt-1">{tierPathLabelFor(selectedService)}</div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="tech-border rounded-2xl p-[1px]">

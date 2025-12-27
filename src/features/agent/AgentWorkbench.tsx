@@ -23,6 +23,7 @@ import { TicketPriorityBadge, TicketStatusBadge, TicketTypeBadge } from "@/compo
 import {
   ArrowDownUp,
   CheckCircle2,
+  CalendarClock,
   Clock,
   Filter,
   Grid2X2,
@@ -37,7 +38,7 @@ import {
 
 type Scope = "mine" | "team";
 type ViewMode = "grid" | "list";
-type Focus = "all" | "waiting" | "inProgress" | "pendingInfo" | "resolved" | "unassigned";
+type Focus = "all" | "waiting" | "inProgress" | "planned" | "unassigned";
 type Sort = "sla" | "priority" | "recent";
 type ActionTab = "approvals" | "tasks" | "participations";
 
@@ -150,10 +151,9 @@ function comparePriority(a: TicketPriority, b: TicketPriority) {
 
 function inferFocusCount(focus: Focus, tickets: Ticket[], meId: string) {
   if (focus === "unassigned") return tickets.filter((t) => !t.assignee_id).length;
-  if (focus === "waiting") return tickets.filter((t) => t.assignee_id === meId && (t.status === "Nuevo" || t.status === "Asignado")).length;
-  if (focus === "inProgress") return tickets.filter((t) => t.assignee_id === meId && t.status === "En Progreso").length;
-  if (focus === "pendingInfo") return tickets.filter((t) => t.assignee_id === meId && t.status === "Pendiente Info").length;
-  if (focus === "resolved") return tickets.filter((t) => t.assignee_id === meId && t.status === "Resuelto").length;
+  if (focus === "waiting") return tickets.filter((t) => t.assignee_id === meId && t.status === "En Espera").length;
+  if (focus === "inProgress") return tickets.filter((t) => t.assignee_id === meId && t.status === "En Curso").length;
+  if (focus === "planned") return tickets.filter((t) => t.assignee_id === meId && t.status === "Planificado o Coordinado").length;
   return tickets.length;
 }
 
@@ -313,7 +313,7 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
             if (!t?.id) continue;
             if (seen.has(t.id)) continue;
             seen.add(t.id);
-            if (t.status === "Cerrado" || t.status === "Rechazado" || t.status === "Cancelado") continue;
+            if (t.status === "Cerrado" || t.status === "Cancelado") continue;
             list.push({ ticket: t, last_at: row.created_at });
             if (list.length >= 12) break;
           }
@@ -337,7 +337,7 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
         "id,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,response_deadline,sla_deadline,ola_response_deadline,ola_deadline,sla_remaining_minutes,sla_traffic_light,sla_pct_used,first_response_at,resolved_at,closed_at"
       )
       .eq("department_id", profile.department_id!)
-      .in("status", ["Nuevo", "Asignado", "En Progreso", "Pendiente Info", "Planificado", "Resuelto"])
+      .in("status", ["En Espera", "En Curso", "Planificado o Coordinado"])
       .order("created_at", { ascending: false })
       .limit(250);
     if (scope === "mine") q.eq("assignee_id", profile.id);
@@ -445,10 +445,9 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
       icon: React.ComponentType<{ className?: string }>;
       show: boolean;
     }> = [
-      { id: "waiting", label: "Por atender", description: "Nuevo / asignado a ti", icon: Inbox, show: scope === "mine" },
+      { id: "waiting", label: "En espera", description: "Esperando respuesta/tercero", icon: Clock, show: true },
       { id: "inProgress", label: "En curso", description: "Trabajo activo", icon: PlayCircle, show: true },
-      { id: "pendingInfo", label: "Pendiente", description: "Esperando respuesta", icon: Clock, show: true },
-      { id: "resolved", label: "Resueltos", description: "Listos para cerrar", icon: CheckCircle2, show: true },
+      { id: "planned", label: "Planificado", description: "Coordinado con usuario", icon: CalendarClock, show: true },
       { id: "unassigned", label: "Sin asignar", description: "Cola del equipo", icon: Users2, show: scope === "team" },
       { id: "all", label: "Todo", description: "Vista general", icon: ArrowDownUp, show: scope === "team" },
     ];
@@ -464,10 +463,9 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
     const q = query.trim().toLowerCase();
     const byFocus = tickets.filter((t) => {
       if (focus === "unassigned") return !t.assignee_id;
-      if (focus === "waiting") return t.assignee_id === profile.id && (t.status === "Nuevo" || t.status === "Asignado");
-      if (focus === "inProgress") return (scope === "mine" ? t.assignee_id === profile.id : true) && t.status === "En Progreso";
-      if (focus === "pendingInfo") return (scope === "mine" ? t.assignee_id === profile.id : true) && t.status === "Pendiente Info";
-      if (focus === "resolved") return (scope === "mine" ? t.assignee_id === profile.id : true) && t.status === "Resuelto";
+      if (focus === "waiting") return (scope === "mine" ? t.assignee_id === profile.id : true) && t.status === "En Espera";
+      if (focus === "inProgress") return (scope === "mine" ? t.assignee_id === profile.id : true) && t.status === "En Curso";
+      if (focus === "planned") return (scope === "mine" ? t.assignee_id === profile.id : true) && t.status === "Planificado o Coordinado";
       return true;
     });
 
@@ -728,7 +726,7 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
                         subcategoriesById={subcategoriesById}
                         requesterLabel={profilesById[t.requester_id]?.full_name || profilesById[t.requester_id]?.email || "Usuario"}
                         canTake={scope === "team" && !t.assignee_id}
-                        onTake={() => void updateTicket(t.id, { assignee_id: profile.id, status: "Asignado" })}
+                        onTake={() => void updateTicket(t.id, { assignee_id: profile.id, status: "En Curso" })}
                         onSetStatus={(s) => void updateTicket(t.id, { status: s })}
                       />
                     </MotionItem>
@@ -744,7 +742,7 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
                         subcategoriesById={subcategoriesById}
                         requesterLabel={profilesById[t.requester_id]?.full_name || profilesById[t.requester_id]?.email || "Usuario"}
                         canTake={scope === "team" && !t.assignee_id}
-                        onTake={() => void updateTicket(t.id, { assignee_id: profile.id, status: "Asignado" })}
+                        onTake={() => void updateTicket(t.id, { assignee_id: profile.id, status: "En Curso" })}
                         onSetStatus={(s) => void updateTicket(t.id, { status: s })}
                       />
                     </MotionItem>
