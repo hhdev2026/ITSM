@@ -296,13 +296,13 @@ begin
   select p.department_id into dept from public.profiles p where p.id = uid;
   if dept is null then raise exception 'department_required'; end if;
 
-  st := case lower(coalesce(p_status,'')) 
-    when 'disponible' then 'Disponible'::public.agent_presence_enum
-    when 'ocupado' then 'Ocupado'::public.agent_presence_enum
-    when 'ausente' then 'Ausente'::public.agent_presence_enum
-    when 'offline' then 'Offline'::public.agent_presence_enum
-    else raise exception 'invalid_status'
-  end;
+  case lower(coalesce(p_status,'')) 
+    when 'disponible' then st := 'Disponible'::public.agent_presence_enum;
+    when 'ocupado' then st := 'Ocupado'::public.agent_presence_enum;
+    when 'ausente' then st := 'Ausente'::public.agent_presence_enum;
+    when 'offline' then st := 'Offline'::public.agent_presence_enum;
+    else raise exception 'invalid_status';
+  end case;
 
   cap := coalesce(p_capacity, 3);
 
