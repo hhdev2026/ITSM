@@ -112,6 +112,7 @@ export default function TicketDetailPage() {
   const [events, setEvents] = useState<TicketEvent[]>([]);
   const [solutionType, setSolutionType] = useState<Ticket["solution_type"]>(null);
   const [solutionNotes, setSolutionNotes] = useState<string>("");
+  const [closureCode, setClosureCode] = useState<Ticket["closure_code"]>(null);
 
   const canModerate = profile?.role === "agent" || profile?.role === "supervisor" || profile?.role === "admin";
   const canReassign = profile?.role === "supervisor" || profile?.role === "admin";
@@ -137,6 +138,7 @@ export default function TicketDetailPage() {
     setAssigneeId(parsed?.assignee_id ?? "");
     setSolutionType(parsed?.solution_type ?? null);
     setSolutionNotes(String(parsed?.solution_notes ?? ""));
+    setClosureCode(parsed?.closure_code ?? null);
 
     if (parsed?.category_id) {
       const { data: cat } = await supabase.from("categories").select("id,name").eq("id", parsed.category_id).maybeSingle();
@@ -264,10 +266,28 @@ export default function TicketDetailPage() {
 
   async function setStatus(status: string) {
     if (!ticketId) return;
-    if (status === "Cerrado" && !solutionType) {
-      toast.error("Selecciona tipo de solución antes de cerrar");
+    if (status === "Cerrado") {
+      if (!solutionType) {
+        toast.error("Selecciona tipo de solución antes de cerrar");
+        return;
+      }
+      if (!closureCode) {
+        toast.error("Selecciona motivo de cierre antes de cerrar");
+        return;
+      }
+      const { error } = await supabase
+        .from("tickets")
+        .update({
+          status,
+          solution_type: solutionType,
+          solution_notes: solutionNotes.trim() || null,
+          closure_code: closureCode,
+        })
+        .eq("id", ticketId);
+      if (error) toast.error("No se pudo actualizar estado", { description: error.message });
       return;
     }
+
     const { error } = await supabase.from("tickets").update({ status }).eq("id", ticketId);
     if (error) toast.error("No se pudo actualizar estado", { description: error.message });
   }
@@ -276,11 +296,26 @@ export default function TicketDetailPage() {
     if (!ticketId || !canModerate) return;
     const { error } = await supabase
       .from("tickets")
-      .update({ solution_type: solutionType, solution_notes: solutionNotes.trim() || null })
+      .update({
+        solution_type: solutionType,
+        solution_notes: solutionNotes.trim() || null,
+        closure_code: closureCode,
+      })
       .eq("id", ticketId);
     if (error) toast.error("No se pudo guardar solución", { description: error.message });
     else toast.success("Solución guardada");
   }
+
+  const closureOptions: Array<{ value: NonNullable<Ticket["closure_code"]>; label: string }> = [
+    { value: "Resuelto y confirmado por el usuario", label: "Resuelto y confirmado por el usuario" },
+    { value: "Resuelto sin confirmación (usuario no responde)", label: "Resuelto sin confirmación (usuario no responde)" },
+    { value: "Resuelto por el usuario (autoservicio)", label: "Resuelto por el usuario (autoservicio)" },
+    { value: "Cerrado por solicitud del usuario", label: "Cerrado por solicitud del usuario" },
+    { value: "Cerrado por duplicidad", label: "Cerrado por duplicidad" },
+    { value: "Cerrado por falta de información del solicitante", label: "Cerrado por falta de información del solicitante" },
+    { value: "Cerrado por fuera de alcance (no aplica)", label: "Cerrado por fuera de alcance (no aplica)" },
+    { value: "Cerrado por derivación a tercero", label: "Cerrado por derivación a tercero" },
+  ];
 
   async function decideApproval(action: "approve" | "reject") {
     if (!profile || !ticketId) return;
@@ -675,13 +710,26 @@ export default function TicketDetailPage() {
                             <option value="Soporte Terreno">Soporte Terreno</option>
                             <option value="Implementación">Implementación</option>
                           </select>
+                          <div className="mt-1 text-xs text-muted-foreground">Motivo de cierre (estandarizado)</div>
+                          <select
+                            value={closureCode ?? ""}
+                            onChange={(e) => setClosureCode((e.target.value || null) as Ticket["closure_code"])}
+                            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+                          >
+                            <option value="">(Seleccionar)</option>
+                            {closureOptions.map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
                           <Input
                             value={solutionNotes}
                             onChange={(e) => setSolutionNotes(e.target.value)}
-                            placeholder="Detalle / observación (opcional)"
+                            placeholder="Observación (opcional)"
                           />
                           <Button variant="outline" onClick={() => void saveSolution()}>
-                            Guardar solución
+                            Guardar
                           </Button>
                         </div>
                       </div>
@@ -791,6 +839,10 @@ export default function TicketDetailPage() {
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Tipo de solución</span>
                     <span>{ticket.solution_type ?? "—"}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Motivo de cierre</span>
+                    <span className="truncate">{ticket.closure_code ?? "—"}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Detalle solución</span>

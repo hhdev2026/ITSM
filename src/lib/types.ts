@@ -33,6 +33,16 @@ export type Ticket = {
   ola_deadline: string | null;
   solution_type?: "Instrucción al usuario" | "Soporte Remoto" | "Soporte Terreno" | "Implementación" | null;
   solution_notes?: string | null;
+  closure_code?:
+    | "Resuelto y confirmado por el usuario"
+    | "Resuelto sin confirmación (usuario no responde)"
+    | "Resuelto por el usuario (autoservicio)"
+    | "Cerrado por solicitud del usuario"
+    | "Cerrado por duplicidad"
+    | "Cerrado por falta de información del solicitante"
+    | "Cerrado por fuera de alcance (no aplica)"
+    | "Cerrado por derivación a tercero"
+    | null;
   sla_excluded?: boolean;
   sla_exclusion_reason?: string | null;
   sla_excluded_by?: string | null;
