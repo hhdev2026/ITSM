@@ -112,6 +112,7 @@ export default function TicketDetailPage() {
 
   const canModerate = profile?.role === "agent" || profile?.role === "supervisor" || profile?.role === "admin";
   const canReassign = profile?.role === "supervisor" || profile?.role === "admin";
+  const isEndUser = profile?.role === "user";
 
   useEffect(() => {
     if (!sessionLoading && !session) router.replace("/login");
@@ -543,8 +544,8 @@ export default function TicketDetailPage() {
 
               <Card className="tech-border">
                 <CardHeader>
-                  <CardTitle>Actividad</CardTitle>
-                  <CardDescription>Comentarios y notas internas.</CardDescription>
+                  <CardTitle>{isEndUser ? "Actualizaciones" : "Actividad"}</CardTitle>
+                  <CardDescription>{isEndUser ? "Mensajes entre soporte y solicitante." : "Comentarios públicos y notas internas (solo TI)."}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
@@ -557,8 +558,10 @@ export default function TicketDetailPage() {
                             <div className={cn("rounded-xl glass-surface p-3", c.is_internal && "bg-amber-500/10")}>
                               <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-medium">{c.author_id.slice(0, 8)}</span>
-                                  {c.is_internal ? <Badge variant="outline">Interna</Badge> : null}
+                                  <span className="font-medium">
+                                    {isEndUser ? (c.author_id === profile?.id ? "Tú" : "Mesa de ayuda") : c.author_id.slice(0, 8)}
+                                  </span>
+                                  {c.is_internal && !isEndUser ? <Badge variant="outline">Interna</Badge> : null}
                                 </div>
                                 <div>{new Date(c.created_at).toLocaleString()}</div>
                               </div>
@@ -574,14 +577,20 @@ export default function TicketDetailPage() {
                     <Textarea
                       value={body}
                       onChange={(e) => setBody(e.target.value)}
-                      placeholder={ticket.status === "Pendiente Info" ? "Provee la información solicitada…" : "Escribe un comentario…"}
+                      placeholder={
+                        ticket.status === "Pendiente Info"
+                          ? "Provee la información solicitada…"
+                          : isEndUser
+                            ? "Escribe un mensaje para soporte…"
+                            : "Escribe un comentario…"
+                      }
                       className="min-h-28"
                     />
                     <div className="flex flex-col gap-2">
                       {canModerate ? (
                         <label className="flex items-center gap-2 rounded-xl glass-surface px-3 py-2 text-sm text-muted-foreground">
                           <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
-                          Nota interna
+                          Nota interna (solo TI)
                         </label>
                       ) : null}
                       <Button disabled={saving || body.trim().length < 2} onClick={() => void postComment()}>
@@ -753,13 +762,24 @@ export default function TicketDetailPage() {
                 <Card className="tech-border">
                   <CardHeader>
                     <CardTitle>Solicitud</CardTitle>
-                    <CardDescription>Service Catalog / metadata.</CardDescription>
+                    <CardDescription>{isEndUser ? "Detalle de la solicitud." : "Detalle (usuario vs. servicio interno)."}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {serviceMeta ? (
                       <div className="rounded-xl glass-surface p-3">
-                        <div className="text-xs text-muted-foreground">Servicio</div>
-                        <div className="mt-1 text-sm font-medium">{typeof serviceMeta["service_name"] === "string" ? serviceMeta["service_name"] : "—"}</div>
+                        <div className="text-xs text-muted-foreground">{isEndUser ? "Problema" : "Servicio"}</div>
+                        <div className="mt-1 text-sm font-medium">
+                          {isEndUser
+                            ? typeof serviceMeta["user_name"] === "string"
+                              ? serviceMeta["user_name"]
+                              : ticket.title
+                            : typeof serviceMeta["service_name"] === "string"
+                              ? serviceMeta["service_name"]
+                              : "—"}
+                        </div>
+                        {!isEndUser && typeof serviceMeta["user_name"] === "string" ? (
+                          <div className="mt-1 text-xs text-muted-foreground">Usuario: {serviceMeta["user_name"]}</div>
+                        ) : null}
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           {metaImpact ? <Badge variant="outline">Impacto: {metaImpact}</Badge> : null}
                           {metaUrgency ? <Badge variant="outline">Urgencia: {metaUrgency}</Badge> : null}

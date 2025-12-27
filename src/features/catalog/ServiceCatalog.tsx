@@ -126,6 +126,8 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
   }>({ context: { location: "", asset_tag: "", contact: "" }, fields: {} });
   const [creating, setCreating] = React.useState(false);
 
+  const isEndUser = profile.role === "user";
+
   const selectedService = React.useMemo(
     () => (selectedServiceId ? services.find((s) => s.id === selectedServiceId) ?? null : null),
     [selectedServiceId, services]
@@ -134,14 +136,31 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
   const categoryNameById = React.useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
   const subcategoryNameById = React.useMemo(() => new Map(subcategories.map((s) => [s.id, s.name])), [subcategories]);
 
+  const userNameFor = React.useCallback((service: ServiceCatalogItem): string | null => {
+    const v = typeof service.user_name === "string" ? service.user_name.trim() : "";
+    return v ? v : null;
+  }, []);
+
+  const userDescriptionFor = React.useCallback((service: ServiceCatalogItem): string | null => {
+    const v = typeof service.user_description === "string" ? service.user_description.trim() : "";
+    return v ? v : null;
+  }, []);
+
+  const keywordsFor = React.useCallback((service: ServiceCatalogItem): string[] => {
+    return Array.isArray(service.keywords) ? service.keywords.map(String) : [];
+  }, []);
+
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return services;
     return services.filter((s) => {
-      const hay = `${s.name} ${s.description ?? ""} ${categoryNameById.get(s.category_id ?? "") ?? ""} ${subcategoryNameById.get(s.subcategory_id ?? "") ?? ""}`.toLowerCase();
+      const uName = userNameFor(s) ?? "";
+      const uDesc = userDescriptionFor(s) ?? "";
+      const kw = keywordsFor(s).join(" ");
+      const hay = `${s.name} ${s.description ?? ""} ${uName} ${uDesc} ${kw} ${categoryNameById.get(s.category_id ?? "") ?? ""} ${subcategoryNameById.get(s.subcategory_id ?? "") ?? ""}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [services, query, categoryNameById, subcategoryNameById]);
+  }, [services, query, categoryNameById, subcategoryNameById, keywordsFor, userDescriptionFor, userNameFor]);
 
   const grouped = React.useMemo(() => {
     const map = new Map<string, ServiceCatalogItem[]>();
@@ -183,7 +202,9 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
 
       const { data: svc, error: svcErr } = await supabase
         .from("service_catalog_items")
-        .select("id,department_id,name,description,category_id,subcategory_id,ticket_type,default_priority,default_impact,default_urgency,icon_key,is_active")
+        .select(
+          "id,department_id,name,user_name,description,user_description,keywords,category_id,subcategory_id,ticket_type,default_priority,default_impact,default_urgency,icon_key,is_active"
+        )
         .eq("is_active", true)
         .or(`department_id.is.null,department_id.eq.${profile.department_id}`)
         .order("name");
@@ -204,7 +225,11 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
     } catch (e: unknown) {
       const msg = errorMessage(e) ?? "No se pudo cargar el catálogo";
       if (msg.toLowerCase().includes("service_catalog_items") || msg.toLowerCase().includes("does not exist") || msg.toLowerCase().includes("relation")) {
-        setError("Tu base de datos aún no tiene Service Catalog. Aplica `supabase/migrations/006_service_catalog.sql` y luego `supabase/seed.sql`.");
+        setError(
+          isEndUser
+            ? "El catálogo aún no está habilitado para tu área. Contacta a tu administrador."
+            : "Service Catalog no está configurado en la base de datos. Aplica las migraciones de Supabase y carga el seed."
+        );
       } else {
         setError(msg);
       }
@@ -279,7 +304,8 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
     void loadApprovalSteps(service.id);
     void loadTimeTargets(service.id);
 
-    setTitle(service.name);
+    const userTitle = userNameFor(service) ?? service.name;
+    setTitle(isEndUser ? userTitle : service.name);
     setDescription("");
     setImpact(service.default_impact);
     setUrgency(service.default_urgency);
@@ -327,10 +353,14 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
     try {
       const steps = approvalStepsByServiceId[selectedService.id] ?? [];
       const needsApproval = steps.length > 0;
+      const userName = userNameFor(selectedService) ?? selectedService.name;
+      const userDescription = userDescriptionFor(selectedService) ?? selectedService.description ?? null;
       const metadata = {
         service_catalog: {
           service_id: selectedService.id,
           service_name: selectedService.name,
+          user_name: userName,
+          user_description: userDescription,
         },
         impact,
         urgency,
@@ -362,11 +392,20 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Catálogo de servicios"
-        description="Solicitudes e incidencias estandarizadas (Service Catalog)."
+        title={isEndUser ? "¿Qué problema tienes?" : "Catálogo de servicios"}
+        description={
+          isEndUser
+            ? "Elige una opción para crear tu solicitud. Usa el buscador (ej: correo, internet, VPN…)."
+            : "Solicitudes e incidencias estandarizadas (Service Catalog)."
+        }
         actions={
           <div className="flex items-center gap-2">
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar (vpn, permisos, software…)" className="md:w-96" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={isEndUser ? "Buscar un problema (correo, internet, VPN…)" : "Buscar (vpn, permisos, software…)"}
+              className="md:w-96"
+            />
             <Button variant="outline" onClick={() => void load()}>
               Actualizar
             </Button>
@@ -401,8 +440,14 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                 <CardDescription>No hay ítems activos en el catálogo para tu departamento.</CardDescription>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">
-                Verifica que existan registros en <code className="text-foreground">service_catalog_items</code> (y sus categorías/subcategorías) o ejecuta{" "}
-                <code className="text-foreground">supabase/seed.sql</code>.
+                {isEndUser ? (
+                  "Contacta a tu administrador para habilitar el catálogo."
+                ) : (
+                  <>
+                    Verifica que existan registros en <code className="text-foreground">service_catalog_items</code> (y sus categorías/subcategorías) o ejecuta{" "}
+                    <code className="text-foreground">supabase/seed.sql</code>.
+                  </>
+                )}
               </CardContent>
             </Card>
           ) : (
@@ -416,17 +461,20 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                   {items.map((svc) => {
                     const Icon = (svc.icon_key && iconByKey[svc.icon_key]) || IconApp;
                     const sub = svc.subcategory_id ? subcategoryNameById.get(svc.subcategory_id) : null;
+                    const displayName = isEndUser ? userNameFor(svc) ?? svc.name : svc.name;
+                    const displayDesc = isEndUser ? userDescriptionFor(svc) ?? svc.description ?? null : svc.description ?? null;
                     return (
                       <MotionItem key={svc.id} id={svc.id}>
                         <Card className="tech-border">
                           <CardHeader className="flex-row items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <CardTitle className="truncate">{svc.name}</CardTitle>
-                              <CardDescription className="line-clamp-2">{svc.description ?? "—"}</CardDescription>
+                              <CardTitle className="truncate">{displayName}</CardTitle>
+                              <CardDescription className="line-clamp-2">{displayDesc ?? "—"}</CardDescription>
                               <div className="mt-2 flex flex-wrap items-center gap-2">
                                 <TicketTypeBadge type={svc.ticket_type} />
                                 <TicketPriorityBadge priority={svc.default_priority} />
                                 {sub ? <Badge variant="outline">{sub}</Badge> : null}
+                                {!isEndUser && userNameFor(svc) ? <Badge variant="outline">Usuario: {userNameFor(svc)}</Badge> : null}
                               </div>
                             </div>
                             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[hsl(var(--brand-cyan))]/12 text-[hsl(var(--brand-cyan))]">
@@ -457,11 +505,18 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
             ) : (
               <div className="space-y-5">
                 <div className="pr-10">
-                  <div className="text-xl font-semibold tracking-tight">{selectedService.name}</div>
-                  <div className="mt-1 text-sm text-muted-foreground">{selectedService.description ?? "—"}</div>
+                  <div className="text-xl font-semibold tracking-tight">
+                    {isEndUser ? userNameFor(selectedService) ?? selectedService.name : selectedService.name}
+                  </div>
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    {isEndUser
+                      ? userDescriptionFor(selectedService) ?? selectedService.description ?? "—"
+                      : selectedService.description ?? "—"}
+                  </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{selectedService.ticket_type}</Badge>
                     <Badge variant="outline">Prioridad: {priority}</Badge>
+                    {!isEndUser && userNameFor(selectedService) ? <Badge variant="outline">Vista usuario: {userNameFor(selectedService)}</Badge> : null}
                   </div>
                 </div>
 

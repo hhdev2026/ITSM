@@ -53,7 +53,10 @@ export type ServiceCatalogItem = {
   id: string;
   department_id: string | null;
   name: string;
+  user_name?: string | null;
   description: string | null;
+  user_description?: string | null;
+  keywords?: string[] | null;
   category_id: string | null;
   subcategory_id: string | null;
   ticket_type: TicketType;
