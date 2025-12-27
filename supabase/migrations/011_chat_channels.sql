@@ -376,6 +376,17 @@ begin
   select f.profile_id into chosen from filtered f;
 
   if chosen is null and need_skill is not null then
+    with candidates as (
+      select
+        p.id as profile_id,
+        ap.capacity,
+        public._chat_open_count(p.id) as open_count
+      from public.profiles p
+      join public.agent_presence ap on ap.profile_id = p.id
+      where p.department_id = dept
+        and p.role in ('agent','supervisor')
+        and ap.status = 'Disponible'
+    )
     select c.profile_id into chosen
     from candidates c
     where c.open_count < c.capacity
