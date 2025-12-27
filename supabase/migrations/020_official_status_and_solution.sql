@@ -272,6 +272,10 @@ revoke all on function public.approval_decide(uuid, text, text) from public;
 grant execute on function public.approval_decide(uuid, text, text) to authenticated;
 
 -- Update view: treat En Espera and Planificado o Coordinado as active states, and close states as Cerrado/Cancelado
+-- NOTE: we must drop the view first because it was previously created using `t.*`,
+-- and new columns added to `public.tickets` would otherwise cause column renames (42P16).
+drop view if exists public.tickets_sla_live;
+
 create or replace view public.tickets_sla_live as
 with base as (
   select
@@ -326,4 +330,3 @@ revoke all on table public.tickets_sla_live from public;
 grant select on table public.tickets_sla_live to authenticated;
 
 commit;
-
