@@ -15,7 +15,7 @@ import { SlaLineChart, TimeLineChart, VolumeAreaChart } from "@/components/chart
 
 type KpiData = {
   range: { start: string; end: string };
-  volume: { created: number; closed: number };
+  volume: { created: number; closed: number; canceled?: number };
   mttr_hours: number;
   sla_compliance_pct: number | null;
   pending_by_priority: Record<string, number>;
@@ -56,6 +56,21 @@ const Periods = [
   { value: "monthly", label: "Mensual" },
 ] as const;
 
+function rangeForPeriod(period: (typeof Periods)[number]["value"]) {
+  const end = new Date();
+  const start = new Date(end);
+  if (period === "daily") start.setDate(end.getDate() - 1);
+  if (period === "weekly") start.setDate(end.getDate() - 7);
+  if (period === "monthly") start.setMonth(end.getMonth() - 1);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
+function defaultBucketForPeriod(period: (typeof Periods)[number]["value"]) {
+  if (period === "daily") return "hour";
+  if (period === "weekly") return "day";
+  return "day";
+}
+
 export function SupervisorDashboard({ profile }: { profile: Profile }) {
   const [period, setPeriod] = useState<(typeof Periods)[number]["value"]>("weekly");
   const [agentId, setAgentId] = useState<string>("");
@@ -69,8 +84,6 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingTrends, setLoadingTrends] = useState(true);
-
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
   async function loadLookups() {
     if (!profile.department_id) {
@@ -104,66 +117,40 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
     setLoading(true);
     setLoadingChatKpis(true);
     setError(null);
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (!token) {
-      setError("No hay sesión");
-      setLoading(false);
-      setLoadingChatKpis(false);
-      return;
-    }
-    const qs = new URLSearchParams({
-      period,
-      ...(agentId ? { agentId } : {}),
-      ...(categoryId ? { categoryId } : {}),
-    });
-    const [ticketsRes, chatsRes] = await Promise.all([
-      fetch(`${apiBase}/api/analytics/kpis?${qs.toString()}`, { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`${apiBase}/api/analytics/chats/kpis?${qs.toString()}`, { headers: { Authorization: `Bearer ${token}` } }),
-    ]);
-
-    if (!ticketsRes.ok) {
-      const j = await ticketsRes.json().catch(() => ({}));
-      setError(j.error ?? "No se pudo cargar KPIs");
+    try {
+      const { start, end } = rangeForPeriod(period);
+      const [ticketsKpisRes, chatsKpisRes] = await Promise.all([
+        supabase.rpc("kpi_dashboard", { p_start: start, p_end: end, p_agent_id: agentId || null, p_category_id: categoryId || null }),
+        supabase.rpc("kpi_chat_dashboard", { p_start: start, p_end: end, p_agent_id: agentId || null, p_category_id: categoryId || null }),
+      ]);
+      if (ticketsKpisRes.error) throw ticketsKpisRes.error;
+      if (chatsKpisRes.error) throw chatsKpisRes.error;
+      setKpis((ticketsKpisRes.data ?? null) as KpiData | null);
+      setChatKpis((chatsKpisRes.data ?? null) as ChatKpiData | null);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "No se pudo cargar KPIs";
+      setError(message);
       setKpis(null);
-      setLoading(false);
-      return;
-    }
-    setKpis((await ticketsRes.json()) as KpiData);
-    setLoading(false);
-
-    if (!chatsRes.ok) {
       setChatKpis(null);
+    } finally {
+      setLoading(false);
       setLoadingChatKpis(false);
-      return;
     }
-    setChatKpis((await chatsRes.json()) as ChatKpiData);
-    setLoadingChatKpis(false);
   }
 
   async function loadTrends() {
     setLoadingTrends(true);
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (!token) {
-      setLoadingTrends(false);
-      return;
-    }
-    const qs = new URLSearchParams({
-      period,
-      ...(agentId ? { agentId } : {}),
-      ...(categoryId ? { categoryId } : {}),
-    });
-    const res = await fetch(`${apiBase}/api/analytics/trends?${qs.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
+    try {
+      const { start, end } = rangeForPeriod(period);
+      const bucket = defaultBucketForPeriod(period);
+      const res = await supabase.rpc("kpi_timeseries", { p_start: start, p_end: end, p_bucket: bucket, p_agent_id: agentId || null, p_category_id: categoryId || null });
+      if (res.error) throw res.error;
+      setTrends({ bucket: bucket as TrendsResponse["bucket"], start, end, points: (res.data ?? []) as TrendPoint[] });
+    } catch {
       setTrends(null);
+    } finally {
       setLoadingTrends(false);
-      return;
     }
-    setTrends((await res.json()) as TrendsResponse);
-    setLoadingTrends(false);
   }
 
   useEffect(() => {
@@ -284,11 +271,11 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
             <Card className="tech-border">
               <CardHeader className="gap-2">
                 <CardTitle>Tickets</CardTitle>
-                <CardDescription>Creados / cerrados</CardDescription>
+                <CardDescription>Creados / cerrados / cancelados</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="text-2xl font-semibold">
-                  {kpis.volume.created} / {kpis.volume.closed}
+                  {kpis.volume.created} / {kpis.volume.closed} / {kpis.volume.canceled ?? 0}
                 </div>
               </CardContent>
             </Card>
