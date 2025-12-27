@@ -34,6 +34,7 @@ import {
   IconSoftware,
   IconUsers,
 } from "@/components/icons/catalog-icons";
+import { MotionItem, MotionList } from "@/components/motion/MotionList";
 
 type Impact = "Alto" | "Medio" | "Bajo";
 type Urgency = "Alta" | "Media" | "Baja";
@@ -460,35 +461,37 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                   <div className="text-sm font-semibold">{group}</div>
                   <Badge variant="outline">{items.length}</Badge>
                 </div>
-                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                <MotionList className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                   {items.map((svc) => {
                     const Icon = (svc.icon_key && iconByKey[svc.icon_key]) || IconApp;
                     const sub = svc.subcategory_id ? subcategoryNameById.get(svc.subcategory_id) : null;
                     return (
-                      <Card key={svc.id} className="tech-border">
-                        <CardHeader className="flex-row items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <CardTitle className="truncate">{svc.name}</CardTitle>
-                            <CardDescription className="line-clamp-2">{svc.description ?? "—"}</CardDescription>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <Badge variant="outline">{svc.ticket_type}</Badge>
-                              <Badge variant="outline">{svc.default_priority}</Badge>
-                              {sub ? <Badge variant="outline">{sub}</Badge> : null}
+                      <MotionItem key={svc.id} id={svc.id}>
+                        <Card className="tech-border">
+                          <CardHeader className="flex-row items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <CardTitle className="truncate">{svc.name}</CardTitle>
+                              <CardDescription className="line-clamp-2">{svc.description ?? "—"}</CardDescription>
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <Badge variant="outline">{svc.ticket_type}</Badge>
+                                <Badge variant="outline">{svc.default_priority}</Badge>
+                                {sub ? <Badge variant="outline">{sub}</Badge> : null}
+                              </div>
                             </div>
-                          </div>
-                          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[hsl(var(--brand-cyan))]/12 text-[hsl(var(--brand-cyan))]">
-                            <Icon className="h-5 w-5" />
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <Button className="w-full" onClick={() => openService(svc)}>
-                            Solicitar
-                          </Button>
-                        </CardContent>
-                      </Card>
+                            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[hsl(var(--brand-cyan))]/12 text-[hsl(var(--brand-cyan))]">
+                              <Icon className="h-5 w-5" />
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <Button className="w-full" onClick={() => openService(svc)}>
+                              Solicitar
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      </MotionItem>
                     );
                   })}
-                </div>
+                </MotionList>
               </div>
             ))
           )}

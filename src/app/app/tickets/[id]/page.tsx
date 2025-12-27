@@ -31,6 +31,7 @@ import {
 } from "@/lib/demoStore";
 import { Check, ChevronDown, Copy, RefreshCcw, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { MotionItem, MotionList } from "@/components/motion/MotionList";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
@@ -399,18 +400,22 @@ export default function TicketDetailPage() {
                     {comments.length === 0 ? (
                       <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">Sin comentarios.</div>
                     ) : (
-                      comments.map((c) => (
-                        <div key={c.id} className={cn("rounded-xl border border-border bg-background/40 p-3", c.is_internal && "bg-amber-500/10")}>
-                          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{c.author_id.slice(0, 8)}</span>
-                              {c.is_internal ? <Badge variant="outline">Interna</Badge> : null}
+                      <MotionList className="space-y-3">
+                        {comments.map((c) => (
+                          <MotionItem key={c.id} id={c.id}>
+                            <div className={cn("rounded-xl border border-border bg-background/40 p-3", c.is_internal && "bg-amber-500/10")}>
+                              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{c.author_id.slice(0, 8)}</span>
+                                  {c.is_internal ? <Badge variant="outline">Interna</Badge> : null}
+                                </div>
+                                <div>{new Date(c.created_at).toLocaleString()}</div>
+                              </div>
+                              <div className="mt-2 whitespace-pre-wrap text-sm">{c.body}</div>
                             </div>
-                            <div>{new Date(c.created_at).toLocaleString()}</div>
-                          </div>
-                          <div className="mt-2 whitespace-pre-wrap text-sm">{c.body}</div>
-                        </div>
-                      ))
+                          </MotionItem>
+                        ))}
+                      </MotionList>
                     )}
                   </div>
 
@@ -508,26 +513,28 @@ export default function TicketDetailPage() {
                     <CardDescription>Flujo multi-nivel (manager/owner) y decisiones.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="space-y-2">
+                    <MotionList className="space-y-2">
                       {approvals.map((a) => (
-                        <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-background/40 px-3 py-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline">Paso {a.step_order}</Badge>
-                            <Badge variant="outline">{approvalKindLabel(a.kind)}</Badge>
-                            {a.required ? <Badge variant="outline">Requerida</Badge> : <Badge variant="outline">Opcional</Badge>}
+                        <MotionItem key={a.id} id={a.id}>
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-background/40 px-3 py-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="outline">Paso {a.step_order}</Badge>
+                              <Badge variant="outline">{approvalKindLabel(a.kind)}</Badge>
+                              {a.required ? <Badge variant="outline">Requerida</Badge> : <Badge variant="outline">Opcional</Badge>}
+                            </div>
+                            <Badge variant="outline" className={approvalStatusBadge(a.status)}>
+                              {a.status === "pending"
+                                ? "Pendiente"
+                                : a.status === "approved"
+                                  ? "Aprobada"
+                                  : a.status === "rejected"
+                                    ? "Rechazada"
+                                    : "Omitida"}
+                            </Badge>
                           </div>
-                          <Badge variant="outline" className={approvalStatusBadge(a.status)}>
-                            {a.status === "pending"
-                              ? "Pendiente"
-                              : a.status === "approved"
-                                ? "Aprobada"
-                                : a.status === "rejected"
-                                  ? "Rechazada"
-                                  : "Omitida"}
-                          </Badge>
-                        </div>
+                        </MotionItem>
                       ))}
-                    </div>
+                    </MotionList>
 
                     {pendingForMe ? (
                       <div className="rounded-2xl border border-border bg-background/40 p-3">

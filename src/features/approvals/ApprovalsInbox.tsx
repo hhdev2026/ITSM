@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { MotionItem, MotionList } from "@/components/motion/MotionList";
 
 type ApprovalRow = {
   id: string;
@@ -162,48 +163,50 @@ export function ApprovalsInbox({ profile }: { profile: Profile }) {
           </CardHeader>
         </Card>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
+        <MotionList className="grid gap-3 md:grid-cols-2">
           {approvals.map((a) => {
             const t = ticketsById[a.ticket_id];
             return (
-              <Card key={a.id} className="tech-border tech-glow">
-                <CardHeader className="gap-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <CardTitle className="truncate">{t?.title ?? "Ticket"}</CardTitle>
-                      <CardDescription className="line-clamp-2">
-                        {t ? `${t.type} · ${t.priority} · ${t.status}` : "Cargando datos…"}
-                      </CardDescription>
+              <MotionItem key={a.id} id={a.id}>
+                <Card className="tech-border tech-glow">
+                  <CardHeader className="gap-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <CardTitle className="truncate">{t?.title ?? "Ticket"}</CardTitle>
+                        <CardDescription className="line-clamp-2">
+                          {t ? `${t.type} · ${t.priority} · ${t.status}` : "Cargando datos…"}
+                        </CardDescription>
+                      </div>
+                      <Badge variant="outline">Paso {a.step_order}</Badge>
                     </div>
-                    <Badge variant="outline">Paso {a.step_order}</Badge>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{kindLabel(a.kind)}</Badge>
-                    {a.required ? <Badge variant="outline">Requerida</Badge> : <Badge variant="outline">Opcional</Badge>}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Input
-                    value={commentByTicketId[a.ticket_id] ?? ""}
-                    onChange={(e) => setCommentByTicketId((cur) => ({ ...cur, [a.ticket_id]: e.target.value }))}
-                    placeholder="Comentario (opcional)"
-                  />
-                  <div className="flex items-center gap-2">
-                    <Button disabled={actingTicketId === a.ticket_id} onClick={() => void decide(a.ticket_id, "approve")}>
-                      Aprobar
-                    </Button>
-                    <Button disabled={actingTicketId === a.ticket_id} variant="destructive" onClick={() => void decide(a.ticket_id, "reject")}>
-                      Rechazar
-                    </Button>
-                    <Button asChild variant="outline" className="ml-auto">
-                      <Link href={`/app/tickets/${a.ticket_id}`}>Ver</Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">{kindLabel(a.kind)}</Badge>
+                      {a.required ? <Badge variant="outline">Requerida</Badge> : <Badge variant="outline">Opcional</Badge>}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Input
+                      value={commentByTicketId[a.ticket_id] ?? ""}
+                      onChange={(e) => setCommentByTicketId((cur) => ({ ...cur, [a.ticket_id]: e.target.value }))}
+                      placeholder="Comentario (opcional)"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button disabled={actingTicketId === a.ticket_id} onClick={() => void decide(a.ticket_id, "approve")}>
+                        Aprobar
+                      </Button>
+                      <Button disabled={actingTicketId === a.ticket_id} variant="destructive" onClick={() => void decide(a.ticket_id, "reject")}>
+                        Rechazar
+                      </Button>
+                      <Button asChild variant="outline" className="ml-auto">
+                        <Link href={`/app/tickets/${a.ticket_id}`}>Ver</Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </MotionItem>
             );
           })}
-        </div>
+        </MotionList>
       )}
     </div>
   );

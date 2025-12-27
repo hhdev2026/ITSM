@@ -17,6 +17,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/cn";
 import { Check, ChevronDown, Plus, RefreshCcw, ShieldBan, ShieldCheck } from "lucide-react";
+import { MotionItem, MotionList } from "@/components/motion/MotionList";
 
 type Role = "user" | "agent" | "supervisor" | "admin";
 const Roles: Role[] = ["user", "agent", "supervisor", "admin"];
@@ -453,66 +454,68 @@ export function UserAdmin({ adminProfile }: { adminProfile: Profile }) {
           </CardHeader>
         </Card>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <MotionList className="grid gap-3 lg:grid-cols-2">
           {users.map((u) => (
-            <Card key={u.id} className={cn("tech-border", u.is_disabled ? "" : "tech-glow")}>
-              <CardHeader className="gap-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <CardTitle className="truncate">{u.full_name || u.email}</CardTitle>
-                    <CardDescription className="truncate">{u.email}</CardDescription>
+            <MotionItem key={u.id} id={u.id}>
+              <Card className={cn("tech-border", u.is_disabled ? "" : "tech-glow")}>
+                <CardHeader className="gap-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <CardTitle className="truncate">{u.full_name || u.email}</CardTitle>
+                      <CardDescription className="truncate">{u.email}</CardDescription>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon" aria-label="Acciones">
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => openEdit(u)}>
+                          <Check className="h-4 w-4" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {u.is_disabled ? (
+                          <DropdownMenuItem onSelect={() => void toggleDisabled(u, false)}>
+                            <ShieldCheck className="h-4 w-4" />
+                            Habilitar
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onSelect={() => void toggleDisabled(u, true)} className="text-destructive-foreground">
+                            <ShieldBan className="h-4 w-4" />
+                            Deshabilitar
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon" aria-label="Acciones">
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => openEdit(u)}>
-                        <Check className="h-4 w-4" />
-                        Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      {u.is_disabled ? (
-                        <DropdownMenuItem onSelect={() => void toggleDisabled(u, false)}>
-                          <ShieldCheck className="h-4 w-4" />
-                          Habilitar
-                        </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem onSelect={() => void toggleDisabled(u, true)} className="text-destructive-foreground">
-                          <ShieldBan className="h-4 w-4" />
-                          Deshabilitar
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">{roleLabel(u.role)}</Badge>
-                  <Badge variant="outline">{u.department_id ? deptNameById.get(u.department_id) ?? "—" : "Sin depto"}</Badge>
-                  <Badge variant="outline" className={statusBadge(u.is_disabled)}>
-                    {u.is_disabled === true ? "Deshabilitado" : u.is_disabled === false ? "Activo" : "—"}
-                  </Badge>
-                  <Badge variant="outline">
-                    {u.rank} · {u.points} pts
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">
-                <div className="flex items-center justify-between gap-3">
-                  <span>Último acceso</span>
-                  <span>{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : "—"}</span>
-                </div>
-                <div className="mt-1 flex items-center justify-between gap-3">
-                  <span>Email verificado</span>
-                  <span>{u.email_confirmed_at ? "Sí" : "—"}</span>
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">{roleLabel(u.role)}</Badge>
+                    <Badge variant="outline">{u.department_id ? deptNameById.get(u.department_id) ?? "—" : "Sin depto"}</Badge>
+                    <Badge variant="outline" className={statusBadge(u.is_disabled)}>
+                      {u.is_disabled === true ? "Deshabilitado" : u.is_disabled === false ? "Activo" : "—"}
+                    </Badge>
+                    <Badge variant="outline">
+                      {u.rank} · {u.points} pts
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Último acceso</span>
+                    <span>{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : "—"}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-3">
+                    <span>Email verificado</span>
+                    <span>{u.email_confirmed_at ? "Sí" : "—"}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </MotionItem>
           ))}
-        </div>
+        </MotionList>
       )}
 
       <Sheet open={editOpen} onOpenChange={setEditOpen}>

@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { MotionItem, MotionList } from "@/components/motion/MotionList";
 
 type Article = {
   id: string;
@@ -183,22 +184,24 @@ export default function KnowledgeBasePage() {
             ) : articles.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">No hay artículos.</div>
             ) : (
-              <div className="divide-y divide-border">
+              <MotionList className="divide-y divide-border">
                 {articles.map((a) => (
-                  <Link key={a.id} href={`/app/kb/${a.id}`} className="block rounded-lg py-3 transition-colors hover:bg-accent/40">
-                    <div className="flex items-center justify-between gap-3 px-2">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium">{a.title}</div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <Badge variant="outline">{a.is_published ? "Publicado" : "Borrador"}</Badge>
-                          <span>{new Date(a.updated_at).toLocaleString()}</span>
+                  <MotionItem key={a.id} id={a.id}>
+                    <Link href={`/app/kb/${a.id}`} className="block rounded-lg py-3 transition-colors hover:bg-accent/40">
+                      <div className="flex items-center justify-between gap-3 px-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium">{a.title}</div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <Badge variant="outline">{a.is_published ? "Publicado" : "Borrador"}</Badge>
+                            <span>{new Date(a.updated_at).toLocaleString()}</span>
+                          </div>
                         </div>
+                        <span className="text-xs text-muted-foreground">Abrir</span>
                       </div>
-                      <span className="text-xs text-muted-foreground">Abrir</span>
-                    </div>
-                  </Link>
+                    </Link>
+                  </MotionItem>
                 ))}
-              </div>
+              </MotionList>
             )}
           </CardContent>
         </Card>

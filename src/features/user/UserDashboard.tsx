@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { MotionItem, MotionList } from "@/components/motion/MotionList";
 
 export function UserDashboard({ profile }: { profile: Profile }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -113,21 +114,23 @@ export function UserDashboard({ profile }: { profile: Profile }) {
             ) : tickets.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">Aún no tienes tickets.</div>
             ) : (
-              <div className="divide-y divide-border">
+              <MotionList className="divide-y divide-border">
                 {tickets.map((t) => (
-                  <Link key={t.id} href={`/app/tickets/${t.id}`} className="block rounded-lg py-3 transition-colors hover:bg-accent/40">
-                    <div className="flex items-center justify-between gap-3 px-2">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium">{t.title}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {t.type} · {t.priority} · {t.status}
+                  <MotionItem key={t.id} id={t.id}>
+                    <Link href={`/app/tickets/${t.id}`} className="block rounded-lg py-3 transition-colors hover:bg-accent/40">
+                      <div className="flex items-center justify-between gap-3 px-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium">{t.title}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {t.type} · {t.priority} · {t.status}
+                          </div>
                         </div>
+                        <div className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString()}</div>
                       </div>
-                      <div className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString()}</div>
-                    </div>
-                  </Link>
+                    </Link>
+                  </MotionItem>
                 ))}
-              </div>
+              </MotionList>
             )}
           </CardContent>
         </Card>

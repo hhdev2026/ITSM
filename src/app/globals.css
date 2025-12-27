@@ -187,6 +187,10 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+  }
+
   .tech-border {
     animation: none;
   }
