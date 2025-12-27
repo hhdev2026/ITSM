@@ -12,6 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ChartCard } from "@/components/charts/ChartCard";
+import { SlaLineChart, TimeLineChart, VolumeAreaChart } from "@/components/charts/Charts";
 
 type KpiData = {
   range: { start: string; end: string };
@@ -21,6 +24,22 @@ type KpiData = {
   pending_by_priority: Record<string, number>;
   workload: Array<{ agent_id: string; agent_name: string; open_assigned: number }>;
   fcr_pct: number | null;
+};
+
+type TrendPoint = {
+  bucket: string;
+  created: number;
+  closed: number;
+  avg_response_hours: number | null;
+  avg_resolution_hours: number | null;
+  sla_pct: number | null;
+};
+
+type TrendsResponse = {
+  bucket: "hour" | "day" | "week" | "month";
+  start: string;
+  end: string;
+  points: TrendPoint[];
 };
 
 const Periods = [
@@ -36,8 +55,10 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [agents, setAgents] = useState<Array<{ id: string; label: string }>>([]);
   const [kpis, setKpis] = useState<KpiData | null>(null);
+  const [trends, setTrends] = useState<TrendsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingTrends, setLoadingTrends] = useState(true);
 
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
@@ -103,6 +124,36 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
     setLoading(false);
   }
 
+  async function loadTrends() {
+    setLoadingTrends(true);
+    if (isDemoMode()) {
+      setTrends(null);
+      setLoadingTrends(false);
+      return;
+    }
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) {
+      setLoadingTrends(false);
+      return;
+    }
+    const qs = new URLSearchParams({
+      period,
+      ...(agentId ? { agentId } : {}),
+      ...(categoryId ? { categoryId } : {}),
+    });
+    const res = await fetch(`${apiBase}/api/analytics/trends?${qs.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      setTrends(null);
+      setLoadingTrends(false);
+      return;
+    }
+    setTrends((await res.json()) as TrendsResponse);
+    setLoadingTrends(false);
+  }
+
   useEffect(() => {
     void loadLookups();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -110,6 +161,7 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
 
   useEffect(() => {
     void loadKpis();
+    void loadTrends();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, agentId, categoryId]);
 
@@ -121,8 +173,8 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Panel (Supervisor)"
-        description="KPIs operativos con filtros por agente, categoría y periodo."
+        title="Panel ejecutivo"
+        description="KPIs, SLA y tendencias operativas por periodo, agente y categoría."
         actions={
           <>
             <Button asChild variant="outline">
@@ -141,7 +193,7 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
       <Card className="tech-border">
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
-          <CardDescription>Restringe KPIs por periodo, agente y categoría.</CardDescription>
+          <CardDescription>Refina la vista por periodo, agente y categoría.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
         <label className="block">
@@ -194,7 +246,19 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
       {error ? <InlineAlert variant="error" description={error} /> : null}
 
       {loading ? (
-        <div className="text-sm text-muted-foreground">Cargando…</div>
+        <div className="grid gap-3 md:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Card key={i} className="tech-border">
+              <CardHeader className="gap-2">
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="h-4 w-32" />
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Skeleton className="h-7 w-24" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : !kpis ? (
         <Card className="tech-border">
           <CardHeader>
@@ -253,6 +317,29 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
               </CardContent>
             </Card>
           </div>
+
+          <div className="grid gap-3 lg:grid-cols-3">
+            <ChartCard
+              title="Tendencia de volumen"
+              description="Creados vs cerrados en el periodo."
+              right={trends?.bucket ? <Badge variant="outline">{trends.bucket}</Badge> : null}
+              className="lg:col-span-2"
+            >
+              {loadingTrends ? (
+                <Skeleton className="h-72 w-full rounded-2xl" />
+              ) : (
+                <VolumeAreaChart data={(trends?.points ?? []) as TrendPoint[]} />
+              )}
+            </ChartCard>
+
+            <ChartCard title="Cumplimiento SLA" description="Cerrados dentro de SLA (%).">
+              {loadingTrends ? <Skeleton className="h-64 w-full rounded-2xl" /> : <SlaLineChart data={(trends?.points ?? []) as TrendPoint[]} />}
+            </ChartCard>
+          </div>
+
+          <ChartCard title="Tiempos promedio" description="Respuesta y resolución (horas) por bucket.">
+            {loadingTrends ? <Skeleton className="h-64 w-full rounded-2xl" /> : <TimeLineChart data={(trends?.points ?? []) as TrendPoint[]} />}
+          </ChartCard>
 
           <div className="grid gap-3 md:grid-cols-2">
             <Card className="tech-border">

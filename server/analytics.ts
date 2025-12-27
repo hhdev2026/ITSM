@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { AuthedRequest } from "./auth";
 
 const PeriodSchema = z.enum(["daily", "weekly", "monthly"]);
+const BucketSchema = z.enum(["hour", "day", "week", "month"]);
 
 export function parseAnalyticsQuery(query: unknown) {
   const QuerySchema = z.object({
@@ -34,3 +35,36 @@ export async function getKpis(req: AuthedRequest, args: { period: "daily" | "wee
   return data;
 }
 
+export function parseTrendsQuery(query: unknown) {
+  const QuerySchema = z.object({
+    period: PeriodSchema.default("weekly"),
+    bucket: BucketSchema.optional(),
+    agentId: z.string().uuid().optional(),
+    categoryId: z.string().uuid().optional(),
+    tz: z.string().default("UTC"),
+  });
+  return QuerySchema.parse(query);
+}
+
+function defaultBucketForPeriod(period: z.infer<typeof PeriodSchema>) {
+  if (period === "daily") return "hour";
+  if (period === "weekly") return "day";
+  return "day";
+}
+
+export async function getTrends(
+  req: AuthedRequest,
+  args: { period: "daily" | "weekly" | "monthly"; bucket?: z.infer<typeof BucketSchema>; agentId?: string; categoryId?: string }
+) {
+  const { start, end } = dateRangeForPeriod(args.period);
+  const bucket = args.bucket ?? defaultBucketForPeriod(args.period);
+  const { data, error } = await req.supabase.rpc("kpi_timeseries", {
+    p_start: start,
+    p_end: end,
+    p_bucket: bucket,
+    p_agent_id: args.agentId ?? null,
+    p_category_id: args.categoryId ?? null,
+  });
+  if (error) throw error;
+  return { bucket, start, end, points: data ?? [] };
+}

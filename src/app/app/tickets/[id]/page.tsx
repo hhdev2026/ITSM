@@ -30,13 +30,12 @@ import {
   listTicketApprovals as demoListTicketApprovals,
   updateTicket as demoUpdateTicket,
 } from "@/lib/demoStore";
-import { Check, ChevronDown, Copy, RefreshCcw, UserPlus } from "lucide-react";
+import { Check, ChevronDown, Clock, Copy, MessageSquare, RefreshCcw, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { MotionItem, MotionList } from "@/components/motion/MotionList";
 import { TicketPriorityBadge, TicketStatusBadge, TicketTypeBadge } from "@/components/tickets/TicketBadges";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { InlineEmpty } from "@/components/feedback/InlineEmpty";
-import { MessageSquare } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AppBootScreen } from "@/components/layout/AppStates";
 
@@ -59,6 +58,21 @@ type TicketApproval = {
   created_at?: string;
 };
 
+type TicketEvent = {
+  id: string;
+  ticket_id: string;
+  actor_id: string | null;
+  event_type: "created" | "status_changed" | "assignee_changed" | "priority_changed" | "approval_decided";
+  from_status: string | null;
+  to_status: string | null;
+  from_priority: string | null;
+  to_priority: string | null;
+  from_assignee_id: string | null;
+  to_assignee_id: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
+};
+
 function approvalKindLabel(kind: string) {
   if (kind === "requester_manager") return "Manager";
   if (kind === "service_owner") return "Owner";
@@ -72,6 +86,16 @@ function approvalStatusBadge(status: TicketApproval["status"]) {
   if (status === "rejected") return "bg-rose-500/15 text-rose-200 border-rose-500/30";
   if (status === "pending") return "bg-[hsl(var(--brand-cyan))]/12 text-[hsl(var(--brand-cyan))] border-[hsl(var(--brand-cyan))]/30";
   return "bg-zinc-800/60 text-zinc-200 border-zinc-700";
+}
+
+function formatDuration(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  const mins = Math.round(ms / 60000);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.round(mins / 60);
+  if (hours < 48) return `${hours}h`;
+  const days = Math.round(hours / 24);
+  return `${days}d`;
 }
 
 export default function TicketDetailPage() {
@@ -96,6 +120,7 @@ export default function TicketDetailPage() {
   const [approvals, setApprovals] = useState<TicketApproval[]>([]);
   const [approvalComment, setApprovalComment] = useState("");
   const [approvalsActing, setApprovalsActing] = useState<null | "approve" | "reject">(null);
+  const [events, setEvents] = useState<TicketEvent[]>([]);
 
   const canModerate = profile?.role === "agent" || profile?.role === "supervisor" || profile?.role === "admin";
   const canReassign = profile?.role === "supervisor" || profile?.role === "admin";
@@ -114,6 +139,7 @@ export default function TicketDetailPage() {
       setAssigneeId(t?.assignee_id ?? "");
       setComments((demoListComments(ticketId) as unknown) as Comment[]);
       setApprovals((demoListTicketApprovals(ticketId) as unknown) as TicketApproval[]);
+      setEvents([]);
       if (profile?.department_id) {
         const cats = (demoListCategories(profile.department_id) as unknown) as Array<{ id: string; name: string }>;
         const catName = t?.category_id ? cats.find((c) => c.id === t.category_id)?.name ?? null : null;
@@ -173,6 +199,23 @@ export default function TicketDetailPage() {
     if (apprErr) setError(apprErr.message);
     setApprovals((appr ?? []) as TicketApproval[]);
 
+    const { data: ev, error: evErr } = await supabase
+      .from("ticket_events")
+      .select("id,ticket_id,actor_id,event_type,from_status,to_status,from_priority,to_priority,from_assignee_id,to_assignee_id,details,created_at")
+      .eq("ticket_id", ticketId)
+      .order("created_at", { ascending: true });
+    if (evErr) {
+      const msg = (evErr.message ?? "").toLowerCase();
+      if (msg.includes("ticket_events") || msg.includes("does not exist") || msg.includes("relation")) {
+        setEvents([]);
+      } else {
+        setError(evErr.message);
+        setEvents([]);
+      }
+    } else {
+      setEvents((ev ?? []) as TicketEvent[]);
+    }
+
     if (canReassign && profile?.department_id) {
       const { data: profsRaw } = await supabase
         .from("profiles")
@@ -196,6 +239,7 @@ export default function TicketDetailPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "tickets", filter: `id=eq.${ticketId}` }, () => void load())
       .on("postgres_changes", { event: "*", schema: "public", table: "comments", filter: `ticket_id=eq.${ticketId}` }, () => void load())
       .on("postgres_changes", { event: "*", schema: "public", table: "ticket_approvals", filter: `ticket_id=eq.${ticketId}` }, () => void load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "ticket_events", filter: `ticket_id=eq.${ticketId}` }, () => void load())
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
@@ -306,9 +350,6 @@ export default function TicketDetailPage() {
     }
   }
 
-  if (sessionLoading || profileLoading) return <AppBootScreen label="Cargando ticket…" />;
-  if (!session || !profile) return null;
-
   const statusBadge = ticket ? <TicketStatusBadge status={ticket.status} /> : null;
   const priorityBadgeEl = ticket ? <TicketPriorityBadge priority={ticket.priority} /> : null;
   const slaBadgeEl =
@@ -327,6 +368,83 @@ export default function TicketDetailPage() {
   const metaFields = isRecord(metaFieldsRaw) ? metaFieldsRaw : null;
   const metaImpact = typeof metadata["impact"] === "string" ? metadata["impact"] : undefined;
   const metaUrgency = typeof metadata["urgency"] === "string" ? metadata["urgency"] : undefined;
+
+  const traceItems = useMemo(() => {
+    const items: Array<{ id: string; at: string; title: string; subtitle?: string | null; actor?: string | null }> = [];
+
+    for (const e of events) {
+      const actor = e.actor_id;
+      if (e.event_type === "created") {
+        items.push({ id: e.id, at: e.created_at, title: "Ticket creado", subtitle: null, actor });
+      } else if (e.event_type === "status_changed") {
+        items.push({
+          id: e.id,
+          at: e.created_at,
+          title: `Estado: ${e.from_status ?? "—"} → ${e.to_status ?? "—"}`,
+          subtitle: null,
+          actor,
+        });
+      } else if (e.event_type === "assignee_changed") {
+        items.push({
+          id: e.id,
+          at: e.created_at,
+          title: "Asignación actualizada",
+          subtitle: `${(e.from_assignee_id ?? "—").slice(0, 8)} → ${(e.to_assignee_id ?? "—").slice(0, 8)}`,
+          actor,
+        });
+      } else if (e.event_type === "priority_changed") {
+        items.push({
+          id: e.id,
+          at: e.created_at,
+          title: `Prioridad: ${e.from_priority ?? "—"} → ${e.to_priority ?? "—"}`,
+          subtitle: null,
+          actor,
+        });
+      } else if (e.event_type === "approval_decided") {
+        const d = (e.details ?? {}) as Record<string, unknown>;
+        const step = typeof d["step_order"] === "number" ? d["step_order"] : null;
+        const kind = typeof d["kind"] === "string" ? d["kind"] : null;
+        const status = typeof d["status"] === "string" ? d["status"] : null;
+        items.push({
+          id: e.id,
+          at: e.created_at,
+          title: `Aprobación${step ? ` (Paso ${step})` : ""}`,
+          subtitle: `${kind ? approvalKindLabel(kind) : "—"} · ${status ? status : "—"}`,
+          actor,
+        });
+      }
+    }
+
+    if (ticket?.first_response_at) items.push({ id: `milestone-fr`, at: ticket.first_response_at, title: "Primera respuesta", actor: null });
+    if (ticket?.resolved_at) items.push({ id: `milestone-res`, at: ticket.resolved_at, title: "Marcado como resuelto", actor: null });
+    if (ticket?.closed_at) items.push({ id: `milestone-closed`, at: ticket.closed_at, title: "Cerrado", actor: null });
+
+    if (items.length === 0 && ticket) {
+      items.push({ id: "fallback-created", at: ticket.created_at, title: "Ticket creado", actor: null });
+      for (const a of approvals) {
+        if (a.status !== "pending" && a.decided_at) {
+          items.push({
+            id: `fallback-approval-${a.id}`,
+            at: a.decided_at,
+            title: `Aprobación (Paso ${a.step_order})`,
+            subtitle: `${approvalKindLabel(a.kind)} · ${a.status}`,
+            actor: a.decided_by,
+          });
+        }
+      }
+    }
+
+    return items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+  }, [approvals, events, ticket]);
+
+  const createdAt = ticket ? new Date(ticket.created_at) : null;
+  const firstResponseAt = ticket?.first_response_at ? new Date(ticket.first_response_at) : null;
+  const closedOrResolvedAt = ticket?.closed_at ? new Date(ticket.closed_at) : ticket?.resolved_at ? new Date(ticket.resolved_at) : null;
+  const responseMs = createdAt && firstResponseAt ? firstResponseAt.getTime() - createdAt.getTime() : null;
+  const resolutionMs = createdAt && closedOrResolvedAt ? closedOrResolvedAt.getTime() - createdAt.getTime() : null;
+
+  if (sessionLoading || profileLoading) return <AppBootScreen label="Cargando ticket…" />;
+  if (!session || !profile) return null;
 
   const pendingForMe =
     approvals.find(
@@ -420,16 +538,74 @@ export default function TicketDetailPage() {
               </Card>
             </div>
           </div>
-        ) : !ticket ? (
-          <div className="text-sm text-muted-foreground">No existe o no tienes acceso.</div>
-        ) : (
-          <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-            <div className="space-y-4">
-              <Card className="tech-border">
-                <CardHeader>
-                  <CardTitle>Descripción</CardTitle>
-                  <CardDescription>Detalle del caso.</CardDescription>
-                </CardHeader>
+	        ) : !ticket ? (
+	          <div className="text-sm text-muted-foreground">No existe o no tienes acceso.</div>
+	        ) : (
+	          <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+	            <div className="space-y-4">
+	              <Card className="tech-border tech-glow">
+	                <CardHeader>
+	                  <CardTitle className="flex items-center gap-2">
+	                    <Clock className="h-4 w-4 text-[hsl(var(--brand-cyan))]" />
+	                    Trazabilidad
+	                  </CardTitle>
+	                  <CardDescription>Timeline y tiempos (SLA/OLA) del caso.</CardDescription>
+	                </CardHeader>
+	                <CardContent className="space-y-3">
+	                  <div className="grid gap-2 md:grid-cols-3">
+	                    <div className="rounded-xl glass-surface px-3 py-2">
+	                      <div className="text-xs text-muted-foreground">Tiempo respuesta</div>
+	                      <div className="mt-1 text-sm font-semibold">{responseMs === null ? "n/a" : formatDuration(responseMs)}</div>
+	                      <div className="mt-1 text-xs text-muted-foreground">
+	                        {ticket.response_deadline ? `SLA resp: ${new Date(ticket.response_deadline).toLocaleString()}` : "SLA resp: n/a"}
+	                      </div>
+	                    </div>
+	                    <div className="rounded-xl glass-surface px-3 py-2">
+	                      <div className="text-xs text-muted-foreground">Tiempo resolución</div>
+	                      <div className="mt-1 text-sm font-semibold">{resolutionMs === null ? "n/a" : formatDuration(resolutionMs)}</div>
+	                      <div className="mt-1 text-xs text-muted-foreground">
+	                        {ticket.sla_deadline ? `SLA res: ${new Date(ticket.sla_deadline).toLocaleString()}` : "SLA res: n/a"}
+	                      </div>
+	                    </div>
+	                    <div className="rounded-xl glass-surface px-3 py-2">
+	                      <div className="text-xs text-muted-foreground">OLA</div>
+	                      <div className="mt-1 text-sm font-semibold">{ticket.ola_deadline ? "Definida" : "n/a"}</div>
+	                      <div className="mt-1 text-xs text-muted-foreground">
+	                        {ticket.ola_deadline ? new Date(ticket.ola_deadline).toLocaleString() : "—"}
+	                      </div>
+	                    </div>
+	                  </div>
+
+	                  {traceItems.length === 0 ? (
+	                    <InlineEmpty title="Sin trazas" description="Aún no hay eventos registrados para este ticket." icon={<Clock className="h-5 w-5" />} className="py-8" />
+	                  ) : (
+	                    <MotionList className="space-y-2">
+	                      {traceItems.slice(-30).map((it) => (
+	                        <MotionItem key={it.id} id={it.id}>
+	                          <div className="rounded-xl glass-surface px-3 py-2">
+	                            <div className="flex items-start justify-between gap-3">
+	                              <div className="min-w-0">
+	                                <div className="truncate text-sm font-medium">{it.title}</div>
+	                                {it.subtitle ? <div className="mt-1 text-xs text-muted-foreground">{it.subtitle}</div> : null}
+	                              </div>
+	                              <div className="shrink-0 text-right text-xs text-muted-foreground">
+	                                <div>{new Date(it.at).toLocaleString()}</div>
+	                                {it.actor ? <div className="mt-1">actor: {it.actor.slice(0, 8)}</div> : null}
+	                              </div>
+	                            </div>
+	                          </div>
+	                        </MotionItem>
+	                      ))}
+	                    </MotionList>
+	                  )}
+	                </CardContent>
+	              </Card>
+
+	              <Card className="tech-border">
+	                <CardHeader>
+	                  <CardTitle>Descripción</CardTitle>
+	                  <CardDescription>Detalle del caso.</CardDescription>
+	                </CardHeader>
                 <CardContent>
                   <div className="whitespace-pre-wrap text-sm text-foreground/90">{ticket.description || "—"}</div>
                 </CardContent>
