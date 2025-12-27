@@ -36,8 +36,6 @@ type TicketLiveRow = Partial<Ticket> & {
   updated_at: string;
 };
 
-type LaneKey = "unassigned" | "in_sla" | "at_risk" | "out_of_time" | "planned" | "closed";
-
 function startOfLocalDay(d: Date) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -84,28 +82,11 @@ function computeTraffic(opts: {
   return { light, remainingMinutes: remainingClamped, pctUsed };
 }
 
-function laneLabel(key: LaneKey) {
-  if (key === "unassigned") return "Sin asignar";
-  if (key === "out_of_time") return "Fuera de plazo";
-  if (key === "at_risk") return "En riesgo";
-  if (key === "planned") return "Planificados";
-  if (key === "closed") return "Cerrados/Cancelados";
-  return "En plazo";
-}
-
-function laneSortKey(key: LaneKey) {
-  const order: Record<LaneKey, number> = { unassigned: 1, out_of_time: 2, at_risk: 3, in_sla: 4, planned: 5, closed: 6 };
-  return order[key];
-}
-
-function pickLane(t: TicketLiveRow): LaneKey {
-  const status = String(t.status ?? "");
-  if (status === "Cerrado" || status === "Cancelado" || status === "Rechazado") return "closed";
-  if (status === "Planificado o Coordinado") return "planned";
-  if (t.sla_traffic_light === "red") return "out_of_time";
-  if (t.sla_traffic_light === "yellow") return "at_risk";
-  if (!t.assignee_id) return "unassigned";
-  return "in_sla";
+function trafficSeverity(light: Ticket["sla_traffic_light"] | undefined) {
+  if (light === "red") return 1;
+  if (light === "yellow") return 2;
+  if (light === "green") return 3;
+  return 4;
 }
 
 export default function DispatchPage() {
@@ -263,27 +244,42 @@ export default function DispatchPage() {
     });
   }, [filtered]);
 
-  const lanes = useMemo(() => {
-    const map = new Map<LaneKey, TicketLiveRow[]>();
-    const keys: LaneKey[] = ["unassigned", "out_of_time", "at_risk", "in_sla", "planned", "closed"];
-    for (const k of keys) map.set(k, []);
+  const columns = useMemo(() => {
+    const base = showClosed ? [...TicketStatuses] : TicketStatuses.filter((s) => s !== "Cerrado" && s !== "Cancelado");
+    if (status) return base.filter((s) => s === status);
+    return base;
+  }, [showClosed, status]);
 
+  const byStatus = useMemo(() => {
+    const map = new Map<string, TicketLiveRow[]>();
+    for (const s of columns) map.set(s, []);
     for (const t of normalized) {
-      map.get(pickLane(t))!.push(t);
+      const st = String(t.status ?? "");
+      if (!map.has(st)) continue;
+      map.get(st)!.push(t);
     }
 
-    for (const [k, list] of map) {
-      if (k === "closed") {
+    for (const [st, list] of map) {
+      if (st === "Cerrado") {
         list.sort((a, b) => (b.closed_at ?? b.updated_at).localeCompare(a.closed_at ?? a.updated_at));
-      } else if (k === "out_of_time" || k === "at_risk") {
-        list.sort((a, b) => (a.sla_deadline ?? "").localeCompare(b.sla_deadline ?? ""));
-      } else {
-        list.sort((a, b) => b.created_at.localeCompare(a.created_at));
+        continue;
       }
+      if (st === "Cancelado") {
+        list.sort((a, b) => (b.canceled_at ?? b.updated_at).localeCompare(a.canceled_at ?? a.updated_at));
+        continue;
+      }
+
+      list.sort((a, b) => {
+        const sev = trafficSeverity(a.sla_traffic_light) - trafficSeverity(b.sla_traffic_light);
+        if (sev !== 0) return sev;
+        const due = (a.sla_deadline ?? "").localeCompare(b.sla_deadline ?? "");
+        if (due !== 0) return due;
+        return b.created_at.localeCompare(a.created_at);
+      });
     }
 
-    return Array.from(map.entries()).sort((a, b) => laneSortKey(a[0]) - laneSortKey(b[0]));
-  }, [normalized]);
+    return map;
+  }, [columns, normalized]);
 
   const workload = useMemo(() => {
     const rows = profiles.map((p) => {
@@ -334,7 +330,7 @@ export default function DispatchPage() {
             </Link>
           }
           title="Centro de mando"
-          description="Kanban operativo para asignación rápida, carga por técnico y control de SLA."
+          description="Kanban por estado oficial, con reasignación rápida y semáforos de SLA/Respuesta."
           actions={
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="flex flex-wrap items-center gap-2">
@@ -446,7 +442,7 @@ export default function DispatchPage() {
         <Card className="tech-border">
           <CardHeader>
             <CardTitle>Tablero</CardTitle>
-            <CardDescription>Arriba lo crítico (fuera de plazo/sin asignar). Reasigna desde cada tarjeta.</CardDescription>
+            <CardDescription>Columnas por estado: En Curso, En Espera, Planificado o Coordinado, Cancelado, Cerrado.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -466,8 +462,8 @@ export default function DispatchPage() {
               ) : null}
             </div>
             {loading ? (
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
-                {Array.from({ length: 6 }).map((_, i) => (
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="min-w-0 rounded-xl border border-border bg-background/20 p-2">
                     <div className="flex items-center justify-between">
                       <Skeleton className="h-4 w-28" />
@@ -481,11 +477,13 @@ export default function DispatchPage() {
                 ))}
               </div>
             ) : (
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
-                {lanes.map(([k, list]) => (
-                  <div key={k} className="min-w-0 rounded-xl border border-border bg-background/20 p-2">
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                {columns.map((col) => {
+                  const list = byStatus.get(col) ?? [];
+                  return (
+                  <div key={col} className="min-w-0 rounded-xl border border-border bg-background/20 p-2">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-xs font-semibold">{laneLabel(k)}</div>
+                      <div className="text-xs font-semibold">{col}</div>
                       <Badge variant="outline">{list.length}</Badge>
                     </div>
                     <div className="mt-2 space-y-2">
@@ -645,7 +643,8 @@ export default function DispatchPage() {
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
