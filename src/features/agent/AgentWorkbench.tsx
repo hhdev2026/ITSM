@@ -30,11 +30,14 @@ import {
   Inbox,
   List,
   MessageSquareText,
+  PanelRightClose,
+  PanelRightOpen,
   PlayCircle,
   RefreshCcw,
   UserCheck,
   Users2,
 } from "lucide-react";
+import { formatTicketNumber } from "@/lib/ticketNumber";
 
 type Scope = "mine" | "team";
 type ViewMode = "grid" | "list";
@@ -169,6 +172,8 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<KanbanStatus[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<TicketPriority[]>([]);
+  const [sidePanelOpen, setSidePanelOpen] = useState(true);
+  const [compactTickets, setCompactTickets] = useState(true);
 
   const [categoriesById, setCategoriesById] = useState<Record<string, Category>>({});
   const [subcategoriesById, setSubcategoriesById] = useState<Record<string, Subcategory>>({});
@@ -425,6 +430,24 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
   }, [viewMode]);
 
   useEffect(() => {
+    const raw = localStorage.getItem("itsm.agent.sidePanelOpen");
+    if (raw === "0") setSidePanelOpen(false);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("itsm.agent.sidePanelOpen", sidePanelOpen ? "1" : "0");
+  }, [sidePanelOpen]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem("itsm.agent.compactTickets");
+    if (raw === "0") setCompactTickets(false);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("itsm.agent.compactTickets", compactTickets ? "1" : "0");
+  }, [compactTickets]);
+
+  useEffect(() => {
     setFocus(scope === "mine" ? "waiting" : "all");
   }, [scope]);
 
@@ -584,7 +607,7 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
 
       {error ? <InlineAlert variant="error" description={error} /> : null}
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+      <div className={cn("grid gap-4", sidePanelOpen ? "lg:grid-cols-[1fr_360px]" : "lg:grid-cols-1")}>
         <div className="space-y-4">
           <div className={cn("grid gap-3", tiles.length >= 6 ? "md:grid-cols-6" : "md:grid-cols-5")}>
             {tiles.map((t) => {
@@ -696,13 +719,33 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
                     <List className="h-4 w-4" />
                   </Button>
                 </div>
+
+                <Button
+                  variant={compactTickets ? "secondary" : "outline"}
+                  size="icon"
+                  onClick={() => setCompactTickets((v) => !v)}
+                  aria-label={compactTickets ? "Vista compacta" : "Vista normal"}
+                  title={compactTickets ? "Vista compacta" : "Vista normal"}
+                >
+                  <Inbox className="h-4 w-4" />
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setSidePanelOpen((v) => !v)}
+                  aria-label={sidePanelOpen ? "Ocultar panel lateral" : "Mostrar panel lateral"}
+                  title={sidePanelOpen ? "Ocultar panel lateral" : "Mostrar panel lateral"}
+                >
+                  {sidePanelOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className={cn(viewMode === "grid" ? "grid gap-3 md:grid-cols-2 xl:grid-cols-3" : "space-y-2")}>
+                <div className={cn(viewMode === "grid" ? "grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" : "space-y-2")}>
                   {Array.from({ length: 9 }).map((_, i) => (
-                    <Skeleton key={i} className={cn(viewMode === "grid" ? "h-[154px] w-full rounded-2xl" : "h-16 w-full")} />
+                    <Skeleton key={i} className={cn(viewMode === "grid" ? "h-[132px] w-full rounded-2xl" : "h-14 w-full")} />
                   ))}
                 </div>
               ) : sorted.length === 0 ? (
@@ -717,7 +760,7 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
                   }
                 />
               ) : viewMode === "grid" ? (
-                <MotionList className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <MotionList className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                   {sorted.map((t) => (
                     <MotionItem key={t.id} id={t.id}>
                       <TicketCard
@@ -728,6 +771,7 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
                         canTake={scope === "team" && !t.assignee_id}
                         onTake={() => void updateTicket(t.id, { assignee_id: profile.id, status: "En Curso" })}
                         onSetStatus={(s) => void updateTicket(t.id, { status: s })}
+                        compact={compactTickets}
                       />
                     </MotionItem>
                   ))}
@@ -744,6 +788,7 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
                         canTake={scope === "team" && !t.assignee_id}
                         onTake={() => void updateTicket(t.id, { assignee_id: profile.id, status: "En Curso" })}
                         onSetStatus={(s) => void updateTicket(t.id, { status: s })}
+                        compact={compactTickets}
                       />
                     </MotionItem>
                   ))}
@@ -753,7 +798,7 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
           </Card>
         </div>
 
-        <div className="space-y-4">
+        {sidePanelOpen ? <div className="space-y-4">
           <Card className="tech-border">
             <CardHeader>
               <CardTitle>SLAs al límite</CardTitle>
@@ -1002,7 +1047,7 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </div> : null}
       </div>
     </div>
   );
@@ -1016,6 +1061,7 @@ function TicketCard({
   canTake,
   onTake,
   onSetStatus,
+  compact = false,
 }: {
   ticket: Ticket;
   requesterLabel: string;
@@ -1024,8 +1070,10 @@ function TicketCard({
   canTake: boolean;
   onTake: () => void;
   onSetStatus: (status: KanbanStatus) => void;
+  compact?: boolean;
 }) {
   const tl = formatTimeLeft(ticket.sla_deadline, ticket.sla_remaining_minutes, ticket.sla_traffic_light);
+  const tracking = formatTicketNumber(ticket.ticket_number) ?? formatShortId(ticket.id);
   const category = ticket.category_id ? categoriesById[ticket.category_id]?.name : null;
   const sub = ticket.subcategory_id ? subcategoriesById[ticket.subcategory_id]?.name : null;
   const meta = [category, sub].filter(Boolean).join(" · ");
@@ -1039,38 +1087,47 @@ function TicketCard({
   return (
     <Card className="group relative overflow-hidden tech-border">
       <div className={cn("absolute inset-x-0 top-0 h-1 bg-gradient-to-r", priorityStripe(ticket.priority))} />
-      <CardHeader className="pb-3">
+      <CardHeader className={cn(compact ? "pb-2 pt-3" : "pb-3")}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold">{ticket.title}</div>
+            <div className={cn("truncate font-semibold", compact ? "text-[13px]" : "text-sm")}>{ticket.title}</div>
             <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="font-mono tracking-wide">{formatShortId(ticket.id)}</span>
+              <span className="font-mono tracking-wide">{tracking}</span>
               <span className="text-muted-foreground/70">·</span>
               <span className="truncate">{requesterLabel}</span>
             </div>
           </div>
           <div className={cn("shrink-0 rounded-lg border px-2 py-1 text-[11px]", warnTone)}>{tl.label}</div>
         </div>
-        {meta ? <div className="mt-2 line-clamp-1 text-xs text-muted-foreground">{meta}</div> : null}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <TicketTypeBadge type={ticket.type} />
-          <TicketPriorityBadge priority={ticket.priority} />
-          <TicketStatusBadge status={ticket.status} />
+        {!compact && meta ? <div className="mt-2 line-clamp-1 text-xs text-muted-foreground">{meta}</div> : null}
+        <div className={cn(compact ? "mt-2 flex flex-wrap items-center gap-2" : "mt-3 flex flex-wrap items-center gap-2")}>
+          {compact ? (
+            <>
+              <TicketPriorityBadge priority={ticket.priority} className="px-1.5 py-0.5 text-[10px] [&_svg]:h-3 [&_svg]:w-3" />
+              <TicketStatusBadge status={ticket.status} className="px-1.5 py-0.5 text-[10px] [&_svg]:h-3 [&_svg]:w-3" />
+            </>
+          ) : (
+            <>
+              <TicketTypeBadge type={ticket.type} />
+              <TicketPriorityBadge priority={ticket.priority} />
+              <TicketStatusBadge status={ticket.status} />
+            </>
+          )}
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="secondary" className="flex-1">
+      <CardContent className={cn("pt-0", compact && "pb-3")}>
+        <div className={cn("flex flex-wrap items-center gap-2", compact && "gap-1.5")}>
+          <Button asChild variant="secondary" className="flex-1" size={compact ? "sm" : "default"}>
             <Link href={`/app/tickets/${ticket.id}`}>Abrir</Link>
           </Button>
           {canTake ? (
-            <Button onClick={onTake} className="flex-1">
+            <Button onClick={onTake} className="flex-1" size={compact ? "sm" : "default"}>
               Tomar
             </Button>
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex-1">
+                <Button variant="outline" className="flex-1" size={compact ? "sm" : "default"}>
                   <ArrowDownUp className="h-4 w-4" />
                   Estado
                 </Button>
@@ -1098,6 +1155,7 @@ function TicketRow({
   canTake,
   onTake,
   onSetStatus,
+  compact = false,
 }: {
   ticket: Ticket;
   requesterLabel: string;
@@ -1106,8 +1164,10 @@ function TicketRow({
   canTake: boolean;
   onTake: () => void;
   onSetStatus: (status: KanbanStatus) => void;
+  compact?: boolean;
 }) {
   const tl = formatTimeLeft(ticket.sla_deadline, ticket.sla_remaining_minutes, ticket.sla_traffic_light);
+  const tracking = formatTicketNumber(ticket.ticket_number) ?? formatShortId(ticket.id);
   const category = ticket.category_id ? categoriesById[ticket.category_id]?.name : null;
   const sub = ticket.subcategory_id ? subcategoriesById[ticket.subcategory_id]?.name : null;
   const meta = [category, sub].filter(Boolean).join(" · ");
@@ -1119,34 +1179,34 @@ function TicketRow({
         : "border-border bg-background/30";
 
   return (
-    <div className="group flex flex-col gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-accent/35 md:flex-row md:items-center md:justify-between">
+    <div className={cn("group flex flex-col gap-3 rounded-xl px-2 transition-colors hover:bg-accent/35 md:flex-row md:items-center md:justify-between", compact ? "py-2" : "py-3")}>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <div className="min-w-0 truncate text-sm font-medium">{ticket.title}</div>
           <span className={cn("rounded-md border px-2 py-1 text-[11px]", tone)}>{tl.label}</span>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground font-mono">{formatShortId(ticket.id)}</span>
+          <span className="text-xs text-muted-foreground font-mono">{tracking}</span>
           <span className="text-xs text-muted-foreground">{requesterLabel}</span>
-          {meta ? <span className="text-xs text-muted-foreground">{meta}</span> : null}
+          {!compact && meta ? <span className="text-xs text-muted-foreground">{meta}</span> : null}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <TicketTypeBadge type={ticket.type} />
+          {!compact ? <TicketTypeBadge type={ticket.type} /> : null}
           <TicketPriorityBadge priority={ticket.priority} />
           <TicketStatusBadge status={ticket.status} />
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 md:shrink-0">
-        <Button asChild variant="secondary">
+        <Button asChild variant="secondary" size={compact ? "sm" : "default"}>
           <Link href={`/app/tickets/${ticket.id}`}>Abrir</Link>
         </Button>
         {canTake ? (
-          <Button onClick={onTake}>Tomar</Button>
+          <Button onClick={onTake} size={compact ? "sm" : "default"}>Tomar</Button>
         ) : (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" size={compact ? "sm" : "default"}>
                 <ArrowDownUp className="h-4 w-4" />
                 Estado
               </Button>

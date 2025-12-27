@@ -75,7 +75,7 @@ function NavItem({
   );
 }
 
-export function AppShell({ profile, children, wide }: { profile: Profile; children: React.ReactNode; wide?: boolean }) {
+export function AppShell({ profile, children, wide = true }: { profile: Profile; children: React.ReactNode; wide?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
