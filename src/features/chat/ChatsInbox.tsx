@@ -36,7 +36,8 @@ function errorMessage(e: unknown) {
 const PresenceOptions: AgentPresenceStatus[] = ["Disponible", "Ocupado", "Ausente", "Offline"];
 
 export function ChatsInbox({ profile }: { profile: Profile }) {
-  const canManage = profile.role === "supervisor" || profile.role === "admin";
+  const isAdmin = profile.role === "admin";
+  const canManage = profile.role === "supervisor";
   const canWork = profile.role === "agent" || canManage;
 
   const [threads, setThreads] = useState<ChatThread[]>([]);
@@ -275,7 +276,7 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
   const timeToTake = selected ? msBetween(selected.created_at, selected.accepted_at) : null;
   const timeToFirstResponse = selected ? msBetween(selected.created_at, selected.first_response_at) : null;
   const timeToClose = selected ? msBetween(selected.created_at, selected.closed_at) : null;
-  const canSend = !!selected && (canManage || selected.requester_id === profile.id || selected.assigned_agent_id === profile.id);
+  const canSend = !!selected && !isAdmin && (canManage || selected.requester_id === profile.id || selected.assigned_agent_id === profile.id);
 
   return (
     <div className="space-y-5">

@@ -2,6 +2,7 @@
 
 import { AppShell } from "@/components/AppShell";
 import { AppBootScreen, AppNoticeScreen } from "@/components/layout/AppStates";
+import { ChatAdminDashboard } from "@/features/chat/ChatAdminDashboard";
 import { ChatsInbox } from "@/features/chat/ChatsInbox";
 import { useProfile, useSession } from "@/lib/hooks";
 import { useEffect } from "react";
@@ -29,7 +30,8 @@ export default function ChatsPage() {
 
   return (
     <AppShell profile={profile}>
-      {profile.role !== "user" ? <ChatsInbox profile={profile} /> : null}
+      {profile.role === "admin" ? <ChatAdminDashboard profile={profile} /> : null}
+      {profile.role !== "user" && profile.role !== "admin" ? <ChatsInbox profile={profile} /> : null}
     </AppShell>
   );
 }

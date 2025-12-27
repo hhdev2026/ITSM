@@ -7,9 +7,11 @@ type Point = {
   bucket: string;
   created: number;
   closed: number;
-  avg_response_hours: number | null;
-  avg_resolution_hours: number | null;
-  sla_pct: number | null;
+  avg_response_hours?: number | null;
+  avg_resolution_hours?: number | null;
+  sla_pct?: number | null;
+  avg_first_response_minutes?: number | null;
+  avg_resolution_minutes?: number | null;
 };
 
 function formatBucketLabel(bucketIso: string) {
@@ -111,3 +113,28 @@ export function TimeLineChart({ data }: { data: Point[] }) {
   );
 }
 
+export function ChatTimeLineChart({ data }: { data: Point[] }) {
+  return (
+    <div className="h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 6, right: 10, left: -18, bottom: 6 }}>
+          <CartesianGrid stroke="hsl(var(--border) / 0.6)" vertical={false} />
+          <XAxis dataKey="bucket" tickFormatter={formatBucketLabel} minTickGap={28} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+          <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+          <Tooltip
+            contentStyle={{
+              background: "hsl(var(--card) / 0.75)",
+              border: "1px solid hsl(var(--border) / 0.6)",
+              borderRadius: 14,
+              backdropFilter: "blur(18px) saturate(150%)",
+            }}
+            labelFormatter={(v) => `Periodo: ${formatBucketLabel(String(v))}`}
+          />
+          <Legend />
+          <Line type="monotone" dataKey="avg_first_response_minutes" name="Primera resp (min)" stroke="hsl(var(--brand-blue))" strokeWidth={2.5} dot={false} />
+          <Line type="monotone" dataKey="avg_resolution_minutes" name="Resolución (min)" stroke="hsl(var(--brand-violet))" strokeWidth={2.5} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
