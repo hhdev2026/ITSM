@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./dotenv";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";

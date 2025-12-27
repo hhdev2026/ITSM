@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../dotenv";
 import { createSupabaseAdmin } from "../supabase";
 
 type Workflow = {
@@ -27,7 +27,7 @@ async function pickLeastLoadedAgent(supabase: ReturnType<typeof createSupabaseAd
   const { data: agents, error: agentsErr } = await supabase
     .from("profiles")
     .select("id,full_name")
-    .eq("role", "agent")
+    .in("role", ["agent", "supervisor"])
     .eq("department_id", departmentId);
   if (agentsErr) throw agentsErr;
   if (!agents || agents.length === 0) return null;

@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../dotenv";
 import { createSupabaseAdmin } from "../supabase";
 
 function normalizeTitle(title: string) {

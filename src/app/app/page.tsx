@@ -5,7 +5,7 @@ import { useProfile, useSession } from "@/lib/hooks";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { UserDashboard } from "@/features/user/UserDashboard";
-import { AgentKanban } from "@/features/agent/AgentKanban";
+import { AgentWorkbench } from "@/features/agent/AgentWorkbench";
 import { SupervisorDashboard } from "@/features/supervisor/SupervisorDashboard";
 import { AppBootScreen, AppNoticeScreen } from "@/components/layout/AppStates";
 
@@ -42,10 +42,9 @@ export default function AppPage() {
       <AppShell profile={profile}>
         <div className="tech-border rounded-2xl p-[1px]">
           <div className="glass-surface rounded-2xl p-6">
-            <div className="text-lg font-semibold">Falta asignar departamento</div>
+            <div className="text-lg font-semibold">Cuenta pendiente de habilitación</div>
             <div className="mt-2 text-sm text-muted-foreground">
-              Tu usuario no tiene <code className="text-foreground">department_id</code>. Un admin debe asignarlo en la tabla{" "}
-              <code className="text-foreground">profiles</code>.
+              Aún no estás asociado a un área de atención. Contacta a tu administrador para completar la configuración de tu cuenta.
             </div>
           </div>
         </div>
@@ -56,7 +55,7 @@ export default function AppPage() {
   return (
     <AppShell profile={profile}>
       {profile.role === "user" && <UserDashboard profile={profile} />}
-      {profile.role === "agent" && <AgentKanban profile={profile} />}
+      {profile.role === "agent" && <AgentWorkbench profile={profile} />}
       {(profile.role === "supervisor" || profile.role === "admin") && <SupervisorDashboard profile={profile} />}
     </AppShell>
   );

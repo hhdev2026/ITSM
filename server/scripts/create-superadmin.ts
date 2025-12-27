@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../dotenv";
 
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";

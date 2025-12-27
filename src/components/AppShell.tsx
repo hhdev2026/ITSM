@@ -103,7 +103,7 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
         ]
       : profile.role === "agent"
         ? [
-            { href: "/app", label: "Bandeja", icon: IconKanban },
+            { href: "/app", label: "Mi trabajo", icon: IconKanban },
             { href: "/app/chats", label: "Chats", icon: IconChat },
             { href: "/app/kb", label: "Base de conocimiento", icon: IconKb },
             { href: "/app/approvals", label: "Aprobaciones", icon: IconApprovals },

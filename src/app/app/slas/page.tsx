@@ -9,8 +9,6 @@ import type { Profile } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { errorMessage } from "@/lib/error";
-import { isDemoMode } from "@/lib/demo";
-import { createSla as demoCreateSla, listSlas as demoListSlas, toggleSla as demoToggleSla } from "@/lib/demoStore";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,11 +54,6 @@ export default function SlasPage() {
   async function load(p: Profile) {
     setLoading(true);
     setError(null);
-    if (isDemoMode()) {
-      setSlas((demoListSlas(p.department_id!) as unknown) as Sla[]);
-      setLoading(false);
-      return;
-    }
     const { data, error } = await supabase
       .from("slas")
       .select("id,department_id,priority,response_time_hours,resolution_time_hours,is_active,updated_at")
@@ -82,17 +75,6 @@ export default function SlasPage() {
     setSaving(true);
     setError(null);
     try {
-      if (isDemoMode()) {
-        demoCreateSla({
-          department_id: p.department_id!,
-          priority,
-          response_time_hours: response,
-          resolution_time_hours: resolution,
-          is_active: active,
-        });
-        await load(p);
-        return;
-      }
       const { error } = await supabase.from("slas").insert({
         department_id: p.department_id,
         priority,
@@ -111,11 +93,6 @@ export default function SlasPage() {
 
   async function toggleActive(id: string, is_active: boolean) {
     if (!canWrite) return;
-    if (isDemoMode()) {
-      demoToggleSla(id, is_active);
-      if (profile) await load(profile);
-      return;
-    }
     await supabase.from("slas").update({ is_active }).eq("id", id);
     if (profile) await load(profile);
   }

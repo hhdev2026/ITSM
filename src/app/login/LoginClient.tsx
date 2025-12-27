@@ -5,8 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseBrowser";
 import { Logo } from "@/components/Logo";
 import { errorMessage } from "@/lib/error";
-import { isDemoMode } from "@/lib/demo";
-import { getDemoProfile, setDemoRole } from "@/lib/demoAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,12 +29,6 @@ export function LoginClient() {
     setBusy(true);
     setError(null);
     try {
-      if (isDemoMode()) {
-        const p = getDemoProfile();
-        if (!p) setDemoRole("user");
-        router.replace(nextPath);
-        return;
-      }
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -64,72 +56,47 @@ export function LoginClient() {
           <Badge variant="outline">Acceso</Badge>
         </div>
 
-        {isDemoMode() ? (
-          <Card className="tech-border tech-glow">
-            <CardHeader>
-              <CardTitle>Modo DEMO</CardTitle>
-              <CardDescription>Elige un perfil para recorrer la plataforma.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" onClick={() => (setDemoRole("user"), router.replace(nextPath))}>
-                  Usuario
-                </Button>
-                <Button variant="outline" onClick={() => (setDemoRole("agent"), router.replace(nextPath))}>
-                  Agente
-                </Button>
-                <Button variant="outline" onClick={() => (setDemoRole("supervisor"), router.replace(nextPath))}>
-                  Supervisor
-                </Button>
-                <Button onClick={() => (setDemoRole("admin"), router.replace(nextPath))}>Admin</Button>
-              </div>
-              <div className="text-xs text-muted-foreground">Sesión temporal para evaluación de UX.</div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="tech-border tech-glow">
-            <CardHeader>
-              <CardTitle>Iniciar sesión</CardTitle>
-              <CardDescription>Accede a tu portal de soporte.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant={mode === "login" ? "default" : "outline"} onClick={() => setMode("login")}>
-                  Ingresar
-                </Button>
-                <Button variant={mode === "signup" ? "default" : "outline"} onClick={() => setMode("signup")}>
-                  Crear cuenta
-                </Button>
-              </div>
+        <Card className="tech-border tech-glow">
+          <CardHeader>
+            <CardTitle>Iniciar sesión</CardTitle>
+            <CardDescription>Accede a tu portal de soporte.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant={mode === "login" ? "default" : "outline"} onClick={() => setMode("login")}>
+                Ingresar
+              </Button>
+              <Button variant={mode === "signup" ? "default" : "outline"} onClick={() => setMode("signup")}>
+                Crear cuenta
+              </Button>
+            </div>
 
-              <div className="grid gap-3">
-                {mode === "signup" ? (
-                  <label className="block">
-                    <div className="text-xs text-muted-foreground">Nombre completo</div>
-                    <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
-                  </label>
-                ) : null}
+            <div className="grid gap-3">
+              {mode === "signup" ? (
                 <label className="block">
-                  <div className="text-xs text-muted-foreground">Email</div>
-                  <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
+                  <div className="text-xs text-muted-foreground">Nombre completo</div>
+                  <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
                 </label>
-                <label className="block">
-                  <div className="text-xs text-muted-foreground">Contraseña</div>
-                  <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" />
-                  <div className="mt-1 text-xs text-muted-foreground">Mínimo 6 caracteres.</div>
-                </label>
+              ) : null}
+              <label className="block">
+                <div className="text-xs text-muted-foreground">Email</div>
+                <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
+              </label>
+              <label className="block">
+                <div className="text-xs text-muted-foreground">Contraseña</div>
+                <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" />
+                <div className="mt-1 text-xs text-muted-foreground">Mínimo 6 caracteres.</div>
+              </label>
 
-                {error ? <InlineAlert variant="error" description={error} /> : null}
+              {error ? <InlineAlert variant="error" description={error} /> : null}
 
-                <Button disabled={!canSubmit || busy} onClick={submit} className={cn("w-full", busy && "opacity-90")}>
-                  {busy ? "Procesando…" : mode === "login" ? "Ingresar" : "Crear cuenta"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              <Button disabled={!canSubmit || busy} onClick={submit} className={cn("w-full", busy && "opacity-90")}>
+                {busy ? "Procesando…" : mode === "login" ? "Ingresar" : "Crear cuenta"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
-

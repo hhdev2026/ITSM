@@ -45,7 +45,7 @@ function rankForPoints(points: number) {
 async function requireAdmin(request: Request) {
   const authHeader = request.headers.get("authorization") ?? "";
   const token = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : null;
-  if (!token || token === "demo") {
+  if (!token) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) as NextResponse };
   }
 

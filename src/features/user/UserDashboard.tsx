@@ -4,8 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseBrowser";
 import type { Profile, Ticket } from "@/lib/types";
-import { isDemoMode } from "@/lib/demo";
-import { listTickets as demoListTickets } from "@/lib/demoStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,12 +28,6 @@ export function UserDashboard({ profile }: { profile: Profile }) {
     setLoading(true);
     setError(null);
 
-    if (isDemoMode()) {
-      setTickets((demoListTickets({ requester_id: profile.id }) as unknown) as Ticket[]);
-      setLoading(false);
-      return;
-    }
-
     const { data, error } = await supabase
       .from("tickets")
       .select(
@@ -52,7 +44,6 @@ export function UserDashboard({ profile }: { profile: Profile }) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-    if (isDemoMode()) return;
     const channel = supabase
       .channel(`rt-user-${profile.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "tickets", filter: `requester_id=eq.${profile.id}` }, () => void load())

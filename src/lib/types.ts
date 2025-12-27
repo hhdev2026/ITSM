@@ -141,3 +141,23 @@ export type Skill = {
   description: string | null;
   category_id: string | null;
 };
+
+export type TaskStatus = "Pendiente" | "En curso" | "Completada" | "Cancelada";
+export type TaskKind = "ticket" | "chat" | "approval" | "general";
+
+export type Task = {
+  id: string;
+  department_id: string | null;
+  kind: TaskKind;
+  title: string;
+  description: string | null;
+  ticket_id: string | null;
+  chat_thread_id: string | null;
+  created_by: string | null;
+  assignee_id: string;
+  status: TaskStatus;
+  due_at: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+};

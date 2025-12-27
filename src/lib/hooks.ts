@@ -3,22 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabaseBrowser";
 import type { Profile } from "./types";
-import { isDemoMode } from "./demo";
-import { clearDemoAuth, getDemoProfile } from "./demoAuth";
 
 export function useSession() {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<{ user: { id: string }; access_token: string } | null>(null);
 
   useEffect(() => {
-    if (isDemoMode()) {
-      const p = getDemoProfile();
-      Promise.resolve().then(() => {
-        setSession(p ? { user: { id: p.id }, access_token: "demo" } : null);
-        setLoading(false);
-      });
-      return;
-    }
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
@@ -45,15 +35,6 @@ export function useProfile(sessionUserId: string | undefined) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isDemoMode()) {
-      const p = getDemoProfile();
-      Promise.resolve().then(() => {
-        setProfile(p);
-        setError(null);
-        setLoading(false);
-      });
-      return;
-    }
     if (!sessionUserId) {
       Promise.resolve().then(() => {
         setProfile(null);
@@ -96,9 +77,5 @@ export function useAccessToken() {
 }
 
 export function signOut() {
-  if (isDemoMode()) {
-    clearDemoAuth();
-    return Promise.resolve();
-  }
   return supabase.auth.signOut();
 }

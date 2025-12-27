@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Category, ChatEvent, ChatMessage, ChatThread, Profile, Subcategory } from "@/lib/types";
 import { supabase } from "@/lib/supabaseBrowser";
-import { isDemoMode } from "@/lib/demo";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -26,6 +25,13 @@ function msBetween(a: string | null, b: string | null) {
   if (!a || !b) return null;
   const ms = new Date(b).getTime() - new Date(a).getTime();
   return Number.isFinite(ms) ? ms : null;
+}
+
+function errorMessage(e: unknown) {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  if (e && typeof e === "object" && "message" in e && typeof (e as { message: unknown }).message === "string") return (e as { message: string }).message;
+  return "Error";
 }
 
 export function UserChat({ profile }: { profile: Profile }) {
@@ -63,7 +69,10 @@ export function UserChat({ profile }: { profile: Profile }) {
   );
 
   const loadLookups = useCallback(async () => {
-    if (isDemoMode()) return;
+    if (!profile.department_id) {
+      setCategories([]);
+      return;
+    }
     const { data: cats } = await supabase
       .from("categories")
       .select("id,name,description,department_id")
@@ -74,12 +83,6 @@ export function UserChat({ profile }: { profile: Profile }) {
 
   const loadThreads = useCallback(async () => {
     setError(null);
-    if (isDemoMode()) {
-      setThreads([]);
-      setSelectedId(null);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     const { data, error } = await supabase
       .from("chat_threads")
@@ -97,7 +100,7 @@ export function UserChat({ profile }: { profile: Profile }) {
   const loadSubcategories = useCallback(async (catId: string | null) => {
     setSubcategories([]);
     setSubcategoryId(null);
-    if (!catId || isDemoMode()) return;
+    if (!catId) return;
     const { data } = await supabase
       .from("subcategories")
       .select("id,category_id,name,description")
@@ -107,7 +110,7 @@ export function UserChat({ profile }: { profile: Profile }) {
   }, []);
 
   const loadThreadData = useCallback(async () => {
-    if (!selectedId || isDemoMode()) return;
+    if (!selectedId) return;
     setLoadingThread(true);
     setError(null);
 
@@ -142,7 +145,6 @@ export function UserChat({ profile }: { profile: Profile }) {
   useEffect(() => {
     void loadLookups();
     void loadThreads();
-    if (isDemoMode()) return;
     const channel = supabase
       .channel(`rt-chat-user-${profile.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "chat_threads", filter: `requester_id=eq.${profile.id}` }, () => void loadThreads())
@@ -152,7 +154,7 @@ export function UserChat({ profile }: { profile: Profile }) {
 
   useEffect(() => {
     void loadThreadData();
-    if (!selectedId || isDemoMode()) return;
+    if (!selectedId) return;
     const channel = supabase
       .channel(`rt-chat-thread-${selectedId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages", filter: `thread_id=eq.${selectedId}` }, () => void loadThreadData())
@@ -181,9 +183,9 @@ export function UserChat({ profile }: { profile: Profile }) {
       setSubcategories([]);
       await loadThreads();
       setSelectedId(tid);
-    } catch (e) {
-      toast.error("No se pudo crear el chat");
-      setError(e instanceof Error ? e.message : "error");
+    } catch (e: unknown) {
+      toast.error("No se pudo crear el chat", { description: errorMessage(e) });
+      setError(errorMessage(e));
     } finally {
       setCreating(false);
     }
@@ -198,8 +200,8 @@ export function UserChat({ profile }: { profile: Profile }) {
       const { error } = await supabase.rpc("chat_send_message", { p_thread_id: selectedId, p_body: clean });
       if (error) throw error;
       setBody("");
-    } catch {
-      toast.error("No se pudo enviar el mensaje");
+    } catch (e: unknown) {
+      toast.error("No se pudo enviar el mensaje", { description: errorMessage(e) });
     } finally {
       setSending(false);
     }
@@ -214,8 +216,8 @@ export function UserChat({ profile }: { profile: Profile }) {
       toast.success("Chat cerrado");
       await loadThreads();
       await loadThreadData();
-    } catch {
-      toast.error("No se pudo cerrar el chat");
+    } catch (e: unknown) {
+      toast.error("No se pudo cerrar el chat", { description: errorMessage(e) });
     } finally {
       setClosing(false);
     }
@@ -237,10 +239,6 @@ export function UserChat({ profile }: { profile: Profile }) {
           </Button>
         }
       />
-
-      {isDemoMode() ? (
-        <EmptyState title="Chat no disponible en DEMO" description="Activa Supabase para usar el canal de comunicación en tiempo real." icon={<MessageSquarePlus className="h-5 w-5" />} />
-      ) : null}
 
       {error ? <InlineAlert variant="error" description={error} /> : null}
 

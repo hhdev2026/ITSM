@@ -5,12 +5,6 @@ import Link from "next/link";
 import { toast } from "sonner";
 import type { Profile, Ticket } from "@/lib/types";
 import { supabase } from "@/lib/supabaseBrowser";
-import { isDemoMode } from "@/lib/demo";
-import {
-  decideTicketApproval as demoDecideTicketApproval,
-  getTicket as demoGetTicket,
-  listPendingApprovalsForApprover as demoListPendingApprovalsForApprover,
-} from "@/lib/demoStore";
 import { errorMessage } from "@/lib/error";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,19 +50,6 @@ export function ApprovalsInbox({ profile }: { profile: Profile }) {
     setLoading(true);
     setError(null);
     try {
-      if (isDemoMode()) {
-        const mine = (demoListPendingApprovalsForApprover(profile.id) as unknown) as ApprovalRow[];
-        const byId: Record<string, Ticket> = {};
-        for (const a of mine) {
-          const t = demoGetTicket(a.ticket_id);
-          if (t) byId[t.id] = t;
-        }
-        setApprovals(mine);
-        setTicketsById(byId);
-        setLoading(false);
-        return;
-      }
-
       const { data, error } = await supabase
         .from("ticket_approvals")
         .select("id,ticket_id,step_order,kind,required,status,created_at,approver_profile_id,approver_role")
@@ -109,12 +90,6 @@ export function ApprovalsInbox({ profile }: { profile: Profile }) {
     setActingTicketId(ticketId);
     try {
       const comment = commentByTicketId[ticketId]?.trim() || null;
-      if (isDemoMode()) {
-        demoDecideTicketApproval({ ticket_id: ticketId, actor_id: profile.id, action, comment });
-        toast.success(action === "approve" ? "Aprobado" : "Rechazado");
-        await load();
-        return;
-      }
       const { error } = await supabase.rpc("approval_decide", {
         p_ticket_id: ticketId,
         p_action: action,

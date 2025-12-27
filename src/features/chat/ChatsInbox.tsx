@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AgentPresence, AgentPresenceStatus, Category, ChatEvent, ChatMessage, ChatThread, Profile } from "@/lib/types";
 import { supabase } from "@/lib/supabaseBrowser";
-import { isDemoMode } from "@/lib/demo";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -25,6 +24,13 @@ function msBetween(a: string | null, b: string | null) {
   if (!a || !b) return null;
   const ms = new Date(b).getTime() - new Date(a).getTime();
   return Number.isFinite(ms) ? ms : null;
+}
+
+function errorMessage(e: unknown) {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  if (e && typeof e === "object" && "message" in e && typeof (e as { message: unknown }).message === "string") return (e as { message: string }).message;
+  return "Error";
 }
 
 const PresenceOptions: AgentPresenceStatus[] = ["Disponible", "Ocupado", "Ausente", "Offline"];
@@ -73,7 +79,12 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
   }, [canManage, profile.id, threads]);
 
   const loadLookups = useCallback(async () => {
-    if (isDemoMode() || !profile.department_id) return;
+    if (!profile.department_id) {
+      setCategories({});
+      setAgents([]);
+      setPresence(null);
+      return;
+    }
     const [{ data: cats }, { data: profs }, { data: pres }] = await Promise.all([
       supabase.from("categories").select("id,name").eq("department_id", profile.department_id),
       supabase.from("profiles").select("id,full_name,email,role").in("role", ["agent", "supervisor"]).eq("department_id", profile.department_id).order("email"),
@@ -89,12 +100,15 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
 
   const loadThreads = useCallback(async () => {
     setError(null);
-    if (isDemoMode() || !profile.department_id) {
+    setLoading(true);
+    if (!profile.department_id) {
       setThreads([]);
+      setSelectedId(null);
+      setSelected(null);
       setLoading(false);
+      setError("Tu perfil no tiene departamento asignado. Pide a un admin que configure tu cuenta.");
       return;
     }
-    setLoading(true);
     const { data, error } = await supabase
       .from("chat_threads")
       .select("id,department_id,requester_id,category_id,subcategory_id,skill_id,subject,status,assigned_agent_id,assigned_at,accepted_at,first_response_at,closed_at,closed_by,metadata,created_at,updated_at")
@@ -109,7 +123,7 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
   }, [profile.department_id, selectedId]);
 
   const loadThreadData = useCallback(async () => {
-    if (!selectedId || isDemoMode()) return;
+    if (!selectedId) return;
     setLoadingThread(true);
     setError(null);
 
@@ -153,7 +167,7 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
   useEffect(() => {
     void loadLookups();
     void loadThreads();
-    if (isDemoMode() || !profile.department_id) return;
+    if (!profile.department_id) return;
     const channel = supabase
       .channel(`rt-chats-dept-${profile.department_id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_threads", filter: `department_id=eq.${profile.department_id}` }, (payload) => {
@@ -168,7 +182,7 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
 
   useEffect(() => {
     void loadThreadData();
-    if (!selectedId || isDemoMode()) return;
+    if (!selectedId) return;
     const channel = supabase
       .channel(`rt-chat-thread-${selectedId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages", filter: `thread_id=eq.${selectedId}` }, () => void loadThreadData())
@@ -180,11 +194,12 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
 
   async function setPresenceStatus(next: AgentPresenceStatus) {
     try {
-      await supabase.rpc("chat_set_presence", { p_status: next, p_capacity: presence?.capacity ?? 3 });
+      const { error } = await supabase.rpc("chat_set_presence", { p_status: next, p_capacity: presence?.capacity ?? 3 });
+      if (error) throw error;
       toast.success(`Estado: ${next}`);
       await loadLookups();
-    } catch {
-      toast.error("No se pudo actualizar presencia");
+    } catch (e: unknown) {
+      toast.error("No se pudo actualizar presencia", { description: errorMessage(e) });
     }
   }
 
@@ -195,8 +210,8 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
       if (error) throw error;
       toast.success("Chat tomado");
       setSelectedId(threadId);
-    } catch {
-      toast.error("No se pudo tomar el chat");
+    } catch (e: unknown) {
+      toast.error("No se pudo tomar el chat", { description: errorMessage(e) });
     } finally {
       setActing(null);
     }
@@ -208,8 +223,8 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
       const { error } = await supabase.rpc("chat_accept_thread", { p_thread_id: threadId });
       if (error) throw error;
       toast.success("Chat aceptado");
-    } catch {
-      toast.error("No se pudo aceptar el chat");
+    } catch (e: unknown) {
+      toast.error("No se pudo aceptar el chat", { description: errorMessage(e) });
     } finally {
       setActing(null);
     }
@@ -221,8 +236,8 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
       const { error } = await supabase.rpc("chat_assign_thread", { p_thread_id: threadId, p_agent_id: agentId });
       if (error) throw error;
       toast.success("Chat asignado");
-    } catch {
-      toast.error("No se pudo asignar");
+    } catch (e: unknown) {
+      toast.error("No se pudo asignar", { description: errorMessage(e) });
     } finally {
       setActing(null);
     }
@@ -234,8 +249,8 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
       const { error } = await supabase.rpc("chat_close_thread", { p_thread_id: threadId });
       if (error) throw error;
       toast.success("Chat cerrado");
-    } catch {
-      toast.error("No se pudo cerrar");
+    } catch (e: unknown) {
+      toast.error("No se pudo cerrar", { description: errorMessage(e) });
     } finally {
       setActing(null);
     }
@@ -250,8 +265,8 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
       const { error } = await supabase.rpc("chat_send_message", { p_thread_id: selected.id, p_body: clean });
       if (error) throw error;
       setBody("");
-    } catch {
-      toast.error("No se pudo enviar");
+    } catch (e: unknown) {
+      toast.error("No se pudo enviar", { description: errorMessage(e) });
     } finally {
       setSending(false);
     }
@@ -260,6 +275,7 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
   const timeToTake = selected ? msBetween(selected.created_at, selected.accepted_at) : null;
   const timeToFirstResponse = selected ? msBetween(selected.created_at, selected.first_response_at) : null;
   const timeToClose = selected ? msBetween(selected.created_at, selected.closed_at) : null;
+  const canSend = !!selected && (canManage || selected.requester_id === profile.id || selected.assigned_agent_id === profile.id);
 
   return (
     <div className="space-y-5">
@@ -276,13 +292,9 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
         }
       />
 
-      {isDemoMode() ? (
-        <EmptyState title="Chats no disponibles en DEMO" description="Activa Supabase para habilitar el canal en tiempo real." />
-      ) : null}
-
       {error ? <InlineAlert variant="error" description={error} /> : null}
 
-      {canWork && !isDemoMode() ? (
+      {canWork ? (
         <Card className="tech-border">
           <CardHeader className="flex-row items-center justify-between">
             <div>
@@ -467,12 +479,17 @@ export function ChatsInbox({ profile }: { profile: Profile }) {
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   rows={2}
-                  placeholder={selected.status === "Cerrado" ? "Chat cerrado" : "Escribe un mensaje…"}
-                  disabled={selected.status === "Cerrado"}
+                  placeholder={selected.status === "Cerrado" ? "Chat cerrado" : canSend ? "Escribe un mensaje…" : "Toma o acepta el chat para responder"}
+                  disabled={selected.status === "Cerrado" || !canSend}
                 />
-                <Button disabled={sending || selected.status === "Cerrado" || body.trim().length === 0} onClick={() => void send()} className="shrink-0">
+                <Button disabled={sending || selected.status === "Cerrado" || !canSend || body.trim().length === 0} onClick={() => void send()} className="shrink-0">
                   {sending ? "Enviando…" : "Enviar"}
                 </Button>
+              </div>
+            ) : null}
+            {selected && !canSend && selected.status !== "Cerrado" ? (
+              <div className="text-xs text-muted-foreground">
+                Para responder debes tomar el chat (cola) o estar asignado. Esto mantiene trazabilidad y permisos correctos.
               </div>
             ) : null}
           </CardContent>

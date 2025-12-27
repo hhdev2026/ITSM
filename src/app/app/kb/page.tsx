@@ -8,8 +8,6 @@ import type { Profile } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { errorMessage } from "@/lib/error";
-import { isDemoMode } from "@/lib/demo";
-import { createArticle as demoCreateArticle, listArticles as demoListArticles } from "@/lib/demoStore";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,11 +54,6 @@ export default function KnowledgeBasePage() {
   async function load(p: Profile) {
     setLoading(true);
     setError(null);
-    if (isDemoMode()) {
-      setArticles((demoListArticles(p.department_id!) as unknown) as Article[]);
-      setLoading(false);
-      return;
-    }
     const q = supabase
       .from("knowledge_base")
       .select("id,department_id,title,content,category_id,author_id,is_published,updated_at")
@@ -76,7 +69,6 @@ export default function KnowledgeBasePage() {
   useEffect(() => {
     if (!profile) return;
     void load(profile);
-    if (isDemoMode()) return;
     const channel = supabase
       .channel(`rt-kb-${profile.department_id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "knowledge_base", filter: `department_id=eq.${profile.department_id}` }, () => void load(profile))
@@ -92,14 +84,6 @@ export default function KnowledgeBasePage() {
     setCreating(true);
     setError(null);
     try {
-      if (isDemoMode()) {
-        demoCreateArticle({ department_id: p.department_id!, title: newTitle.trim(), content: newContent.trim(), is_published: newPublished });
-        setNewTitle("");
-        setNewContent("");
-        setNewPublished(false);
-        await load(p);
-        return;
-      }
       const { error } = await supabase.from("knowledge_base").insert({
         department_id: p.department_id!,
         title: newTitle.trim(),

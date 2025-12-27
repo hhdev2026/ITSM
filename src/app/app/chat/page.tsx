@@ -6,7 +6,6 @@ import { UserChat } from "@/features/chat/UserChat";
 import { useProfile, useSession } from "@/lib/hooks";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -17,6 +16,12 @@ export default function ChatPage() {
     if (!sessionLoading && !session) router.replace("/login");
   }, [sessionLoading, session, router]);
 
+  useEffect(() => {
+    if (sessionLoading || profileLoading) return;
+    if (!session || !profile) return;
+    if (profile.role !== "user") router.replace("/app/chats");
+  }, [profile, profileLoading, router, session, sessionLoading]);
+
   if (sessionLoading || profileLoading) return <AppBootScreen label="Cargando chat…" />;
   if (!session) return null;
   if (error) return <AppNoticeScreen variant="error" title="No se pudo cargar el perfil" description={error} />;
@@ -24,18 +29,7 @@ export default function ChatPage() {
 
   return (
     <AppShell profile={profile}>
-      {profile.role === "user" ? (
-        <UserChat profile={profile} />
-      ) : (
-        <div className="space-y-3">
-          <div className="text-xl font-semibold">Chat</div>
-          <div className="text-sm text-muted-foreground">El chat de solicitantes está disponible solo para rol user.</div>
-          <Link href="/app/chats" className="inline-flex text-sm text-[hsl(var(--brand-cyan))] hover:underline">
-            Ir a bandeja de chats
-          </Link>
-        </div>
-      )}
+      {profile.role === "user" ? <UserChat profile={profile} /> : null}
     </AppShell>
   );
 }
-

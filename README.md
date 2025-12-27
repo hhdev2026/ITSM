@@ -19,14 +19,6 @@ Completa los valores:
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 
-### Modo DEMO (sin Supabase)
-
-Para ver la UI sin conectar Supabase, activa:
-
-- `NEXT_PUBLIC_DEMO_MODE=true` en `.env.local`
-
-Luego entra en `http://localhost:3000/login` y elige un rol (Admin/Agent/Supervisor/User).
-
 ### 2) Base de datos (Supabase)
 
 En tu proyecto Supabase ejecuta (SQL Editor o Supabase CLI) las migraciones:
@@ -45,8 +37,8 @@ Para que Realtime funcione en la UI (suscripciones `postgres_changes`), habilita
 
 ### 3) Roles y multi-departamento
 
-Al registrarse un usuario se crea su fila en `profiles` con `role='user'` y `department_id=NULL`.
-Para poder crear/ver tickets, un **admin** debe asignar `department_id` y, si aplica, ajustar el `role`:
+Al registrarse un usuario se crea su fila en `profiles` con `role='user'`.
+Para operar por departamento/rol, un **admin** puede ajustar `department_id` y, si aplica, el `role`:
 
 - `user`: solicitante
 - `agent`: agente

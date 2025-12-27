@@ -4,9 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseBrowser";
 import type { Category, Profile } from "@/lib/types";
 import Link from "next/link";
-import { isDemoMode } from "@/lib/demo";
-import { listCategories as demoListCategories, computeKpis as demoComputeKpis } from "@/lib/demoStore";
-import { listDemoAgents } from "@/lib/demoAuth";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,9 +73,9 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
   async function loadLookups() {
-    if (isDemoMode()) {
-      setCategories((demoListCategories(profile.department_id!) as unknown) as Category[]);
-      setAgents(listDemoAgents(profile.department_id!).map((p) => ({ id: p.id, label: p.full_name || p.email })));
+    if (!profile.department_id) {
+      setCategories([]);
+      setAgents([]);
       return;
     }
     const { data: cats } = await supabase
@@ -107,13 +104,6 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
     setLoading(true);
     setLoadingChatKpis(true);
     setError(null);
-    if (isDemoMode()) {
-      setKpis(demoComputeKpis(profile.department_id!, period, agentId || undefined, categoryId || undefined) as KpiData);
-      setChatKpis(null);
-      setLoading(false);
-      setLoadingChatKpis(false);
-      return;
-    }
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
     if (!token) {
@@ -153,11 +143,6 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
 
   async function loadTrends() {
     setLoadingTrends(true);
-    if (isDemoMode()) {
-      setTrends(null);
-      setLoadingTrends(false);
-      return;
-    }
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
     if (!token) {
@@ -223,50 +208,50 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
           <CardDescription>Refina la vista por periodo, agente y categoría.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
-        <label className="block">
-          <div className="text-xs text-muted-foreground">Periodo</div>
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as (typeof Periods)[number]["value"])}
-            className="mt-1 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-          >
-            {Periods.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <div className="text-xs text-muted-foreground">Agente</div>
-          <select
-            value={agentId}
-            onChange={(e) => setAgentId(e.target.value)}
-            className="mt-1 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-          >
-            <option value="">Todos</option>
-            {agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <div className="text-xs text-muted-foreground">Categoría</div>
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            className="mt-1 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-          >
-            <option value="">Todas</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="block">
+            <div className="text-xs text-muted-foreground">Periodo</div>
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value as (typeof Periods)[number]["value"])}
+              className="mt-1 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+            >
+              {Periods.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <div className="text-xs text-muted-foreground">Agente</div>
+            <select
+              value={agentId}
+              onChange={(e) => setAgentId(e.target.value)}
+              className="mt-1 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+            >
+              <option value="">Todos</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <div className="text-xs text-muted-foreground">Categoría</div>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className="mt-1 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+            >
+              <option value="">Todas</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
         </CardContent>
       </Card>
 

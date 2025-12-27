@@ -3,7 +3,6 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseBrowser";
-import { isDemoMode } from "@/lib/demo";
 import type { Category, Profile, ServiceCatalogField, ServiceCatalogItem, Subcategory } from "@/lib/types";
 import { errorMessage } from "@/lib/error";
 import { Button } from "@/components/ui/button";
@@ -14,15 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { TicketPriorities, type TicketPriority } from "@/lib/constants";
-import {
-  createTicket as demoCreateTicket,
-  listCategories as demoListCategories,
-  listServiceApprovalSteps as demoListServiceApprovalSteps,
-  listServiceCatalogFields,
-  listServiceCatalogItems,
-  listSlas as demoListSlas,
-  listSubcategories as demoListSubcategories,
-} from "@/lib/demoStore";
+import { TicketTypeBadge } from "@/components/tickets/TicketBadges";
 import {
   IconAccess,
   IconApp,
@@ -35,7 +26,7 @@ import {
   IconUsers,
 } from "@/components/icons/catalog-icons";
 import { MotionItem, MotionList } from "@/components/motion/MotionList";
-import { TicketPriorityBadge, TicketTypeBadge } from "@/components/tickets/TicketBadges";
+import { TicketPriorityBadge } from "@/components/tickets/TicketBadges";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { InlineEmpty } from "@/components/feedback/InlineEmpty";
 import { SlidersHorizontal } from "lucide-react";
@@ -169,22 +160,6 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
     setError(null);
 
     try {
-      if (isDemoMode()) {
-        const cats = (demoListCategories(profile.department_id!) as unknown) as Category[];
-        setCategories(cats);
-        const subs: Subcategory[] = [];
-        for (const c of cats) {
-          subs.push(...(((demoListSubcategories(c.id) as unknown) as Subcategory[]) ?? []));
-        }
-        setSubcategories(subs);
-
-        const items = (listServiceCatalogItems(profile.department_id!) as unknown) as ServiceCatalogItem[];
-        setServices(items);
-        setSlas((demoListSlas(profile.department_id!) as unknown) as SlaRow[]);
-        setLoading(false);
-        return;
-      }
-
       const { data: cats, error: catErr } = await supabase
         .from("categories")
         .select("id,name,description,department_id")
@@ -254,10 +229,6 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
 
   async function loadFields(serviceId: string) {
     if (fieldsByServiceId[serviceId]) return;
-    if (isDemoMode()) {
-      setFieldsByServiceId((cur) => ({ ...cur, [serviceId]: (listServiceCatalogFields(serviceId) as unknown) as ServiceCatalogField[] }));
-      return;
-    }
     const { data, error } = await supabase
       .from("service_catalog_fields")
       .select("id,service_id,key,label,field_type,required,placeholder,help_text,options,sort_order")
@@ -273,10 +244,6 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
 
   async function loadApprovalSteps(serviceId: string) {
     if (approvalStepsByServiceId[serviceId]) return;
-    if (isDemoMode()) {
-      setApprovalStepsByServiceId((cur) => ({ ...cur, [serviceId]: (demoListServiceApprovalSteps(serviceId) as unknown) as ApprovalStep[] }));
-      return;
-    }
     const { data, error } = await supabase
       .from("service_catalog_approval_steps")
       .select("id,service_id,step_order,kind,required,approver_profile_id,approver_role")
@@ -292,10 +259,6 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
 
   async function loadTimeTargets(serviceId: string) {
     if (timeTargetsByServiceId[serviceId]) return;
-    if (isDemoMode()) {
-      setTimeTargetsByServiceId((cur) => ({ ...cur, [serviceId]: [] }));
-      return;
-    }
     const { data, error } = await supabase
       .from("service_time_targets")
       .select("id,service_id,target,priority,response_time_hours,resolution_time_hours,is_active")
@@ -374,23 +337,6 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
         context: (meta.context as Record<string, unknown> | undefined) ?? {},
         fields: fieldsPayload,
       };
-
-      if (isDemoMode()) {
-        demoCreateTicket({
-          requester_id: profile.id,
-          title: title.trim(),
-          description: description.trim() || null,
-          type: selectedService.ticket_type,
-          priority,
-          category_id: selectedService.category_id,
-          subcategory_id: selectedService.subcategory_id,
-          metadata,
-        });
-        toast.success(needsApproval ? "Ticket creado (Pendiente Aprobación)" : "Ticket creado");
-        setOpen(false);
-        setCreating(false);
-        return;
-      }
 
       const { error } = await supabase.from("tickets").insert({
         requester_id: profile.id,

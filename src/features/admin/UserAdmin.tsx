@@ -4,7 +4,6 @@ import * as React from "react";
 import { toast } from "sonner";
 import type { Profile } from "@/lib/types";
 import { useAccessToken } from "@/lib/hooks";
-import { isDemoMode } from "@/lib/demo";
 import { supabase } from "@/lib/supabaseBrowser";
 import { errorMessage } from "@/lib/error";
 import { Button } from "@/components/ui/button";
@@ -147,12 +146,6 @@ export function UserAdmin({ adminProfile }: { adminProfile: Profile }) {
 
   async function load() {
     if (!token) return;
-    if (isDemoMode()) {
-      setError("El mantenedor de usuarios requiere Supabase (no disponible en DEMO).");
-      setUsers([]);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     setError(null);
     try {

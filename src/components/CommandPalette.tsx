@@ -105,12 +105,14 @@ export function createAppCommandPaletteItems({
   onSignOut: () => void;
   onToggleTheme: () => void;
 }): CommandPaletteItem[] {
+  const homeTitle = role === "user" ? "Ir a Mis tickets" : role === "agent" ? "Ir a Mi trabajo" : "Ir al panel";
+  const homeSubtitle = role === "user" ? "Tus tickets y seguimiento" : role === "agent" ? "Bandeja operativa" : "KPIs y tendencias";
   const items: CommandPaletteItem[] = [
     {
       id: "nav-home",
-      title: "Ir al dashboard",
-      subtitle: "Abrir vista principal",
-      keywords: "inicio dashboard home",
+      title: homeTitle,
+      subtitle: homeSubtitle,
+      keywords: "inicio home principal",
       onSelect: () => onNavigate("/app"),
     },
     {

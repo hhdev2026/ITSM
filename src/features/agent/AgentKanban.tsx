@@ -6,9 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseBrowser";
 import type { Profile, Ticket } from "@/lib/types";
-import { KanbanStatuses, type KanbanStatus, priorityBadge, slaBadge, type TicketStatus } from "@/lib/constants";
-import { isDemoMode } from "@/lib/demo";
-import { listTickets as demoListTickets, updateTicket as demoUpdateTicket } from "@/lib/demoStore";
+import { KanbanStatuses, type KanbanStatus, priorityBadge, slaBadge } from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,17 +41,6 @@ export function AgentKanban({ profile }: { profile: Profile }) {
   async function load() {
     setLoading(true);
     setError(null);
-    if (isDemoMode()) {
-      const statusIn: TicketStatus[] = ["Nuevo", "Asignado", "En Progreso", "Pendiente Info", "Resuelto"];
-      const data = demoListTickets({
-        department_id: profile.department_id!,
-        ...(onlyMine ? { assignee_id: profile.id } : {}),
-        statusIn,
-      });
-      setTickets((data as unknown) as Ticket[]);
-      setLoading(false);
-      return;
-    }
     const q = supabase
       .from("tickets")
       .select("id,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,sla_deadline,first_response_at,resolved_at,closed_at")
@@ -70,7 +57,6 @@ export function AgentKanban({ profile }: { profile: Profile }) {
 
   useEffect(() => {
     void load();
-    if (isDemoMode()) return;
     const channel = supabase
       .channel(`rt-agent-${profile.department_id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "tickets", filter: `department_id=eq.${profile.department_id}` }, () => void load())
@@ -82,11 +68,6 @@ export function AgentKanban({ profile }: { profile: Profile }) {
   }, [profile.department_id, onlyMine]);
 
   async function updateStatus(ticketId: string, status: KanbanStatus) {
-    if (isDemoMode()) {
-      demoUpdateTicket(ticketId, { status });
-      await load();
-      return;
-    }
     const prev = tickets;
     setTickets((cur) => cur.map((t) => (t.id === ticketId ? { ...t, status } : t)));
     const { error } = await supabase.from("tickets").update({ status }).eq("id", ticketId);
@@ -97,11 +78,6 @@ export function AgentKanban({ profile }: { profile: Profile }) {
   }
 
   async function assignToMe(ticketId: string) {
-    if (isDemoMode()) {
-      demoUpdateTicket(ticketId, { assignee_id: profile.id, status: "Asignado" });
-      await load();
-      return;
-    }
     const prev = tickets;
     setTickets((cur) => cur.map((t) => (t.id === ticketId ? { ...t, assignee_id: profile.id, status: "Asignado" } : t)));
     const { error } = await supabase.from("tickets").update({ assignee_id: profile.id, status: "Asignado" }).eq("id", ticketId);

@@ -18,18 +18,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { errorMessage } from "@/lib/error";
-import { isDemoMode } from "@/lib/demo";
-import { listDemoAgents } from "@/lib/demoAuth";
-import {
-  addComment as demoAddComment,
-  decideTicketApproval as demoDecideTicketApproval,
-  getTicket as demoGetTicket,
-  listCategories as demoListCategories,
-  listComments as demoListComments,
-  listSubcategories as demoListSubcategories,
-  listTicketApprovals as demoListTicketApprovals,
-  updateTicket as demoUpdateTicket,
-} from "@/lib/demoStore";
 import { Check, ChevronDown, Clock, Copy, MessageSquare, RefreshCcw, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { MotionItem, MotionList } from "@/components/motion/MotionList";
@@ -133,31 +121,6 @@ export default function TicketDetailPage() {
     if (!ticketId) return;
     setLoading(true);
     setError(null);
-    if (isDemoMode()) {
-      const t = demoGetTicket(ticketId);
-      setTicket(t);
-      setAssigneeId(t?.assignee_id ?? "");
-      setComments((demoListComments(ticketId) as unknown) as Comment[]);
-      setApprovals((demoListTicketApprovals(ticketId) as unknown) as TicketApproval[]);
-      setEvents([]);
-      if (profile?.department_id) {
-        const cats = (demoListCategories(profile.department_id) as unknown) as Array<{ id: string; name: string }>;
-        const catName = t?.category_id ? cats.find((c) => c.id === t.category_id)?.name ?? null : null;
-        setCategoryLabel(catName);
-        if (t?.category_id) {
-          const subs = (demoListSubcategories(t.category_id) as unknown) as Array<{ id: string; name: string }>;
-          const subName = t.subcategory_id ? subs.find((s) => s.id === t.subcategory_id)?.name ?? null : null;
-          setSubcategoryLabel(subName);
-        } else {
-          setSubcategoryLabel(null);
-        }
-      }
-      if (canReassign && profile?.department_id) {
-        setAgents(listDemoAgents(profile.department_id).map((p) => ({ id: p.id, label: p.full_name || p.email })));
-      }
-      setLoading(false);
-      return;
-    }
     const { data: t, error: tErr } = await supabase
       .from("tickets")
       .select(
@@ -233,7 +196,6 @@ export default function TicketDetailPage() {
   useEffect(() => {
     void load();
     if (!ticketId) return;
-    if (isDemoMode()) return;
     const channel = supabase
       .channel(`rt-ticket-${ticketId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "tickets", filter: `id=eq.${ticketId}` }, () => void load())
@@ -263,14 +225,6 @@ export default function TicketDetailPage() {
     setSaving(true);
     setError(null);
     try {
-      if (isDemoMode()) {
-        demoAddComment({ ticket_id: ticketId, author_id: profile.id, body: body.trim(), is_internal: canModerate ? internal : false });
-        setBody("");
-        setInternal(false);
-        await load();
-        toast.success("Comentario enviado");
-        return;
-      }
       const { error } = await supabase.from("comments").insert({
         ticket_id: ticketId,
         author_id: profile.id,
@@ -293,35 +247,18 @@ export default function TicketDetailPage() {
 
   async function assignToMe() {
     if (!profile || !ticketId) return;
-    if (isDemoMode()) {
-      demoUpdateTicket(ticketId, { assignee_id: profile.id, status: "Asignado" });
-      await load();
-      return;
-    }
     const { error } = await supabase.from("tickets").update({ assignee_id: profile.id, status: "Asignado" }).eq("id", ticketId);
     if (error) toast.error("No se pudo asignar", { description: error.message });
   }
 
   async function reassign(id: string) {
     if (!ticketId) return;
-    if (isDemoMode()) {
-      demoUpdateTicket(ticketId, { assignee_id: id || null, status: id ? "Asignado" : "Nuevo" });
-      await load();
-      return;
-    }
     const { error } = await supabase.from("tickets").update({ assignee_id: id || null, status: id ? "Asignado" : "Nuevo" }).eq("id", ticketId);
     if (error) toast.error("No se pudo reasignar", { description: error.message });
   }
 
   async function setStatus(status: string) {
     if (!ticketId) return;
-    if (isDemoMode()) {
-      if (TicketStatuses.includes(status as (typeof TicketStatuses)[number])) {
-        demoUpdateTicket(ticketId, { status: status as (typeof TicketStatuses)[number] });
-      }
-      await load();
-      return;
-    }
     const { error } = await supabase.from("tickets").update({ status }).eq("id", ticketId);
     if (error) toast.error("No se pudo actualizar estado", { description: error.message });
   }
@@ -331,13 +268,6 @@ export default function TicketDetailPage() {
     setApprovalsActing(action);
     try {
       const comment = approvalComment.trim() || null;
-      if (isDemoMode()) {
-        demoDecideTicketApproval({ ticket_id: ticketId, actor_id: profile.id, action, comment });
-        toast.success(action === "approve" ? "Aprobado" : "Rechazado");
-        setApprovalComment("");
-        await load();
-        return;
-      }
       const { error } = await supabase.rpc("approval_decide", { p_ticket_id: ticketId, p_action: action, p_comment: comment });
       if (error) throw error;
       toast.success(action === "approve" ? "Aprobado" : "Rechazado");
