@@ -128,8 +128,8 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
   }
 
   function onCreate() {
-    if (profile.role === "user") router.push("/app?new=1");
-    else router.push("/app");
+    // Always take user/admin/agent/supervisor to the guided catalog flow.
+    router.push("/app/catalog");
   }
 
   const paletteItems = createAppCommandPaletteItems({
