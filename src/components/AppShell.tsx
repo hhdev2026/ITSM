@@ -92,33 +92,64 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
     localStorage.setItem("itsm.sidebarCollapsed", collapsed ? "1" : "0");
   }, [collapsed]);
 
-  const nav =
-    profile.role === "user"
-      ? [
-          { href: "/app", label: "Inicio", icon: IconTickets },
-          { href: "/app/assets", label: "Mis activos", icon: IconAssets },
-          { href: "/app/catalog", label: "Crear ticket", icon: IconCatalog },
-          { href: "/app/chat", label: "Chat con soporte", icon: IconChat },
-          { href: "/app/kb", label: "Guías y ayuda", icon: IconKb },
-        ]
-      : profile.role === "agent"
-        ? [
-            { href: "/app", label: "Mi trabajo", icon: IconKanban },
-            { href: "/app/assets", label: "Activos", icon: IconAssets },
+  type NavEntry = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
+  type NavSection = { title: string; items: NavEntry[] };
+
+  const sections: NavSection[] = React.useMemo(() => {
+    if (profile.role === "user") {
+      return [
+        {
+          title: "Tickets",
+          items: [
+            { href: "/app", label: "Mis tickets", icon: IconTickets },
+            { href: "/app/catalog", label: "Crear ticket", icon: IconCatalog },
+          ],
+        },
+        { title: "Activos", items: [{ href: "/app/assets", label: "Mis equipos", icon: IconAssets }] },
+        {
+          title: "Soporte",
+          items: [
+            { href: "/app/chat", label: "Chat con soporte", icon: IconChat },
+            { href: "/app/kb", label: "Ayuda", icon: IconKb },
+          ],
+        },
+      ];
+    }
+    if (profile.role === "agent") {
+      return [
+        {
+          title: "Operación",
+          items: [
+            { href: "/app", label: "Bandeja", icon: IconKanban },
             { href: "/app/chats", label: "Chats", icon: IconChat },
-            { href: "/app/kb", label: "Base de conocimiento", icon: IconKb },
             { href: "/app/approvals", label: "Aprobaciones", icon: IconApprovals },
-          ]
-        : [
-            { href: "/app", label: "Panel", icon: IconAnalytics },
-            { href: "/app/dispatch", label: "Centro de mando", icon: IconKanban },
-            { href: "/app/tickets", label: "Seguimiento", icon: IconTickets },
-            { href: "/app/assets", label: "Activos", icon: IconAssets },
-            { href: "/app/chats", label: "Chats", icon: IconChat },
-            { href: "/app/slas", label: "SLAs", icon: IconSla },
-            { href: "/app/kb", label: "Base de conocimiento", icon: IconKb },
-            { href: "/app/approvals", label: "Aprobaciones", icon: IconApprovals },
-          ];
+          ],
+        },
+        { title: "Gestión", items: [{ href: "/app/assets", label: "Activos", icon: IconAssets }] },
+        { title: "Conocimiento", items: [{ href: "/app/kb", label: "Base de conocimiento", icon: IconKb }] },
+      ];
+    }
+    return [
+      { title: "Panel", items: [{ href: "/app", label: "Panel ejecutivo", icon: IconAnalytics }] },
+      {
+        title: "Operación",
+        items: [
+          { href: "/app/dispatch", label: "Centro de mando", icon: IconKanban },
+          { href: "/app/tickets", label: "Seguimiento de tickets", icon: IconTickets },
+          { href: "/app/chats", label: "Chats", icon: IconChat },
+          { href: "/app/approvals", label: "Aprobaciones", icon: IconApprovals },
+        ],
+      },
+      {
+        title: "Gestión",
+        items: [
+          { href: "/app/assets", label: "Activos", icon: IconAssets },
+          { href: "/app/slas", label: "SLAs", icon: IconSla },
+        ],
+      },
+      { title: "Conocimiento", items: [{ href: "/app/kb", label: "Base de conocimiento", icon: IconKb }] },
+    ];
+  }, [profile.role]);
 
   const secondaryNav = profile.role === "admin" ? [{ href: "/app/admin/users", label: "Usuarios", icon: IconUsers }] : [];
 
@@ -247,10 +278,20 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
             </div>
 
             <div className="mt-4">
-              {!collapsed && <div className="px-3 pb-2 text-[11px] font-medium tracking-wide text-sidebar-muted-foreground">NAVEGACIÓN</div>}
-              <nav className="flex flex-col gap-1">
-                {nav.map((i) => (
-                  <NavItem key={i.href} href={i.href} label={i.label} icon={i.icon} collapsed={collapsed} />
+              <nav className="flex flex-col gap-3">
+                {sections.map((section) => (
+                  <div key={section.title}>
+                    {!collapsed ? (
+                      <div className="px-3 pb-2 text-[11px] font-medium tracking-wide text-sidebar-muted-foreground">
+                        {section.title.toUpperCase()}
+                      </div>
+                    ) : null}
+                    <div className="flex flex-col gap-1">
+                      {section.items.map((i) => (
+                        <NavItem key={i.href} href={i.href} label={i.label} icon={i.icon} collapsed={collapsed} />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </nav>
             </div>
@@ -286,15 +327,20 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
-                      {nav.map((i) => {
-                        const Icon = i.icon;
-                        return (
-                          <DropdownMenuItem key={i.href} onSelect={() => router.push(i.href)}>
-                            <Icon className="h-4 w-4" />
-                            {i.label}
-                          </DropdownMenuItem>
-                        );
-                      })}
+                      {sections.map((section, idx) => (
+                        <React.Fragment key={section.title}>
+                          {idx > 0 ? <DropdownMenuSeparator /> : null}
+                          {section.items.map((i) => {
+                            const Icon = i.icon;
+                            return (
+                              <DropdownMenuItem key={i.href} onSelect={() => router.push(i.href)}>
+                                <Icon className="h-4 w-4" />
+                                {i.label}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </React.Fragment>
+                      ))}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onSelect={onToggleTheme}>
                         {resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -333,11 +379,11 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
                         <span className="truncate">{profile.full_name || profile.email}</span>
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => router.push("/app")}>
-                        <IconTickets className="h-4 w-4" />
-                        Inicio
-                      </DropdownMenuItem>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => router.push("/app")}>
+                      <IconTickets className="h-4 w-4" />
+                        {profile.role === "user" ? "Mis tickets" : profile.role === "agent" ? "Bandeja" : "Panel ejecutivo"}
+                    </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onSelect={onToggleTheme}>
                         {resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
