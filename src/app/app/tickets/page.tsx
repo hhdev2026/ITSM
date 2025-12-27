@@ -16,39 +16,21 @@ import { useProfile, useSession } from "@/lib/hooks";
 import { supabase } from "@/lib/supabaseBrowser";
 import type { Category, Subcategory, Ticket } from "@/lib/types";
 import { formatTicketNumber } from "@/lib/ticketNumber";
+import { errorMessage } from "@/lib/error";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCcw } from "lucide-react";
 
-type TicketLiveRow = Pick<
-  Ticket,
-  | "id"
-  | "ticket_number"
-  | "department_id"
-  | "type"
-  | "title"
-  | "status"
-  | "priority"
-  | "category_id"
-  | "subcategory_id"
-  | "requester_id"
-  | "assignee_id"
-  | "created_at"
-  | "updated_at"
-  | "sla_deadline"
-  | "response_deadline"
-  | "sla_remaining_minutes"
-  | "sla_traffic_light"
-  | "sla_pct_used"
-  | "response_remaining_minutes"
-  | "response_traffic_light"
-  | "response_pct_used"
-  | "sla_excluded"
-  | "sla_exclusion_reason"
-  | "planned_for_at"
-  | "canceled_reason"
-  | "metadata"
->;
+type TicketLiveRow = Partial<Ticket> & {
+  id: string;
+  department_id: string;
+  title: string;
+  type: Ticket["type"];
+  status: Ticket["status"];
+  priority: Ticket["priority"];
+  created_at: string;
+  updated_at: string;
+};
 
 function profileLabel(p: { full_name: string | null; email: string }) {
   return p.full_name?.trim() || p.email;
@@ -67,6 +49,28 @@ function tierPathFromMetadata(meta: unknown) {
   ].filter((v) => typeof v === "string" && v.trim().length > 0) as string[];
   if (!parts.length) return null;
   return parts.join(" → ");
+}
+
+function computeTraffic(opts: {
+  status?: unknown;
+  excluded?: unknown;
+  deadline?: unknown;
+  targetMinutes?: unknown;
+}): { light: Ticket["sla_traffic_light"]; remainingMinutes: number | null; pctUsed: number | null } {
+  const status = typeof opts.status === "string" ? opts.status : null;
+  if (opts.excluded === true) return { light: "excluded", remainingMinutes: 0, pctUsed: null };
+  if (status === "Cerrado" || status === "Cancelado" || status === "Rechazado") return { light: "closed", remainingMinutes: 0, pctUsed: null };
+
+  const deadline = typeof opts.deadline === "string" ? opts.deadline : null;
+  const target = typeof opts.targetMinutes === "number" ? opts.targetMinutes : null;
+  if (!deadline || !target || target <= 0) return { light: null, remainingMinutes: null, pctUsed: null };
+
+  const remaining = Math.floor((new Date(deadline).getTime() - Date.now()) / 60000);
+  const remainingClamped = Math.max(remaining, 0);
+  const ratio = remaining / target;
+  const light: Ticket["sla_traffic_light"] = remaining <= 0 ? "red" : ratio <= 0.2 ? "yellow" : "green";
+  const pctUsed = Math.round((1 - remainingClamped / target) * 10000) / 100;
+  return { light, remainingMinutes: remainingClamped, pctUsed };
 }
 
 export default function TicketsTrackingPage() {
@@ -119,59 +123,77 @@ export default function TicketsTrackingPage() {
         setSubcategories([]);
       }
 
-      let query = supabase
+      // Fetch a snapshot and apply filters locally (avoids enum-filter errors if DB is mid-migration).
+      const { data, error } = await supabase
         .from("tickets_sla_live")
-        .select(
-          [
-            "id",
-            "ticket_number",
-            "department_id",
-            "type",
-            "title",
-            "status",
-            "priority",
-            "category_id",
-            "subcategory_id",
-            "metadata",
-            "requester_id",
-            "assignee_id",
-            "created_at",
-            "updated_at",
-            "response_deadline",
-            "sla_deadline",
-            "sla_remaining_minutes",
-            "sla_traffic_light",
-            "sla_pct_used",
-            "response_remaining_minutes",
-            "response_traffic_light",
-            "response_pct_used",
-            "sla_excluded",
-            "sla_exclusion_reason",
-            "planned_for_at",
-            "canceled_reason",
-          ].join(",")
-        )
+        .select("*")
         .eq("department_id", profile.department_id)
         .order("created_at", { ascending: false })
         .limit(250);
 
-      if (!showClosed) query = query.not("status", "in", "(Cerrado,Cancelado)");
-      if (status) query = query.eq("status", status);
-      if (priority) query = query.eq("priority", priority);
-      if (assigneeId) query = query.eq("assignee_id", assigneeId);
-      if (q.trim()) query = query.ilike("title", `%${q.trim()}%`);
+      let finalRows: TicketLiveRow[] = [];
 
-      const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        // Fallback: DB may not have the view/grants yet; use base table.
+        const base = await supabase.from("tickets").select("*").eq("department_id", profile.department_id).order("created_at", { ascending: false }).limit(250);
+        if (base.error) throw base.error;
 
-      const tickets = (data ?? []) as unknown as TicketLiveRow[];
-      setRows(tickets);
+        const computed = ((base.data ?? []) as Array<Record<string, unknown>>).map((t) => {
+          const sla = computeTraffic({
+            status: t.status,
+            excluded: (t as { sla_excluded?: unknown }).sla_excluded,
+            deadline: (t as { sla_deadline?: unknown }).sla_deadline,
+            targetMinutes: (t as { sla_resolution_target_minutes?: unknown }).sla_resolution_target_minutes,
+          });
+          const resp = computeTraffic({
+            status: t.status,
+            excluded: (t as { sla_excluded?: unknown }).sla_excluded,
+            deadline: (t as { response_deadline?: unknown }).response_deadline,
+            targetMinutes: (t as { sla_response_target_minutes?: unknown }).sla_response_target_minutes,
+          });
+          return {
+            ...(t as unknown as TicketLiveRow),
+            sla_remaining_minutes: sla.remainingMinutes ?? undefined,
+            sla_traffic_light: sla.light,
+            sla_pct_used: sla.pctUsed,
+            response_remaining_minutes: resp.remainingMinutes ?? undefined,
+            response_traffic_light: resp.light,
+            response_pct_used: resp.pctUsed,
+          } satisfies TicketLiveRow;
+        });
+
+        finalRows = computed.filter((t) => {
+          const title = typeof t.title === "string" ? t.title : "";
+          if (!showClosed && (t.status === "Cerrado" || t.status === "Cancelado")) return false;
+          if (status && t.status !== status) return false;
+          if (priority && t.priority !== priority) return false;
+          if (assigneeId && t.assignee_id !== assigneeId) return false;
+          if (q.trim() && !title.toLowerCase().includes(q.trim().toLowerCase())) return false;
+          return true;
+        });
+      } else {
+        const tickets = (data ?? []) as Array<Record<string, unknown>>;
+        finalRows = tickets.filter((t) => {
+          const st = typeof t.status === "string" ? t.status : "";
+          const pr = typeof t.priority === "string" ? t.priority : "";
+          const asg = typeof t.assignee_id === "string" ? t.assignee_id : null;
+          const title = typeof t.title === "string" ? t.title : "";
+          if (!showClosed && (st === "Cerrado" || st === "Cancelado")) return false;
+          if (status && st !== status) return false;
+          if (priority && pr !== priority) return false;
+          if (assigneeId && asg !== assigneeId) return false;
+          if (q.trim() && !title.toLowerCase().includes(q.trim().toLowerCase())) return false;
+          return true;
+        }) as unknown as TicketLiveRow[];
+      }
 
       const ids = new Set<string>();
-      for (const t of tickets) {
+      for (const t of finalRows) {
         if (typeof t.requester_id === "string") ids.add(t.requester_id);
         if (typeof t.assignee_id === "string") ids.add(t.assignee_id);
       }
+
+      setRows(finalRows);
 
       if (ids.size) {
         const { data: profsRaw, error: pErr } = await supabase.from("profiles").select("id,email,full_name").in("id", Array.from(ids));
@@ -181,7 +203,7 @@ export default function TicketsTrackingPage() {
         setProfiles([]);
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "No se pudo cargar tickets";
+      const msg = errorMessage(e) ?? "No se pudo cargar tickets";
       setError(msg);
       setRows([]);
     } finally {
