@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Service Desk - ITSM",
-  description: "Mesa de Servicios inspirada en ITIL (Supabase + Next.js)",
+  title: "Service Desk",
+  description: "Portal de soporte y mesa de servicios para tu organización.",
 };
 
 export default function RootLayout({
