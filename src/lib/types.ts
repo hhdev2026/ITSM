@@ -6,6 +6,7 @@ export type Profile = {
   full_name: string | null;
   role: Role;
   department_id: string | null;
+  manager_id?: string | null;
   points: number;
   rank: string;
 };

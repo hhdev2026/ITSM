@@ -68,7 +68,7 @@ export function useProfile(sessionUserId: string | undefined) {
     });
     supabase
       .from("profiles")
-      .select("id,email,full_name,role,department_id,points,rank")
+      .select("id,email,full_name,role,department_id,manager_id,points,rank")
       .eq("id", sessionUserId)
       .single()
       .then(({ data, error }) => {

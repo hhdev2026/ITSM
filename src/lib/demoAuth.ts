@@ -13,6 +13,7 @@ const DemoUsers: Record<DemoRole, Profile> = {
     full_name: "Demo User",
     role: "user",
     department_id: "11111111-1111-1111-1111-111111111111",
+    manager_id: null,
     points: 0,
     rank: "Bronce",
   },
@@ -22,6 +23,7 @@ const DemoUsers: Record<DemoRole, Profile> = {
     full_name: "Demo Agent",
     role: "agent",
     department_id: "11111111-1111-1111-1111-111111111111",
+    manager_id: null,
     points: 320,
     rank: "Plata",
   },
@@ -31,6 +33,7 @@ const DemoUsers: Record<DemoRole, Profile> = {
     full_name: "Demo Supervisor",
     role: "supervisor",
     department_id: "11111111-1111-1111-1111-111111111111",
+    manager_id: null,
     points: 1200,
     rank: "Platino",
   },
@@ -40,6 +43,7 @@ const DemoUsers: Record<DemoRole, Profile> = {
     full_name: "Demo Admin",
     role: "admin",
     department_id: "11111111-1111-1111-1111-111111111111",
+    manager_id: null,
     points: 2500,
     rank: "Diamante",
   },
@@ -70,4 +74,3 @@ export function listDemoAgents(departmentId: string) {
   const all = Object.values(DemoUsers);
   return all.filter((p) => (p.role === "agent" || p.role === "supervisor") && p.department_id === departmentId);
 }
-

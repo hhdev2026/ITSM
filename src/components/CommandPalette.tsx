@@ -146,6 +146,16 @@ export function createAppCommandPaletteItems({
     });
   }
 
+  if (role === "admin") {
+    items.push({
+      id: "nav-users",
+      title: "Usuarios",
+      subtitle: "Administrar cuentas y roles",
+      keywords: "usuarios roles admin",
+      onSelect: () => onNavigate("/app/admin/users"),
+    });
+  }
+
   items.push(
     {
       id: "theme-toggle",

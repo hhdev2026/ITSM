@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/cn";
 import { ChevronLeft, ChevronRight, LogOut, Menu, Moon, Plus, Search, Sun } from "lucide-react";
-import { IconAnalytics, IconApprovals, IconCatalog, IconKanban, IconKb, IconSla, IconTickets } from "@/components/icons/nav-icons";
+import { IconAnalytics, IconApprovals, IconCatalog, IconKanban, IconKb, IconSla, IconTickets, IconUsers } from "@/components/icons/nav-icons";
 import * as React from "react";
 
 function initialsFromName(nameOrEmail: string) {
@@ -112,10 +112,7 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
             { href: "/app/approvals", label: "Aprobaciones", icon: IconApprovals },
           ];
 
-  const secondaryNav =
-    profile.role === "supervisor" || profile.role === "admin"
-      ? [{ href: "/app/slas", label: "SLAs", icon: IconSla }]
-      : [];
+  const secondaryNav = profile.role === "admin" ? [{ href: "/app/admin/users", label: "Usuarios", icon: IconUsers }] : [];
 
   async function onSignOut() {
     await signOut();

@@ -97,3 +97,12 @@ export function IconApprovals(props: Props) {
     </Svg>
   );
 }
+
+export function IconUsers(props: Props) {
+  return (
+    <Svg title="Usuarios" {...props}>
+      <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" />
+      <path d="M20 20a8 8 0 0 0-16 0" />
+    </Svg>
+  );
+}
