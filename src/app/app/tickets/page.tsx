@@ -94,6 +94,12 @@ function computeTraffic(opts: {
   return { light, remainingMinutes: remainingClamped, pctUsed };
 }
 
+function formatPct(v: unknown) {
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  if (v > 0 && v < 1) return "<1%";
+  return `${Math.round(v)}%`;
+}
+
 export default function TicketsTrackingPage() {
   const { loading: sessionLoading, session } = useSession();
   const { loading: profileLoading, profile, error: profileError } = useProfile(session?.user.id);
@@ -388,7 +394,7 @@ export default function TicketsTrackingPage() {
         <Card className="tech-border">
           <CardHeader>
             <CardTitle>Detalle</CardTitle>
-            <CardDescription>Semáforo SLA/Respuesta: verde (ok), amarillo (riesgo), rojo (vencido), excluido/cerrado.</CardDescription>
+            <CardDescription>Semáforo SLA/Respuesta: verde (en plazo), amarillo (riesgo), rojo (vencido), excluido/cerrado.</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -418,7 +424,7 @@ export default function TicketsTrackingPage() {
                           : t.sla_traffic_light === "yellow"
                             ? "En riesgo"
                             : t.sla_traffic_light === "green"
-                              ? "OK"
+                              ? "En plazo"
                               : "Sin SLA";
                   const respLabel =
                     t.response_traffic_light === "excluded"
@@ -430,8 +436,11 @@ export default function TicketsTrackingPage() {
                           : t.response_traffic_light === "yellow"
                             ? "En riesgo"
                             : t.response_traffic_light === "green"
-                              ? "OK"
+                              ? "En plazo"
                               : "Sin objetivo";
+
+                  const slaUse = formatPct(t.sla_pct_used);
+                  const respUse = formatPct(t.response_pct_used);
 
                   return (
                     <Link key={t.id} href={`/app/tickets/${t.id}`} className="block rounded-2xl border border-border bg-background/20 p-3 hover:bg-accent/20">
@@ -477,7 +486,8 @@ export default function TicketsTrackingPage() {
                         <div className="shrink-0 text-right text-xs text-muted-foreground">
                           {typeof t.sla_remaining_minutes === "number" ? <div>SLA: {Math.max(0, Math.round(t.sla_remaining_minutes))}m</div> : null}
                           {typeof t.response_remaining_minutes === "number" ? <div>Resp: {Math.max(0, Math.round(t.response_remaining_minutes))}m</div> : null}
-                          {typeof t.sla_pct_used === "number" ? <div>Uso SLA: {Math.round(t.sla_pct_used)}%</div> : null}
+                          {slaUse ? <div>Consumo SLA: {slaUse}</div> : null}
+                          {respUse ? <div>Consumo Resp: {respUse}</div> : null}
                         </div>
                       </div>
                     </Link>
