@@ -445,10 +445,10 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
   return (
     <div className="space-y-5">
       <PageHeader
-        title={isEndUser ? "¿Qué problema tienes?" : "Catálogo de servicios"}
+        title={isEndUser ? "¿Qué necesitas?" : "Catálogo de servicios"}
         description={
           isEndUser
-            ? "Elige una opción para crear tu solicitud. Usa el buscador (ej: correo, internet, VPN…)."
+            ? "Te guiamos paso a paso para crear tu ticket. Puedes buscar por palabras (ej: no imprime, wifi, office, bitdefender…)."
             : "Solicitudes e incidencias estandarizadas (Service Catalog)."
         }
         actions={
@@ -464,8 +464,10 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                     if (svc) openService(svc);
                   }}
                   options={comboOptions}
-                  placeholder="Buscar y seleccionar (ej: impresora, wifi, kyocera, bitdefender…)…"
-                  searchPlaceholder="Buscar en el catálogo…"
+                  disabled={comboOptions.length === 0}
+                  placeholder="Busca tu problema y selecciónalo (ej: no imprime, wifi, office…)…"
+                  searchPlaceholder="Buscar…"
+                  emptyText={comboOptions.length === 0 ? "Catálogo no disponible." : "Sin resultados."}
                 />
               </div>
             ) : (
@@ -506,30 +508,68 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
           {isEndUser && comboOptions.length === 0 ? (
             <Card className="tech-border">
               <CardHeader>
-                <CardTitle>Catálogo no cargado</CardTitle>
-                <CardDescription>Aún no hay registros Tier 1..4 disponibles para tu área.</CardDescription>
+                <CardTitle>Catálogo no disponible</CardTitle>
+                <CardDescription>Tu área aún no tiene opciones configuradas para crear tickets.</CardDescription>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">
-                Contacta a tu supervisor para cargar el catálogo real (CSV) en <code className="text-foreground">service_catalog_items</code>.
+                Contacta a tu supervisor/administrador para habilitar el catálogo de servicios.
               </CardContent>
             </Card>
           ) : null}
-          {isEndUser ? (
+          {isEndUser && comboOptions.length > 0 ? (
             <Card className="tech-border">
               <CardHeader>
-                <CardTitle>Clasificación del ticket</CardTitle>
-                <CardDescription>Selecciona una ruta lógica para que el equipo técnico lo atienda y se mida correctamente.</CardDescription>
+                <CardTitle>Atajos</CardTitle>
+                <CardDescription>Accesos rápidos a solicitudes comunes.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const catalog = services.filter((s) => Boolean(s.tier1 && s.tier2 && s.tier3 && s.tier4));
+                  const preferredTier2 = ["Conexión a Internet", "Impresora", "Aplicaciones de Escritorio", "Seguridad", "Sistema Operativo"];
+                  const picks = [...catalog]
+                    .sort((a, b) => {
+                      const pa = preferredTier2.indexOf(String(a.tier2 ?? ""));
+                      const pb = preferredTier2.indexOf(String(b.tier2 ?? ""));
+                      const ra = pa === -1 ? 999 : pa;
+                      const rb = pb === -1 ? 999 : pb;
+                      if (ra !== rb) return ra - rb;
+                      return tierTitleFor(a).localeCompare(tierTitleFor(b));
+                    })
+                    .slice(0, 8);
+
+                  return (
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      {picks.map((svc) => (
+                        <Button key={svc.id} variant="outline" className="h-auto justify-start whitespace-normal py-3 text-left" onClick={() => openService(svc)}>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium">{tierTitleFor(svc)}</div>
+                            <div className="mt-1 truncate text-xs text-muted-foreground">{tierPathLabelFor(svc)}</div>
+                          </div>
+                        </Button>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          ) : null}
+          {isEndUser && comboOptions.length > 0 ? (
+            <Card className="tech-border">
+              <CardHeader>
+                <CardTitle>Paso 1: Cuéntanos qué necesitas</CardTitle>
+                <CardDescription>Selecciona estas opciones para dirigir tu solicitud al equipo correcto.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <div className="md:col-span-2 text-xs text-muted-foreground">
-                    Esta clasificación se guarda automáticamente en el ticket para reportería y dashboards.
-                  </div>
+                  <div className="md:col-span-2 text-xs text-muted-foreground">Tip: si sabes el nombre, usa el buscador de arriba para ir más rápido.</div>
                   {(() => {
                     const catalog = services.filter((s) => Boolean(s.tier1 && s.tier2 && s.tier3 && s.tier4));
                     const ticketTypeOptions: ComboboxOption[] = Array.from(new Set(catalog.map((s) => s.ticket_type)))
                       .sort()
-                      .map((v) => ({ value: v, label: v }));
+                      .map((v) => ({
+                        value: v,
+                        label: v === "Incidente" ? "Incidente (algo no funciona)" : v === "Requerimiento" ? "Requerimiento (necesito algo)" : v,
+                      }));
 
                     const selectedType = tierType;
                     const inType = selectedType ? catalog.filter((s) => s.ticket_type === selectedType) : catalog;
@@ -564,7 +604,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                     return (
                       <>
                         <label className="block md:col-span-2">
-                          <div className="text-xs text-muted-foreground">Tipo de ticket</div>
+                          <div className="text-xs text-muted-foreground">Tipo de solicitud</div>
                           <Combobox
                             value={tierType}
                             onValueChange={(v) => {
@@ -579,7 +619,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                           />
                         </label>
                         <label className="block">
-                          <div className="text-xs text-muted-foreground">Categoría</div>
+                          <div className="text-xs text-muted-foreground">Área</div>
                           <Combobox
                             value={tier1}
                             onValueChange={(v) => {
@@ -594,7 +634,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                           />
                         </label>
                         <label className="block">
-                          <div className="text-xs text-muted-foreground">Servicio</div>
+                          <div className="text-xs text-muted-foreground">Elemento</div>
                           <Combobox
                             value={tier2}
                             onValueChange={(v) => {
@@ -621,7 +661,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                           />
                         </label>
                         <label className="block">
-                          <div className="text-xs text-muted-foreground">Motivo</div>
+                          <div className="text-xs text-muted-foreground">Qué necesitas</div>
                           <Combobox
                             value={tier4}
                             onValueChange={(v) => setTier4(v)}

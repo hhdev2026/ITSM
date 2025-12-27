@@ -95,11 +95,10 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
   const nav =
     profile.role === "user"
       ? [
-          { href: "/app", label: "Mis Tickets", icon: IconTickets },
-          { href: "/app/chat", label: "Chat", icon: IconChat },
-          { href: "/app/catalog", label: "Catálogo", icon: IconCatalog },
-          { href: "/app/kb", label: "Autoservicio", icon: IconKb },
-          { href: "/app/approvals", label: "Aprobaciones", icon: IconApprovals },
+          { href: "/app", label: "Inicio", icon: IconTickets },
+          { href: "/app/catalog", label: "Crear ticket", icon: IconCatalog },
+          { href: "/app/chat", label: "Chat con soporte", icon: IconChat },
+          { href: "/app/kb", label: "Guías y ayuda", icon: IconKb },
         ]
       : profile.role === "agent"
         ? [
@@ -131,6 +130,16 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
     // Always take user/admin/agent/supervisor to the guided catalog flow.
     router.push("/app/catalog");
   }
+
+  const createLabel = profile.role === "user" ? "Crear ticket" : "Nuevo ticket";
+  const roleLabel =
+    profile.role === "user"
+      ? "Usuario"
+      : profile.role === "agent"
+        ? "Agente"
+        : profile.role === "supervisor"
+          ? "Supervisor"
+          : "Admin";
 
   const paletteItems = createAppCommandPaletteItems({
     role: profile.role,
@@ -189,7 +198,7 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
                 <AnimatePresence initial={false}>
                   {!collapsed && (
                     <motion.span initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }}>
-                      Nuevo ticket
+                      {createLabel}
                     </motion.span>
                   )}
                 </AnimatePresence>
@@ -206,7 +215,7 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">{profile.full_name || profile.email}</div>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <Badge variant="outline">{profile.role}</Badge>
+                        <Badge variant="outline">{roleLabel}</Badge>
                         <Badge variant="outline">
                           {profile.rank} · {profile.points} pts
                         </Badge>
@@ -217,7 +226,10 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
               </div>
               {!collapsed && (
                 <div className="mt-2 text-xs text-sidebar-muted-foreground">
-                  Depto: <span className="text-sidebar-foreground">{profile.department_id ?? "Sin asignar"}</span>
+                  Área:{" "}
+                  <span className="text-sidebar-foreground">
+                    {profile.department_id ? (profile.role === "user" ? "Asignada" : profile.department_id) : "Sin asignar"}
+                  </span>
                 </div>
               )}
             </div>
@@ -299,7 +311,7 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
                 <div className="flex items-center gap-2">
                   <Button className="hidden md:inline-flex" onClick={onCreate}>
                     <Plus className="h-4 w-4" />
-                    Nuevo
+                    {profile.role === "user" ? "Crear" : "Nuevo"}
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
