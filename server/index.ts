@@ -6,20 +6,219 @@ import pinoHttp from "pino-http";
 import { loadEnv } from "./env";
 import { requireAuth, requireRole, type AuthedRequest } from "./auth";
 import { getChatKpis, getChatTrends, getKpis, getTrends, parseAnalyticsQuery, parseTrendsQuery } from "./analytics";
+import { createSupabaseAdmin } from "./supabase";
 
 const env = loadEnv();
+const supabaseAdmin = env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : null;
 
 const app = express();
 app.use(helmet());
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "10mb" }));
 app.use(pinoHttp());
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
+function hasAssetsSecret(req: express.Request) {
+  const header = req.header("x-assets-secret") ?? "";
+  return !!env.ASSETS_WEBHOOK_SECRET && header.length > 0 && header === env.ASSETS_WEBHOOK_SECRET;
+}
+
+function requireAuthOrAssetsSecret(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (hasAssetsSecret(req)) return next();
+  return requireAuth(req, res, next);
+}
+
+async function resolveSingleDepartmentId() {
+  if (!supabaseAdmin) throw new Error("SUPABASE_SERVICE_ROLE_KEY required");
+  const { data, error } = await supabaseAdmin.from("departments").select("id").order("created_at", { ascending: true }).limit(2);
+  if (error) throw error;
+  const list = (data ?? []) as Array<{ id: string }>;
+  if (list.length === 1) return list[0].id;
+  return null;
+}
+
 app.get("/api/me", requireAuth, (req, res) => {
   const authed = req as AuthedRequest;
   res.json({ userId: authed.auth.userId, role: authed.auth.role, departmentId: authed.auth.departmentId, email: authed.auth.email });
+});
+
+app.post("/api/assets/sync", requireAuthOrAssetsSecret, async (req, res) => {
+  try {
+    const isSecret = hasAssetsSecret(req);
+    const body = (req.body ?? null) as unknown;
+    const rows = Array.isArray(body)
+      ? (body as unknown[])
+      : body && typeof body === "object" && Array.isArray((body as { rows?: unknown }).rows)
+        ? (((body as { rows: unknown }).rows ?? []) as unknown[])
+        : null;
+    if (!rows) return res.status(400).json({ error: "rows_required" });
+
+    if (!isSecret) {
+      const authed = req as AuthedRequest;
+      if (authed.auth.role !== "supervisor" && authed.auth.role !== "admin") return res.status(403).json({ error: "forbidden" });
+      const { data, error } = await authed.supabase.rpc("asset_upsert_many", { p_rows: rows });
+      if (error) throw error;
+      return res.json(data);
+    }
+
+    if (!supabaseAdmin) return res.status(500).json({ error: "service_role_required" });
+
+    const deptFromBody =
+      body && typeof body === "object" && typeof (body as { department_id?: unknown }).department_id === "string"
+        ? String((body as { department_id: string }).department_id)
+        : null;
+    const deptId = deptFromBody ?? (await resolveSingleDepartmentId());
+    if (!deptId) return res.status(400).json({ error: "department_required" });
+
+    const errors: Array<{ row: number; error: string }> = [];
+    const byTag: Array<Record<string, unknown>> = [];
+    const bySerial: Array<Record<string, unknown>> = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || typeof r !== "object") {
+        errors.push({ row: i + 1, error: "row_must_be_object" });
+        continue;
+      }
+      const rr = r as Record<string, unknown>;
+      const name = typeof rr.name === "string" ? rr.name.trim() : "";
+      if (!name) {
+        errors.push({ row: i + 1, error: "name_required" });
+        continue;
+      }
+
+      const payload: Record<string, unknown> = { ...rr, department_id: deptId, name };
+      const assetTag = payload.asset_tag;
+      const serial = typeof payload.serial_number === "string" ? payload.serial_number.trim() : "";
+
+      if (assetTag != null && String(assetTag).trim().length > 0) byTag.push(payload);
+      else if (serial) bySerial.push({ ...payload, serial_number: serial });
+      else bySerial.push(payload);
+    }
+
+    if (byTag.length) {
+      const { error } = await supabaseAdmin.from("assets").upsert(byTag, { onConflict: "asset_tag" });
+      if (error) throw error;
+    }
+    if (bySerial.length) {
+      const { error } = await supabaseAdmin.from("assets").upsert(bySerial, { onConflict: "department_id,serial_number" });
+      if (error) throw error;
+    }
+
+    return res.json({ upserted: byTag.length + bySerial.length, errors });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "bad_request";
+    res.status(400).json({ error: message });
+  }
+});
+
+app.post("/api/assets/heartbeat", requireAuthOrAssetsSecret, async (req, res) => {
+  try {
+    const isSecret = hasAssetsSecret(req);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const assetTagRaw = body.asset_tag ?? null;
+    const serialRaw = body.serial_number ?? null;
+    const statusRaw = body.status ?? "Online";
+
+    const occurredAt = typeof body.occurred_at === "string" ? body.occurred_at : new Date().toISOString();
+    const ip = typeof body.ip === "string" ? body.ip : null;
+    const mac = typeof body.mac === "string" ? body.mac : null;
+    const hostname = typeof body.hostname === "string" ? body.hostname : null;
+    const networkType = typeof body.network_type === "string" ? body.network_type : null;
+
+    const status = typeof statusRaw === "string" ? statusRaw : "Online";
+    if (!["Online", "Offline", "Durmiente", "Desconocido", "Crítico"].includes(status)) {
+      return res.status(400).json({ error: "invalid_status" });
+    }
+
+    const findByTag = assetTagRaw != null && String(assetTagRaw).trim().length > 0;
+    const findBySerial = typeof serialRaw === "string" && serialRaw.trim().length > 0;
+    if (!findByTag && !findBySerial) return res.status(400).json({ error: "asset_tag_or_serial_required" });
+
+    if (isSecret && !supabaseAdmin) return res.status(500).json({ error: "service_role_required" });
+
+    const client = isSecret ? supabaseAdmin! : (req as AuthedRequest).supabase;
+    const deptId = isSecret ? null : (req as AuthedRequest).auth.departmentId;
+    const deptFilter = deptId ? (q: any) => q.eq("department_id", deptId) : (q: any) => q;
+
+    let assetQuery = client.from("assets").select("id,asset_tag,department_id").limit(2);
+    if (findByTag) {
+      const n = Number(String(assetTagRaw).trim());
+      if (!Number.isFinite(n) || n <= 0) return res.status(400).json({ error: "invalid_asset_tag" });
+      assetQuery = assetQuery.eq("asset_tag", Math.trunc(n));
+    } else {
+      assetQuery = assetQuery.eq("serial_number", String(serialRaw).trim());
+    }
+    assetQuery = deptFilter(assetQuery);
+
+    const { data: found, error: fErr } = await assetQuery;
+    if (fErr) throw fErr;
+    const list = (found ?? []) as Array<{ id: string; asset_tag: number; department_id: string }>;
+    if (list.length === 0) return res.status(404).json({ error: "asset_not_found" });
+    if (list.length > 1) return res.status(409).json({ error: "asset_not_unique" });
+    const a = list[0];
+
+    const { error: uErr } = await client
+      .from("assets")
+      .update({
+        last_seen_at: occurredAt,
+        connectivity_status: status,
+        last_ip: ip,
+        last_mac: mac,
+        last_hostname: hostname,
+        last_network_type: networkType,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", a.id);
+    if (uErr) throw uErr;
+
+    const { error: eErr } = await client.from("asset_connectivity_events").insert({
+      asset_id: a.id,
+      status,
+      occurred_at: occurredAt,
+      ip,
+      mac,
+      hostname,
+      network_type: networkType,
+      meta: {},
+    });
+    if (eErr) throw eErr;
+
+    // Minimal alerting: open/resolve "offline_unexpected"
+    if (status === "Offline" || status === "Crítico") {
+      const { data: existing } = await client
+        .from("asset_alerts")
+        .select("id,status")
+        .eq("asset_id", a.id)
+        .eq("kind", "offline_unexpected")
+        .eq("status", "open")
+        .limit(1);
+      if (!existing || existing.length === 0) {
+        await client.from("asset_alerts").insert({
+          asset_id: a.id,
+          kind: "offline_unexpected",
+          severity: status === "Crítico" ? "critical" : "warning",
+          status: "open",
+          title: "Activo sin conectividad",
+          message: `Estado reportado: ${status}`,
+          meta: { source: "heartbeat" },
+        });
+      }
+    } else if (status === "Online") {
+      await client
+        .from("asset_alerts")
+        .update({ status: "resolved", resolved_at: new Date().toISOString() })
+        .eq("asset_id", a.id)
+        .eq("kind", "offline_unexpected")
+        .eq("status", "open");
+    }
+
+    return res.json({ ok: true, asset_id: a.id, asset_tag: a.asset_tag });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "bad_request";
+    res.status(400).json({ error: message });
+  }
 });
 
 app.get("/api/analytics/kpis", requireAuth, requireRole(["supervisor", "admin"]), async (req, res) => {
@@ -95,6 +294,115 @@ function getStringField(row: Record<string, unknown>, key: string) {
   const v = row[key];
   return typeof v === "string" ? v : "";
 }
+
+app.get("/api/assets/export.csv", requireAuth, requireRole(["supervisor", "admin"]), async (req, res) => {
+  try {
+    const authed = req as AuthedRequest;
+    const deptId = authed.auth.departmentId;
+    if (!deptId) return res.status(400).json({ error: "department_required" });
+
+    const { data: assets, error } = await authed.supabase
+      .from("assets")
+      .select("*")
+      .eq("department_id", deptId)
+      .order("updated_at", { ascending: false })
+      .limit(5000);
+    if (error) throw error;
+    const list = (assets ?? []) as Array<Record<string, unknown>>;
+    const assetIds = list.map((a) => String(a.id));
+
+    const { data: asg, error: asgErr } = assetIds.length
+      ? await authed.supabase
+          .from("asset_assignments")
+          .select("asset_id,user_id,role,ended_at")
+          .in("asset_id", assetIds)
+          .is("ended_at", null)
+      : { data: [] as unknown[], error: null };
+    if (asgErr) throw asgErr;
+
+    const userIds = new Set<string>();
+    for (const a of (asg ?? []) as Array<Record<string, unknown>>) if (typeof a.user_id === "string") userIds.add(a.user_id);
+
+    const { data: profs, error: pErr } = userIds.size
+      ? await authed.supabase.from("profiles").select("id,email,full_name").in("id", Array.from(userIds))
+      : { data: [] as unknown[], error: null };
+    if (pErr) throw pErr;
+
+    const profById = new Map<string, { email: string; full_name: string | null }>();
+    for (const p of (profs ?? []) as Array<{ id: string; email: string; full_name: string | null }>) profById.set(p.id, { email: p.email, full_name: p.full_name });
+
+    const principalByAsset = new Map<string, string>();
+    const responsibleByAsset = new Map<string, string>();
+    for (const a of (asg ?? []) as Array<{ asset_id: string; user_id: string; role: string }>) {
+      const p = profById.get(a.user_id);
+      const name = p?.full_name?.trim() || p?.email || a.user_id;
+      if (a.role === "principal") principalByAsset.set(a.asset_id, name);
+      if (a.role === "responsable") responsibleByAsset.set(a.asset_id, name);
+    }
+
+    const header = [
+      "asset_tag",
+      "name",
+      "serial_number",
+      "asset_type",
+      "category",
+      "subcategory",
+      "lifecycle_status",
+      "connectivity_status",
+      "last_seen_at",
+      "region",
+      "comuna",
+      "building",
+      "floor",
+      "room",
+      "address",
+      "latitude",
+      "longitude",
+      "failure_risk_pct",
+      "usuario_asignado",
+      "responsable",
+      "created_at",
+      "updated_at",
+    ];
+
+    res.setHeader("content-type", "text/csv; charset=utf-8");
+    res.setHeader("content-disposition", `attachment; filename="activos-${deptId}.csv"`);
+    res.write(header.map(csvEscape).join(",") + "\n");
+
+    for (const a of list) {
+      const id = String(a.id);
+      const row = [
+        a.asset_tag ?? "",
+        getStringField(a, "name"),
+        getStringField(a, "serial_number"),
+        getStringField(a, "asset_type"),
+        getStringField(a, "category"),
+        getStringField(a, "subcategory"),
+        getStringField(a, "lifecycle_status"),
+        getStringField(a, "connectivity_status"),
+        getStringField(a, "last_seen_at"),
+        getStringField(a, "region"),
+        getStringField(a, "comuna"),
+        getStringField(a, "building"),
+        getStringField(a, "floor"),
+        getStringField(a, "room"),
+        getStringField(a, "address"),
+        a.latitude ?? "",
+        a.longitude ?? "",
+        a.failure_risk_pct ?? "",
+        principalByAsset.get(id) ?? "",
+        responsibleByAsset.get(id) ?? "",
+        getStringField(a, "created_at"),
+        getStringField(a, "updated_at"),
+      ];
+      res.write(row.map(csvEscape).join(",") + "\n");
+    }
+    res.end();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "bad_request";
+    res.status(400).json({ error: message });
+  }
+});
 
 app.get("/api/tickets/export.csv", requireAuth, requireRole(["supervisor", "admin"]), async (req, res) => {
   try {

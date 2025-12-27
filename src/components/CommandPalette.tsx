@@ -123,6 +123,13 @@ export function createAppCommandPaletteItems({
       onSelect: () => onNavigate("/app/catalog"),
     },
     {
+      id: "nav-assets",
+      title: role === "user" ? "Mis activos" : "Activos",
+      subtitle: role === "user" ? "Equipos asignados y ubicación" : "Inventario · mapa · importación",
+      keywords: "activos inventario equipos serial ubicacion mapa",
+      onSelect: () => onNavigate("/app/assets"),
+    },
+    {
       id: "nav-chat",
       title: "Chat",
       subtitle: role === "user" ? "Conversación con mesa de ayuda" : "Bandeja de chats",

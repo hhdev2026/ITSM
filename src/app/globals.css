@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
+@import "leaflet/dist/leaflet.css";
 
 :root {
   --brand-cyan: 188 92% 45%;

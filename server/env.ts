@@ -7,6 +7,7 @@ const EnvSchema = z.object({
   SUPABASE_ANON_KEY: z.string().min(20),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
+  ASSETS_WEBHOOK_SECRET: z.string().min(8).optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

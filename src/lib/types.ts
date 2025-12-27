@@ -62,6 +62,64 @@ export type Ticket = {
   closed_at: string | null;
 };
 
+export type AssetConnectivityStatus = "Online" | "Offline" | "Durmiente" | "Desconocido" | "Crítico";
+export type AssetLifecycleStatus = "Activo" | "En reparación" | "Retirado" | "Descartado";
+
+export type Asset = {
+  id: string;
+  department_id: string;
+  asset_tag: number;
+  name: string;
+  serial_number: string | null;
+  barcode: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  asset_type: string | null;
+  category: string | null;
+  subcategory: string | null;
+  region: string | null;
+  comuna: string | null;
+  building: string | null;
+  floor: string | null;
+  room: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  lifecycle_status: AssetLifecycleStatus;
+  connectivity_status: AssetConnectivityStatus;
+  last_seen_at: string | null;
+  failure_risk_pct: number;
+  tags: string[] | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AssetAssignmentRole = "principal" | "secundario" | "responsable";
+
+export type AssetAssignment = {
+  id: string;
+  asset_id: string;
+  user_id: string;
+  role: AssetAssignmentRole;
+  assigned_by: string | null;
+  assigned_at: string;
+  ended_at: string | null;
+  notes: string | null;
+};
+
+export type AssetAlert = {
+  id: string;
+  asset_id: string;
+  kind: string;
+  severity: "info" | "warning" | "critical";
+  status: "open" | "resolved" | "ignored";
+  title: string;
+  message: string | null;
+  opened_at: string;
+  resolved_at: string | null;
+};
+
 export type Category = {
   id: string;
   name: string;

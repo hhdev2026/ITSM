@@ -116,3 +116,13 @@ export function IconChat(props: Props) {
     </Svg>
   );
 }
+
+export function IconAssets(props: Props) {
+  return (
+    <Svg title="Activos" {...props}>
+      <path d="M7 7h10l2 5-2 5H7l-2-5 2-5Z" />
+      <path d="M9 11h6" />
+      <path d="M9 13h6" />
+    </Svg>
+  );
+}

@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/cn";
 import { ChevronLeft, ChevronRight, LogOut, Menu, Moon, Plus, Search, Sun } from "lucide-react";
-import { IconAnalytics, IconApprovals, IconCatalog, IconChat, IconKanban, IconKb, IconSla, IconTickets, IconUsers } from "@/components/icons/nav-icons";
+import { IconAnalytics, IconApprovals, IconAssets, IconCatalog, IconChat, IconKanban, IconKb, IconSla, IconTickets, IconUsers } from "@/components/icons/nav-icons";
 import * as React from "react";
 
 function initialsFromName(nameOrEmail: string) {
@@ -96,6 +96,7 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
     profile.role === "user"
       ? [
           { href: "/app", label: "Inicio", icon: IconTickets },
+          { href: "/app/assets", label: "Mis activos", icon: IconAssets },
           { href: "/app/catalog", label: "Crear ticket", icon: IconCatalog },
           { href: "/app/chat", label: "Chat con soporte", icon: IconChat },
           { href: "/app/kb", label: "Guías y ayuda", icon: IconKb },
@@ -103,6 +104,7 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
       : profile.role === "agent"
         ? [
             { href: "/app", label: "Mi trabajo", icon: IconKanban },
+            { href: "/app/assets", label: "Activos", icon: IconAssets },
             { href: "/app/chats", label: "Chats", icon: IconChat },
             { href: "/app/kb", label: "Base de conocimiento", icon: IconKb },
             { href: "/app/approvals", label: "Aprobaciones", icon: IconApprovals },
@@ -111,6 +113,7 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
             { href: "/app", label: "Panel", icon: IconAnalytics },
             { href: "/app/dispatch", label: "Centro de mando", icon: IconKanban },
             { href: "/app/tickets", label: "Seguimiento", icon: IconTickets },
+            { href: "/app/assets", label: "Activos", icon: IconAssets },
             { href: "/app/chats", label: "Chats", icon: IconChat },
             { href: "/app/slas", label: "SLAs", icon: IconSla },
             { href: "/app/kb", label: "Base de conocimiento", icon: IconKb },
