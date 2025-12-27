@@ -23,9 +23,12 @@ create table if not exists public.skills (
   description text,
   category_id uuid references public.categories (id) on delete set null,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (category_id)
+  updated_at timestamptz not null default now()
 );
+
+-- Allow multiple skills per category (drop accidental unique, if present)
+alter table public.skills drop constraint if exists skills_category_id_key;
+create index if not exists skills_category_idx on public.skills (category_id);
 
 create table if not exists public.agent_skills (
   id uuid primary key default gen_random_uuid(),
@@ -118,7 +121,7 @@ drop trigger if exists t_agent_presence_touch on public.agent_presence;
 create trigger t_agent_presence_touch before update on public.agent_presence for each row execute function public._touch_updated_at();
 
 drop trigger if exists t_chat_threads_touch on public.chat_threads;
-create trigger t_chat_threads_touch before update on public.chat_threads for each row execute function public._touch_updated_at();
+-- Chat threads updated_at is controlled by workflow functions/triggers; keep single source of truth.
 
 -- Department enforcement (chat thread inherits requester's department)
 create or replace function public._set_chat_department()
