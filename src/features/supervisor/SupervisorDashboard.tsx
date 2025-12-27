@@ -26,6 +26,17 @@ type KpiData = {
   fcr_pct: number | null;
 };
 
+type ChatKpiData = {
+  range: { start: string; end: string };
+  volume: { created: number; closed: number };
+  backlog_open: number;
+  active_open: number;
+  avg_take_minutes: number;
+  avg_first_response_minutes: number;
+  avg_resolution_minutes: number;
+  workload: Array<{ agent_id: string; agent_name: string; open_assigned: number }>;
+};
+
 type TrendPoint = {
   bucket: string;
   created: number;
@@ -56,6 +67,8 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
   const [agents, setAgents] = useState<Array<{ id: string; label: string }>>([]);
   const [kpis, setKpis] = useState<KpiData | null>(null);
   const [trends, setTrends] = useState<TrendsResponse | null>(null);
+  const [chatKpis, setChatKpis] = useState<ChatKpiData | null>(null);
+  const [loadingChatKpis, setLoadingChatKpis] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingTrends, setLoadingTrends] = useState(true);
@@ -92,10 +105,13 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
 
   async function loadKpis() {
     setLoading(true);
+    setLoadingChatKpis(true);
     setError(null);
     if (isDemoMode()) {
       setKpis(demoComputeKpis(profile.department_id!, period, agentId || undefined, categoryId || undefined) as KpiData);
+      setChatKpis(null);
       setLoading(false);
+      setLoadingChatKpis(false);
       return;
     }
     const { data } = await supabase.auth.getSession();
@@ -103,6 +119,7 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
     if (!token) {
       setError("No hay sesión");
       setLoading(false);
+      setLoadingChatKpis(false);
       return;
     }
     const qs = new URLSearchParams({
@@ -110,18 +127,28 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
       ...(agentId ? { agentId } : {}),
       ...(categoryId ? { categoryId } : {}),
     });
-    const res = await fetch(`${apiBase}/api/analytics/kpis?${qs.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
+    const [ticketsRes, chatsRes] = await Promise.all([
+      fetch(`${apiBase}/api/analytics/kpis?${qs.toString()}`, { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`${apiBase}/api/analytics/chats/kpis?${qs.toString()}`, { headers: { Authorization: `Bearer ${token}` } }),
+    ]);
+
+    if (!ticketsRes.ok) {
+      const j = await ticketsRes.json().catch(() => ({}));
       setError(j.error ?? "No se pudo cargar KPIs");
       setKpis(null);
       setLoading(false);
       return;
     }
-    setKpis((await res.json()) as KpiData);
+    setKpis((await ticketsRes.json()) as KpiData);
     setLoading(false);
+
+    if (!chatsRes.ok) {
+      setChatKpis(null);
+      setLoadingChatKpis(false);
+      return;
+    }
+    setChatKpis((await chatsRes.json()) as ChatKpiData);
+    setLoadingChatKpis(false);
   }
 
   async function loadTrends() {
@@ -373,6 +400,59 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
                     </div>
                   ))
                 )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-5">
+            <Card className="tech-border md:col-span-2">
+              <CardHeader>
+                <CardTitle>Chats</CardTitle>
+                <CardDescription>Volumen y backlog</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {loadingChatKpis ? (
+                  <Skeleton className="h-8 w-40" />
+                ) : !chatKpis ? (
+                  <div className="text-sm text-muted-foreground">Sin datos de chats.</div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-2xl font-semibold">
+                      {chatKpis.volume.created} / {chatKpis.volume.closed}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Backlog: {chatKpis.backlog_open} · Activos: {chatKpis.active_open}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="tech-border">
+              <CardHeader className="gap-2">
+                <CardTitle>Tomado</CardTitle>
+                <CardDescription>Prom (min)</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {loadingChatKpis ? <Skeleton className="h-7 w-24" /> : <div className="text-2xl font-semibold">{chatKpis ? chatKpis.avg_take_minutes.toFixed(1) : "—"}</div>}
+              </CardContent>
+            </Card>
+            <Card className="tech-border">
+              <CardHeader className="gap-2">
+                <CardTitle>1ª respuesta</CardTitle>
+                <CardDescription>Prom (min)</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {loadingChatKpis ? <Skeleton className="h-7 w-24" /> : <div className="text-2xl font-semibold">{chatKpis ? chatKpis.avg_first_response_minutes.toFixed(1) : "—"}</div>}
+              </CardContent>
+            </Card>
+            <Card className="tech-border">
+              <CardHeader className="gap-2">
+                <CardTitle>Resolución</CardTitle>
+                <CardDescription>Prom (min)</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {loadingChatKpis ? <Skeleton className="h-7 w-24" /> : <div className="text-2xl font-semibold">{chatKpis ? chatKpis.avg_resolution_minutes.toFixed(1) : "—"}</div>}
               </CardContent>
             </Card>
           </div>

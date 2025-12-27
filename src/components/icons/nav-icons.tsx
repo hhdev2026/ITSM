@@ -106,3 +106,13 @@ export function IconUsers(props: Props) {
     </Svg>
   );
 }
+
+export function IconChat(props: Props) {
+  return (
+    <Svg title="Chat" {...props}>
+      <path d="M7.5 18.5 4 20l1.5-3.5A8 8 0 1 1 20 12a8 8 0 0 1-12.5 6.5Z" />
+      <path d="M8.5 12h7" />
+      <path d="M8.5 9.5h4.5" />
+    </Svg>
+  );
+}

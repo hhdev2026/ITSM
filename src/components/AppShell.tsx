@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/cn";
 import { ChevronLeft, ChevronRight, LogOut, Menu, Moon, Plus, Search, Sun } from "lucide-react";
-import { IconAnalytics, IconApprovals, IconCatalog, IconKanban, IconKb, IconSla, IconTickets, IconUsers } from "@/components/icons/nav-icons";
+import { IconAnalytics, IconApprovals, IconCatalog, IconChat, IconKanban, IconKb, IconSla, IconTickets, IconUsers } from "@/components/icons/nav-icons";
 import * as React from "react";
 
 function initialsFromName(nameOrEmail: string) {
@@ -96,6 +96,7 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
     profile.role === "user"
       ? [
           { href: "/app", label: "Mis Tickets", icon: IconTickets },
+          { href: "/app/chat", label: "Chat", icon: IconChat },
           { href: "/app/catalog", label: "Catálogo", icon: IconCatalog },
           { href: "/app/kb", label: "Autoservicio", icon: IconKb },
           { href: "/app/approvals", label: "Aprobaciones", icon: IconApprovals },
@@ -103,11 +104,13 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
       : profile.role === "agent"
         ? [
             { href: "/app", label: "Bandeja", icon: IconKanban },
+            { href: "/app/chats", label: "Chats", icon: IconChat },
             { href: "/app/kb", label: "Base de conocimiento", icon: IconKb },
             { href: "/app/approvals", label: "Aprobaciones", icon: IconApprovals },
           ]
         : [
             { href: "/app", label: "Panel", icon: IconAnalytics },
+            { href: "/app/chats", label: "Chats", icon: IconChat },
             { href: "/app/slas", label: "SLAs", icon: IconSla },
             { href: "/app/kb", label: "Base de conocimiento", icon: IconKb },
             { href: "/app/approvals", label: "Aprobaciones", icon: IconApprovals },

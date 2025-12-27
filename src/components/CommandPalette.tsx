@@ -121,6 +121,13 @@ export function createAppCommandPaletteItems({
       onSelect: () => onNavigate("/app/catalog"),
     },
     {
+      id: "nav-chat",
+      title: "Chat",
+      subtitle: role === "user" ? "Conversación con mesa de ayuda" : "Bandeja de chats",
+      keywords: "chat conversacion soporte helpdesk",
+      onSelect: () => onNavigate(role === "user" ? "/app/chat" : "/app/chats"),
+    },
+    {
       id: "nav-approvals",
       title: "Aprobaciones",
       subtitle: "Pendientes de aprobar",

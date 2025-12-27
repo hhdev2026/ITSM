@@ -5,7 +5,7 @@ import helmet from "helmet";
 import pinoHttp from "pino-http";
 import { loadEnv } from "./env";
 import { requireAuth, requireRole, type AuthedRequest } from "./auth";
-import { getKpis, getTrends, parseAnalyticsQuery, parseTrendsQuery } from "./analytics";
+import { getChatKpis, getChatTrends, getKpis, getTrends, parseAnalyticsQuery, parseTrendsQuery } from "./analytics";
 
 const env = loadEnv();
 
@@ -33,10 +33,37 @@ app.get("/api/analytics/kpis", requireAuth, requireRole(["supervisor", "admin"])
   }
 });
 
+app.get("/api/analytics/chats/kpis", requireAuth, requireRole(["supervisor", "admin"]), async (req, res) => {
+  try {
+    const q = parseAnalyticsQuery(req.query);
+    const data = await getChatKpis(req as AuthedRequest, { period: q.period, agentId: q.agentId, categoryId: q.categoryId });
+    res.json(data);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "bad_request";
+    res.status(400).json({ error: message });
+  }
+});
+
 app.get("/api/analytics/trends", requireAuth, requireRole(["supervisor", "admin"]), async (req, res) => {
   try {
     const q = parseTrendsQuery(req.query);
     const data = await getTrends(req as AuthedRequest, {
+      period: q.period,
+      bucket: q.bucket,
+      agentId: q.agentId,
+      categoryId: q.categoryId,
+    });
+    res.json(data);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "bad_request";
+    res.status(400).json({ error: message });
+  }
+});
+
+app.get("/api/analytics/chats/trends", requireAuth, requireRole(["supervisor", "admin"]), async (req, res) => {
+  try {
+    const q = parseTrendsQuery(req.query);
+    const data = await getChatTrends(req as AuthedRequest, {
       period: q.period,
       bucket: q.bucket,
       agentId: q.agentId,

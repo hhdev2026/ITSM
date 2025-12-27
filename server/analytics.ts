@@ -35,6 +35,18 @@ export async function getKpis(req: AuthedRequest, args: { period: "daily" | "wee
   return data;
 }
 
+export async function getChatKpis(req: AuthedRequest, args: { period: "daily" | "weekly" | "monthly"; agentId?: string; categoryId?: string }) {
+  const { start, end } = dateRangeForPeriod(args.period);
+  const { data, error } = await req.supabase.rpc("kpi_chat_dashboard", {
+    p_start: start,
+    p_end: end,
+    p_agent_id: args.agentId ?? null,
+    p_category_id: args.categoryId ?? null,
+  });
+  if (error) throw error;
+  return data;
+}
+
 export function parseTrendsQuery(query: unknown) {
   const QuerySchema = z.object({
     period: PeriodSchema.default("weekly"),
@@ -59,6 +71,23 @@ export async function getTrends(
   const { start, end } = dateRangeForPeriod(args.period);
   const bucket = args.bucket ?? defaultBucketForPeriod(args.period);
   const { data, error } = await req.supabase.rpc("kpi_timeseries", {
+    p_start: start,
+    p_end: end,
+    p_bucket: bucket,
+    p_agent_id: args.agentId ?? null,
+    p_category_id: args.categoryId ?? null,
+  });
+  if (error) throw error;
+  return { bucket, start, end, points: data ?? [] };
+}
+
+export async function getChatTrends(
+  req: AuthedRequest,
+  args: { period: "daily" | "weekly" | "monthly"; bucket?: z.infer<typeof BucketSchema>; agentId?: string; categoryId?: string }
+) {
+  const { start, end } = dateRangeForPeriod(args.period);
+  const bucket = args.bucket ?? defaultBucketForPeriod(args.period);
+  const { data, error } = await req.supabase.rpc("kpi_chat_timeseries", {
     p_start: start,
     p_end: end,
     p_bucket: bucket,

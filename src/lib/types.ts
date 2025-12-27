@@ -85,3 +85,59 @@ export type Comment = {
   is_internal: boolean;
   created_at: string;
 };
+
+export type ChatStatus = "En cola" | "Asignado" | "Activo" | "Cerrado";
+export type AgentPresenceStatus = "Disponible" | "Ocupado" | "Ausente" | "Offline";
+
+export type ChatThread = {
+  id: string;
+  department_id: string;
+  requester_id: string;
+  category_id: string | null;
+  subcategory_id: string | null;
+  skill_id: string | null;
+  subject: string | null;
+  status: ChatStatus;
+  assigned_agent_id: string | null;
+  assigned_at: string | null;
+  accepted_at: string | null;
+  first_response_at: string | null;
+  closed_at: string | null;
+  closed_by: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ChatMessage = {
+  id: string;
+  thread_id: string;
+  author_id: string | null;
+  body: string;
+  created_at: string;
+};
+
+export type ChatEvent = {
+  id: string;
+  thread_id: string;
+  actor_id: string | null;
+  event_type: "created" | "assigned" | "accepted" | "closed" | "message";
+  details: Record<string, unknown>;
+  created_at: string;
+};
+
+export type AgentPresence = {
+  profile_id: string;
+  department_id: string | null;
+  status: AgentPresenceStatus;
+  capacity: number;
+  updated_at: string;
+};
+
+export type Skill = {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  category_id: string | null;
+};
