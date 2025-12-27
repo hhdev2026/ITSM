@@ -11,7 +11,11 @@ const EnvSchema = z.object({
 export type Env = z.infer<typeof EnvSchema>;
 
 export function loadEnv(): Env {
-  const parsed = EnvSchema.safeParse(process.env);
+  const parsed = EnvSchema.safeParse({
+    ...process.env,
+    SUPABASE_URL: process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL,
+    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  });
   if (!parsed.success) {
     console.error(parsed.error.format());
     throw new Error("Invalid environment variables for server");
