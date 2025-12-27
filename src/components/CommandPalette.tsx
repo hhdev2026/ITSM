@@ -147,6 +147,20 @@ export function createAppCommandPaletteItems({
 
   if (role === "supervisor" || role === "admin") {
     items.push({
+      id: "nav-dispatch",
+      title: "Centro de mando",
+      subtitle: "Kanban de asignación y SLA",
+      keywords: "centro mando kanban asignacion sla",
+      onSelect: () => onNavigate("/app/dispatch"),
+    });
+    items.push({
+      id: "nav-tracking",
+      title: "Seguimiento",
+      subtitle: "Detalle por ticket con semáforo",
+      keywords: "seguimiento tickets semaforo",
+      onSelect: () => onNavigate("/app/tickets"),
+    });
+    items.push({
       id: "nav-slas",
       title: "SLAs",
       subtitle: "Configurar tiempos por prioridad",
