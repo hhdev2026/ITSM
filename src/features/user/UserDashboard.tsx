@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MotionItem, MotionList } from "@/components/motion/MotionList";
+import { TicketPriorityBadge, TicketStatusBadge, TicketTypeBadge } from "@/components/tickets/TicketBadges";
 
 export function UserDashboard({ profile }: { profile: Profile }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -121,8 +122,10 @@ export function UserDashboard({ profile }: { profile: Profile }) {
                       <div className="flex items-center justify-between gap-3 px-2">
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium">{t.title}</div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {t.type} · {t.priority} · {t.status}
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <TicketTypeBadge type={t.type} />
+                            <TicketPriorityBadge priority={t.priority} />
+                            <TicketStatusBadge status={t.status} />
                           </div>
                         </div>
                         <div className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString()}</div>

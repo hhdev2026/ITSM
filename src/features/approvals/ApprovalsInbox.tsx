@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MotionItem, MotionList } from "@/components/motion/MotionList";
+import { TicketPriorityBadge, TicketStatusBadge, TicketTypeBadge } from "@/components/tickets/TicketBadges";
 
 type ApprovalRow = {
   id: string;
@@ -173,9 +174,15 @@ export function ApprovalsInbox({ profile }: { profile: Profile }) {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <CardTitle className="truncate">{t?.title ?? "Ticket"}</CardTitle>
-                        <CardDescription className="line-clamp-2">
-                          {t ? `${t.type} · ${t.priority} · ${t.status}` : "Cargando datos…"}
-                        </CardDescription>
+                        {t ? (
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <TicketTypeBadge type={t.type} />
+                            <TicketPriorityBadge priority={t.priority} />
+                            <TicketStatusBadge status={t.status} />
+                          </div>
+                        ) : (
+                          <CardDescription className="line-clamp-2">Cargando datos…</CardDescription>
+                        )}
                       </div>
                       <Badge variant="outline">Paso {a.step_order}</Badge>
                     </div>

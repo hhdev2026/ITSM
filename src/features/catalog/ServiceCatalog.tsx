@@ -35,6 +35,7 @@ import {
   IconUsers,
 } from "@/components/icons/catalog-icons";
 import { MotionItem, MotionList } from "@/components/motion/MotionList";
+import { TicketPriorityBadge, TicketTypeBadge } from "@/components/tickets/TicketBadges";
 
 type Impact = "Alto" | "Medio" | "Bajo";
 type Urgency = "Alta" | "Media" | "Baja";
@@ -473,8 +474,8 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                               <CardTitle className="truncate">{svc.name}</CardTitle>
                               <CardDescription className="line-clamp-2">{svc.description ?? "—"}</CardDescription>
                               <div className="mt-2 flex flex-wrap items-center gap-2">
-                                <Badge variant="outline">{svc.ticket_type}</Badge>
-                                <Badge variant="outline">{svc.default_priority}</Badge>
+                                <TicketTypeBadge type={svc.ticket_type} />
+                                <TicketPriorityBadge priority={svc.default_priority} />
                                 {sub ? <Badge variant="outline">{sub}</Badge> : null}
                               </div>
                             </div>

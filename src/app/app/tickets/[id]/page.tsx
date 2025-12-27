@@ -12,7 +12,7 @@ import { cn } from "@/lib/cn";
 import { useProfile, useSession } from "@/lib/hooks";
 import { supabase } from "@/lib/supabaseBrowser";
 import type { Comment, Ticket } from "@/lib/types";
-import { TicketStatuses, priorityBadge, slaBadge } from "@/lib/constants";
+import { TicketStatuses, slaBadge } from "@/lib/constants";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -32,6 +32,7 @@ import {
 import { Check, ChevronDown, Copy, RefreshCcw, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { MotionItem, MotionList } from "@/components/motion/MotionList";
+import { TicketPriorityBadge, TicketStatusBadge, TicketTypeBadge } from "@/components/tickets/TicketBadges";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
@@ -302,8 +303,8 @@ export default function TicketDetailPage() {
   if (sessionLoading || profileLoading) return <div className="p-6 text-sm text-muted-foreground">Cargando...</div>;
   if (!session || !profile) return null;
 
-  const statusBadge = ticket ? <Badge variant="outline">{ticket.status}</Badge> : null;
-  const priorityBadgeEl = ticket ? <span className={cn("rounded-full px-2 py-1 text-[11px]", priorityBadge(ticket.priority))}>{ticket.priority}</span> : null;
+  const statusBadge = ticket ? <TicketStatusBadge status={ticket.status} /> : null;
+  const priorityBadgeEl = ticket ? <TicketPriorityBadge priority={ticket.priority} /> : null;
   const slaBadgeEl =
     ticket ? (
       <span className={cn("rounded-full px-2 py-1 text-[11px]", slaBadge(new Date(), ticket.sla_deadline))}>
@@ -344,7 +345,7 @@ export default function TicketDetailPage() {
               {priorityBadgeEl}
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              {ticket ? <span>{ticket.type}</span> : null}
+              {ticket ? <TicketTypeBadge type={ticket.type} /> : null}
               {categoryLabel ? <span>· {categoryLabel}</span> : null}
               {subcategoryLabel ? <span>· {subcategoryLabel}</span> : null}
               {slaBadgeEl ? <span>· {slaBadgeEl}</span> : null}
