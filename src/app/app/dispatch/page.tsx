@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TicketPriorityBadge, TicketStatusBadge, TicketTypeBadge } from "@/components/tickets/TicketBadges";
+import { TicketPriorityBadge, TicketStatusBadge } from "@/components/tickets/TicketBadges";
 import { slaBadgeFromTrafficLight, TicketPriorities, TicketStatuses } from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import { useProfile, useSession } from "@/lib/hooks";
@@ -21,7 +21,7 @@ import { supabase } from "@/lib/supabaseBrowser";
 import type { Ticket } from "@/lib/types";
 import { errorMessage } from "@/lib/error";
 import { formatTicketNumber } from "@/lib/ticketNumber";
-import { RefreshCcw } from "lucide-react";
+import { RefreshCcw, SlidersHorizontal, X } from "lucide-react";
 
 type RangePreset = "today" | "7d" | "30d" | "open";
 
@@ -123,6 +123,8 @@ export default function DispatchPage() {
   const [priority, setPriority] = useState<string | null>(null);
   const [assignee, setAssignee] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
+  const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
+  const [compactCards, setCompactCards] = useState(true);
 
   const canSee = profile?.role === "supervisor" || profile?.role === "admin";
 
@@ -447,6 +449,22 @@ export default function DispatchPage() {
             <CardDescription>Arriba lo crítico (fuera de plazo/sin asignar). Reasigna desde cada tarjeta.</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Button
+                variant={compactCards ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setCompactCards((v) => !v)}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                {compactCards ? "Compacto" : "Normal"}
+              </Button>
+              {activeTicketId ? (
+                <Button variant="outline" size="sm" onClick={() => setActiveTicketId(null)}>
+                  <X className="h-4 w-4" />
+                  Cerrar reasignación
+                </Button>
+              ) : null}
+            </div>
             {loading ? (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -474,14 +492,15 @@ export default function DispatchPage() {
                       {list.length === 0 ? (
                         <div className="rounded-xl border border-dashed border-border p-4 text-xs text-muted-foreground">Sin tickets</div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className={cn("space-y-2 pr-1", compactCards ? "max-h-[60vh] overflow-y-auto" : "max-h-[70vh] overflow-y-auto")}>
                           {list.map((t) => {
-                          const tracking = formatTicketNumber(t.ticket_number) ?? t.id.slice(0, 8).toUpperCase();
-                          const who = t.assignee_id ? profById.get(t.assignee_id) ?? null : null;
+                            const tracking = formatTicketNumber(t.ticket_number) ?? t.id.slice(0, 8).toUpperCase();
+                            const who = t.assignee_id ? profById.get(t.assignee_id) ?? null : null;
+                            const whoLabel = who ? profileLabel(who) : "Sin asignar";
 
-                          const slaLabel =
-                            t.sla_traffic_light === "excluded"
-                              ? "Excluido"
+                            const slaLabel =
+                              t.sla_traffic_light === "excluded"
+                                ? "Excluido"
                               : t.sla_traffic_light === "closed"
                                 ? "Cerrado"
                                 : t.sla_traffic_light === "red"
@@ -504,75 +523,123 @@ export default function DispatchPage() {
                                       ? "En plazo"
                                       : "Sin objetivo";
 
-                          const slaUse = formatPct(t.sla_pct_used);
-                          const respUse = formatPct(t.response_pct_used);
+                            const slaUse = formatPct(t.sla_pct_used);
+                            const respUse = formatPct(t.response_pct_used);
 
-                          const cardTone =
-                            t.sla_traffic_light === "red"
-                              ? "border-rose-500/25"
+                            const slaMins =
+                              typeof t.sla_remaining_minutes === "number" ? Math.max(0, Math.round(t.sla_remaining_minutes)) : null;
+                            const respMins =
+                              typeof t.response_remaining_minutes === "number"
+                                ? Math.max(0, Math.round(t.response_remaining_minutes))
+                                : null;
+                            const timeLineParts: string[] = [];
+                            if (slaMins != null) timeLineParts.push(`SLA ${slaMins}m`);
+                            if (respMins != null) timeLineParts.push(`R ${respMins}m`);
+                            const timeLine = timeLineParts.join(" · ");
+
+                            const cardTone =
+                              t.sla_traffic_light === "red"
+                                ? "border-rose-500/25"
                               : t.sla_traffic_light === "yellow"
                                 ? "border-amber-500/25"
                                 : "border-border";
 
-                          return (
-                            <div key={t.id} className={cn("rounded-xl border bg-background/30 p-2 hover:bg-accent/20", cardTone)}>
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0">
-                                  <Link href={`/app/tickets/${t.id}`} className="block truncate text-[13px] font-medium hover:underline">
-                                    {t.title}
-                                  </Link>
-                                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                    <Badge variant="outline" className="font-mono text-[10px]">
-                                      {tracking}
-                                    </Badge>
-                                    <TicketTypeBadge type={t.type} />
-                                    <TicketPriorityBadge priority={t.priority} />
-                                    <TicketStatusBadge status={t.status} />
+                            const isActive = activeTicketId === t.id;
+
+                            return (
+                              <div
+                                key={t.id}
+                                className={cn(
+                                  "rounded-xl border bg-background/30 hover:bg-accent/20",
+                                  compactCards ? "p-2" : "p-3",
+                                  isActive && "ring-1 ring-[hsl(var(--brand-cyan))]/25",
+                                  cardTone
+                                )}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <Link
+                                      href={`/app/tickets/${t.id}`}
+                                      className={cn("block truncate hover:underline", compactCards ? "text-[12px] font-medium" : "text-[13px] font-medium")}
+                                      title={t.title}
+                                    >
+                                      {t.title}
+                                    </Link>
+                                    <div className={cn("mt-1 flex flex-wrap items-center gap-1.5", compactCards ? "text-[10px]" : "text-[11px]")}>
+                                      <Badge variant="outline" className={cn("font-mono", compactCards ? "px-1.5 py-0.5 text-[10px]" : "text-[10px]")}>
+                                        {tracking}
+                                      </Badge>
+                                      <TicketPriorityBadge priority={t.priority} className={cn("px-1.5 py-0.5 text-[10px] [&_svg]:h-3 [&_svg]:w-3", compactCards && "gap-1")} />
+                                      <TicketStatusBadge status={t.status} className={cn("px-1.5 py-0.5 text-[10px] [&_svg]:h-3 [&_svg]:w-3", compactCards && "gap-1")} />
+                                    </div>
+                                  </div>
+
+                                  <div className="shrink-0 text-right">
+                                    <div className="flex flex-col items-end gap-1">
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          compactCards ? "px-1.5 py-0.5 text-[10px]" : "text-[10px]",
+                                          slaBadgeFromTrafficLight(t.sla_traffic_light)
+                                        )}
+                                        title={`SLA: ${slaLabel}`}
+                                      >
+                                        SLA
+                                      </Badge>
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          compactCards ? "px-1.5 py-0.5 text-[10px]" : "text-[10px]",
+                                          slaBadgeFromTrafficLight(t.response_traffic_light)
+                                        )}
+                                        title={`Respuesta: ${respLabel}`}
+                                      >
+                                        R
+                                      </Badge>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
 
-                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                <Badge variant="outline" className={cn("text-[10px]", slaBadgeFromTrafficLight(t.sla_traffic_light))}>
-                                  SLA: {slaLabel}
-                                </Badge>
-                                <Badge variant="outline" className={cn("text-[10px]", slaBadgeFromTrafficLight(t.response_traffic_light))}>
-                                  Resp: {respLabel}
-                                </Badge>
-                              </div>
-
-                              <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
-                                <div className="space-y-0.5">
-                                  {typeof t.sla_remaining_minutes === "number" ? <div>SLA: {Math.max(0, Math.round(t.sla_remaining_minutes))}m</div> : null}
-                                  {typeof t.response_remaining_minutes === "number" ? <div>Resp: {Math.max(0, Math.round(t.response_remaining_minutes))}m</div> : null}
+                                <div className={cn("mt-2 flex items-center justify-between gap-2", compactCards ? "text-[11px]" : "text-xs")}>
+                                  <button
+                                    type="button"
+                                    className={cn(
+                                      "min-w-0 truncate text-left text-muted-foreground hover:text-foreground",
+                                      compactCards ? "max-w-[72%]" : "max-w-[70%]"
+                                    )}
+                                    title={whoLabel}
+                                    onClick={() => setActiveTicketId((cur) => (cur === t.id ? null : t.id))}
+                                  >
+                                    {whoLabel}
+                                  </button>
+                                  <div className="shrink-0 text-muted-foreground">
+                                    {timeLine ? timeLine : slaUse || respUse ? `${slaUse ? `SLA ${slaUse}` : ""}${slaUse && respUse ? " · " : ""}${respUse ? `R ${respUse}` : ""}` : "—"}
+                                  </div>
                                 </div>
-                                <div className="space-y-0.5 text-right">
-                                  {slaUse ? <div>Consumo SLA: {slaUse}</div> : null}
-                                  {respUse ? <div>Consumo Resp: {respUse}</div> : null}
-                                </div>
-                              </div>
 
-                              <div className="mt-3 grid gap-2">
-                                <div className="text-[10px] text-muted-foreground">Asignado</div>
-                                <Combobox
-                                  value={t.assignee_id ?? "__unassigned__"}
-                                  onValueChange={(v) => {
-                                    const st = String(t.status ?? "");
-                                    if (st === "Cerrado" || st === "Cancelado" || st === "Rechazado") return;
-                                    const next = v === "__unassigned__" ? null : v;
-                                    void updateAssignee(t.id, next);
-                                  }}
-                                  options={[{ value: "__unassigned__", label: "Sin asignar" }].concat(
-                                    profiles
-                                      .slice()
-                                      .sort((a, b) => profileLabel(a).localeCompare(profileLabel(b)))
-                                      .map((p) => ({ value: p.id, label: profileLabel(p) }))
-                                  )}
-                                  placeholder={who ? profileLabel(who) : "Sin asignar"}
-                                />
+                                {isActive ? (
+                                  <div className="mt-2">
+                                    <Combobox
+                                      value={t.assignee_id ?? "__unassigned__"}
+                                      onValueChange={(v) => {
+                                        const st = String(t.status ?? "");
+                                        if (st === "Cerrado" || st === "Cancelado" || st === "Rechazado") return;
+                                        const next = v === "__unassigned__" ? null : v;
+                                        void updateAssignee(t.id, next);
+                                      }}
+                                      options={[{ value: "__unassigned__", label: "Sin asignar" }].concat(
+                                        profiles
+                                          .slice()
+                                          .sort((a, b) => profileLabel(a).localeCompare(profileLabel(b)))
+                                          .map((p) => ({ value: p.id, label: profileLabel(p) }))
+                                      )}
+                                      placeholder={whoLabel}
+                                      className={cn(compactCards ? "h-8 px-2 text-xs" : undefined)}
+                                    />
+                                  </div>
+                                ) : null}
                               </div>
-                            </div>
-                          );
+                            );
                           })}
                         </div>
                       )}
