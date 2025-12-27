@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
 import { useProfile, useSession } from "@/lib/hooks";
 import { supabase } from "@/lib/supabaseBrowser";
 import type { Comment, Ticket } from "@/lib/types";
-import { TicketStatuses, slaBadge } from "@/lib/constants";
+import { TicketStatuses, slaBadgeFromTrafficLight } from "@/lib/constants";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -123,9 +123,9 @@ export default function TicketDetailPage() {
     setLoading(true);
     setError(null);
     const { data: t, error: tErr } = await supabase
-      .from("tickets")
+      .from("tickets_sla_live")
       .select(
-        "id,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,response_deadline,sla_deadline,ola_response_deadline,ola_deadline,first_response_at,resolved_at,closed_at"
+        "id,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,response_deadline,sla_deadline,ola_response_deadline,ola_deadline,sla_excluded,sla_exclusion_reason,planned_at,planned_for_at,canceled_at,canceled_reason,sla_remaining_minutes,sla_traffic_light,sla_pct_used,response_remaining_minutes,response_traffic_light,response_pct_used,first_response_at,resolved_at,closed_at"
       )
       .eq("id", ticketId)
       .single();
@@ -215,8 +215,10 @@ export default function TicketDetailPage() {
       { label: "Asignado", value: "Asignado" },
       { label: "En Progreso", value: "En Progreso" },
       { label: "Pendiente Info", value: "Pendiente Info" },
+      { label: "Planificado", value: "Planificado" },
       { label: "Resuelto", value: "Resuelto" },
       { label: "Cerrado", value: "Cerrado" },
+      { label: "Cancelado", value: "Cancelado" },
     ].filter((a) => TicketStatuses.includes(a.value as (typeof TicketStatuses)[number]));
   }, [ticket]);
 
@@ -285,8 +287,8 @@ export default function TicketDetailPage() {
   const priorityBadgeEl = ticket ? <TicketPriorityBadge priority={ticket.priority} /> : null;
   const slaBadgeEl =
     ticket ? (
-      <span className={cn("rounded-full px-2 py-1 text-[11px]", slaBadge(new Date(), ticket.sla_deadline))}>
-        {ticket.sla_deadline ? `SLA ${new Date(ticket.sla_deadline).toLocaleString()}` : "SLA n/a"}
+      <span className={cn("rounded-full px-2 py-1 text-[11px]", slaBadgeFromTrafficLight(ticket.sla_traffic_light))}>
+        {ticket.sla_deadline ? `SLA ${Math.round((ticket.sla_pct_used ?? 0) as number)}%` : "SLA n/a"}
       </span>
     ) : null;
 

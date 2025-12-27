@@ -9,6 +9,7 @@
     "dev:problem-linker": "tsx server/workers/problem-linker.ts",
     "dev:all": "concurrently -k -n web,api,workflows \"next dev\" \"tsx watch server/index.ts\" \"tsx watch server/workers/workflows.ts\"",
     "seed:superadmin": "tsx server/scripts/create-superadmin.ts",
+    "import:catalog": "tsx server/scripts/import-tiered-catalog.ts",
     "build": "next build",
     "start": "next start",
     "start:api": "tsx server/index.ts",

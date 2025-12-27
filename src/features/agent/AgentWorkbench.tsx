@@ -79,8 +79,20 @@ function formatShortId(id: string) {
   return id.slice(0, 8).toUpperCase();
 }
 
-function formatTimeLeft(deadline: string | null) {
+function formatTimeLeft(deadline: string | null, remainingMinutes?: number | null, traffic?: Ticket["sla_traffic_light"]) {
   if (!deadline) return { label: "Sin SLA", tone: "muted" as const };
+
+  if (typeof remainingMinutes === "number" && Number.isFinite(remainingMinutes)) {
+    const mins = Math.max(0, Math.round(remainingMinutes));
+    const hours = Math.round(mins / 60);
+    const days = Math.round(hours / 24);
+    const pretty = days >= 2 ? `${days}d` : hours >= 2 ? `${hours}h` : `${Math.max(1, mins)}m`;
+    if (mins <= 0) return { label: `Vencido · ${pretty}`, tone: "danger" as const };
+    if (traffic === "yellow") return { label: `Vence en ${pretty}`, tone: "warn" as const };
+    if (traffic === "red") return { label: `Vencido · ${pretty}`, tone: "danger" as const };
+    return { label: `Vence en ${pretty}`, tone: "ok" as const };
+  }
+
   const ms = new Date(deadline).getTime() - Date.now();
   const abs = Math.abs(ms);
   const minutes = Math.round(abs / 60000);
@@ -301,7 +313,7 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
             if (!t?.id) continue;
             if (seen.has(t.id)) continue;
             seen.add(t.id);
-            if (t.status === "Cerrado" || t.status === "Rechazado") continue;
+            if (t.status === "Cerrado" || t.status === "Rechazado" || t.status === "Cancelado") continue;
             list.push({ ticket: t, last_at: row.created_at });
             if (list.length >= 12) break;
           }
@@ -320,12 +332,12 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
     setLoading(true);
     setError(null);
     const q = supabase
-      .from("tickets")
+      .from("tickets_sla_live")
       .select(
-        "id,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,response_deadline,sla_deadline,ola_response_deadline,ola_deadline,first_response_at,resolved_at,closed_at"
+        "id,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,response_deadline,sla_deadline,ola_response_deadline,ola_deadline,sla_remaining_minutes,sla_traffic_light,sla_pct_used,first_response_at,resolved_at,closed_at"
       )
       .eq("department_id", profile.department_id!)
-      .in("status", ["Nuevo", "Asignado", "En Progreso", "Pendiente Info", "Resuelto"])
+      .in("status", ["Nuevo", "Asignado", "En Progreso", "Pendiente Info", "Planificado", "Resuelto"])
       .order("created_at", { ascending: false })
       .limit(250);
     if (scope === "mine") q.eq("assignee_id", profile.id);
@@ -760,7 +772,7 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
                 <div className="text-sm text-muted-foreground">No hay SLAs activos en la bandeja actual.</div>
               ) : (
                 slaHotlist.map((t) => {
-                  const tl = formatTimeLeft(t.sla_deadline);
+                  const tl = formatTimeLeft(t.sla_deadline, t.sla_remaining_minutes, t.sla_traffic_light);
                   const tone =
                     tl.tone === "danger"
                       ? "border-rose-500/30 bg-rose-500/10"
@@ -948,7 +960,7 @@ export function AgentWorkbench({ profile }: { profile: Profile }) {
               ) : (
                 <div className="space-y-2">
                   {participations.map((p) => {
-                    const tl = formatTimeLeft(p.ticket.sla_deadline);
+                    const tl = formatTimeLeft(p.ticket.sla_deadline, null, null);
                     const tone =
                       tl.tone === "danger"
                         ? "border-rose-500/30 bg-rose-500/10"
@@ -1015,7 +1027,7 @@ function TicketCard({
   onTake: () => void;
   onSetStatus: (status: KanbanStatus) => void;
 }) {
-  const tl = formatTimeLeft(ticket.sla_deadline);
+  const tl = formatTimeLeft(ticket.sla_deadline, ticket.sla_remaining_minutes, ticket.sla_traffic_light);
   const category = ticket.category_id ? categoriesById[ticket.category_id]?.name : null;
   const sub = ticket.subcategory_id ? subcategoriesById[ticket.subcategory_id]?.name : null;
   const meta = [category, sub].filter(Boolean).join(" · ");
@@ -1097,7 +1109,7 @@ function TicketRow({
   onTake: () => void;
   onSetStatus: (status: KanbanStatus) => void;
 }) {
-  const tl = formatTimeLeft(ticket.sla_deadline);
+  const tl = formatTimeLeft(ticket.sla_deadline, ticket.sla_remaining_minutes, ticket.sla_traffic_light);
   const category = ticket.category_id ? categoriesById[ticket.category_id]?.name : null;
   const sub = ticket.subcategory_id ? subcategoriesById[ticket.subcategory_id]?.name : null;
   const meta = [category, sub].filter(Boolean).join(" · ");

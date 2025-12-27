@@ -31,6 +31,7 @@ import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { InlineEmpty } from "@/components/feedback/InlineEmpty";
 import { SlidersHorizontal } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 
 type Impact = "Alto" | "Medio" | "Bajo";
 type Urgency = "Alta" | "Media" | "Baja";
@@ -113,6 +114,13 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
   const [query, setQuery] = React.useState(initialQuery ?? "");
   const [open, setOpen] = React.useState(false);
   const [selectedServiceId, setSelectedServiceId] = React.useState<string | null>(null);
+  const [selectedServiceFromCombo, setSelectedServiceFromCombo] = React.useState<string | null>(null);
+
+  const [tierType, setTierType] = React.useState<string | null>(null);
+  const [tier1, setTier1] = React.useState<string | null>(null);
+  const [tier2, setTier2] = React.useState<string | null>(null);
+  const [tier3, setTier3] = React.useState<string | null>(null);
+  const [tier4, setTier4] = React.useState<string | null>(null);
 
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
@@ -127,6 +135,19 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
   const [creating, setCreating] = React.useState(false);
 
   const isEndUser = profile.role === "user";
+
+  const tierTitleFor = React.useCallback((service: ServiceCatalogItem) => {
+    const parts = [service.tier1, service.tier2, service.tier3, service.tier4].filter((p) => typeof p === "string" && p.trim().length > 0) as string[];
+    if (parts.length >= 2) return parts.join(" · ");
+    const v = typeof service.user_name === "string" ? service.user_name.trim() : "";
+    return v ? v : service.name;
+  }, []);
+
+  const tierPathLabelFor = React.useCallback((service: ServiceCatalogItem) => {
+    const parts = [service.ticket_type, service.tier1, service.tier2, service.tier3, service.tier4]
+      .filter((p) => typeof p === "string" && p.trim().length > 0) as string[];
+    return parts.join(" → ");
+  }, []);
 
   const selectedService = React.useMemo(
     () => (selectedServiceId ? services.find((s) => s.id === selectedServiceId) ?? null : null),
@@ -157,10 +178,28 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
       const uName = userNameFor(s) ?? "";
       const uDesc = userDescriptionFor(s) ?? "";
       const kw = keywordsFor(s).join(" ");
-      const hay = `${s.name} ${s.description ?? ""} ${uName} ${uDesc} ${kw} ${categoryNameById.get(s.category_id ?? "") ?? ""} ${subcategoryNameById.get(s.subcategory_id ?? "") ?? ""}`.toLowerCase();
+      const tiers = `${s.ticket_type ?? ""} ${s.tier1 ?? ""} ${s.tier2 ?? ""} ${s.tier3 ?? ""} ${s.tier4 ?? ""}`;
+      const hay = `${s.name} ${s.description ?? ""} ${uName} ${uDesc} ${kw} ${tiers} ${categoryNameById.get(s.category_id ?? "") ?? ""} ${subcategoryNameById.get(s.subcategory_id ?? "") ?? ""}`.toLowerCase();
       return hay.includes(q);
     });
   }, [services, query, categoryNameById, subcategoryNameById, keywordsFor, userDescriptionFor, userNameFor]);
+
+  const comboOptions = React.useMemo(() => {
+    const catalog = isEndUser
+      ? services.filter((s) => Boolean(s.tier1 && s.tier2 && s.tier3 && s.tier4))
+      : services;
+    const opts: ComboboxOption[] = [];
+    for (const svc of catalog) {
+      const label = tierTitleFor(svc);
+      const userDesc = userDescriptionFor(svc) ?? svc.description ?? null;
+      const hasTiers = Boolean(svc.tier1 || svc.tier2 || svc.tier3 || svc.tier4);
+      const desc = hasTiers ? tierPathLabelFor(svc) : userDesc;
+      const keywords = [tierPathLabelFor(svc), userDesc ?? "", ...(keywordsFor(svc) ?? [])].join(" ");
+      opts.push({ value: svc.id, label, description: desc, keywords });
+    }
+    opts.sort((a, b) => a.label.localeCompare(b.label));
+    return opts;
+  }, [isEndUser, keywordsFor, services, tierPathLabelFor, tierTitleFor, userDescriptionFor]);
 
   const grouped = React.useMemo(() => {
     const map = new Map<string, ServiceCatalogItem[]>();
@@ -203,7 +242,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
       const { data: svc, error: svcErr } = await supabase
         .from("service_catalog_items")
         .select(
-          "id,department_id,name,user_name,description,user_description,keywords,category_id,subcategory_id,ticket_type,default_priority,default_impact,default_urgency,icon_key,is_active"
+          "id,department_id,name,user_name,description,user_description,keywords,category_id,subcategory_id,tier1,tier2,tier3,tier4,ticket_type,default_priority,default_impact,default_urgency,icon_key,is_active"
         )
         .eq("is_active", true)
         .or(`department_id.is.null,department_id.eq.${profile.department_id}`)
@@ -304,14 +343,22 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
     void loadApprovalSteps(service.id);
     void loadTimeTargets(service.id);
 
-    const userTitle = userNameFor(service) ?? service.name;
-    setTitle(isEndUser ? userTitle : service.name);
+    const autoTitle = tierTitleFor(service);
+    setTitle(isEndUser ? autoTitle : service.name);
     setDescription("");
     setImpact(service.default_impact);
     setUrgency(service.default_urgency);
     setPriorityManual(false);
     setPriority(service.default_priority);
     setMeta({ context: { location: "", asset_tag: "", contact: "" }, fields: {} });
+
+    if (isEndUser) {
+      setTierType(service.ticket_type ?? null);
+      setTier1(service.tier1 ?? null);
+      setTier2(service.tier2 ?? null);
+      setTier3(service.tier3 ?? null);
+      setTier4(service.tier4 ?? null);
+    }
   }
 
   const selectedFields = selectedService ? fieldsByServiceId[selectedService.id] ?? [] : [];
@@ -355,12 +402,18 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
       const needsApproval = steps.length > 0;
       const userName = userNameFor(selectedService) ?? selectedService.name;
       const userDescription = userDescriptionFor(selectedService) ?? selectedService.description ?? null;
+      const computedTitle = tierTitleFor(selectedService);
       const metadata = {
         service_catalog: {
           service_id: selectedService.id,
           service_name: selectedService.name,
           user_name: userName,
           user_description: userDescription,
+          ticket_type: selectedService.ticket_type,
+          tier1: selectedService.tier1 ?? null,
+          tier2: selectedService.tier2 ?? null,
+          tier3: selectedService.tier3 ?? null,
+          tier4: selectedService.tier4 ?? null,
         },
         impact,
         urgency,
@@ -370,7 +423,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
 
       const { error } = await supabase.from("tickets").insert({
         requester_id: profile.id,
-        title: title.trim(),
+        title: isEndUser ? computedTitle : title.trim(),
         description: description.trim() || null,
         type: selectedService.ticket_type,
         priority,
@@ -400,12 +453,29 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
         }
         actions={
           <div className="flex items-center gap-2">
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={isEndUser ? "Buscar un problema (correo, internet, VPN…)" : "Buscar (vpn, permisos, software…)"}
-              className="md:w-96"
-            />
+            {isEndUser ? (
+              <div className="md:w-[520px]">
+                <Combobox
+                  value={selectedServiceFromCombo}
+                  onValueChange={(id) => {
+                    setSelectedServiceFromCombo(id);
+                    if (!id) return;
+                    const svc = services.find((s) => s.id === id) ?? null;
+                    if (svc) openService(svc);
+                  }}
+                  options={comboOptions}
+                  placeholder="Buscar y seleccionar (ej: impresora, wifi, kyocera, bitdefender…)…"
+                  searchPlaceholder="Buscar en el catálogo…"
+                />
+              </div>
+            ) : (
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar (vpn, permisos, software…)"
+                className="md:w-96"
+              />
+            )}
             <Button variant="outline" onClick={() => void load()}>
               Actualizar
             </Button>
@@ -433,7 +503,156 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
         </div>
       ) : (
         <div className="space-y-6">
-          {grouped.length === 0 ? (
+          {isEndUser && comboOptions.length === 0 ? (
+            <Card className="tech-border">
+              <CardHeader>
+                <CardTitle>Catálogo no cargado</CardTitle>
+                <CardDescription>Aún no hay registros Tier 1..4 disponibles para tu área.</CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                Contacta a tu supervisor para cargar el catálogo real (CSV) en <code className="text-foreground">service_catalog_items</code>.
+              </CardContent>
+            </Card>
+          ) : null}
+          {isEndUser ? (
+            <Card className="tech-border">
+              <CardHeader>
+                <CardTitle>Selección guiada</CardTitle>
+                <CardDescription>Si prefieres, elige por niveles (Tipo de ticket → Tier 1…4).</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="md:col-span-2 text-xs text-muted-foreground">
+                    Tu solicitud quedará clasificada con estos niveles para el equipo técnico y reportería.
+                  </div>
+                  {(() => {
+                    const catalog = services.filter((s) => Boolean(s.tier1 && s.tier2 && s.tier3 && s.tier4));
+                    const ticketTypeOptions: ComboboxOption[] = Array.from(new Set(catalog.map((s) => s.ticket_type)))
+                      .sort()
+                      .map((v) => ({ value: v, label: v }));
+
+                    const selectedType = tierType;
+                    const inType = selectedType ? catalog.filter((s) => s.ticket_type === selectedType) : catalog;
+
+                    const tier1Options: ComboboxOption[] = Array.from(new Set(inType.map((s) => s.tier1).filter(Boolean) as string[]))
+                      .sort()
+                      .map((v) => ({ value: v, label: v }));
+                    const inTier1 = tier1 ? inType.filter((s) => s.tier1 === tier1) : inType;
+
+                    const tier2Options: ComboboxOption[] = Array.from(new Set(inTier1.map((s) => s.tier2).filter(Boolean) as string[]))
+                      .sort()
+                      .map((v) => ({ value: v, label: v }));
+                    const inTier2 = tier2 ? inTier1.filter((s) => s.tier2 === tier2) : inTier1;
+
+                    const tier3Options: ComboboxOption[] = Array.from(new Set(inTier2.map((s) => s.tier3).filter(Boolean) as string[]))
+                      .sort()
+                      .map((v) => ({ value: v, label: v }));
+                    const inTier3 = tier3 ? inTier2.filter((s) => s.tier3 === tier3) : inTier2;
+
+                    const tier4Options: ComboboxOption[] = Array.from(new Set(inTier3.map((s) => s.tier4).filter(Boolean) as string[]))
+                      .sort()
+                      .map((v) => ({ value: v, label: v }));
+
+                    const leaf =
+                      tierType && tier1 && tier2 && tier3 && tier4
+                        ? catalog.find(
+                            (s) =>
+                              s.ticket_type === tierType && s.tier1 === tier1 && s.tier2 === tier2 && s.tier3 === tier3 && s.tier4 === tier4
+                          ) ?? null
+                        : null;
+
+                    return (
+                      <>
+                        <label className="block md:col-span-2">
+                          <div className="text-xs text-muted-foreground">Tipo de ticket</div>
+                          <Combobox
+                            value={tierType}
+                            onValueChange={(v) => {
+                              setTierType(v);
+                              setTier1(null);
+                              setTier2(null);
+                              setTier3(null);
+                              setTier4(null);
+                            }}
+                            options={ticketTypeOptions}
+                            placeholder="Seleccionar tipo…"
+                          />
+                        </label>
+                        <label className="block">
+                          <div className="text-xs text-muted-foreground">Tier 1</div>
+                          <Combobox
+                            value={tier1}
+                            onValueChange={(v) => {
+                              setTier1(v);
+                              setTier2(null);
+                              setTier3(null);
+                              setTier4(null);
+                            }}
+                            options={tier1Options}
+                            disabled={!tierType}
+                            placeholder="Seleccionar…"
+                          />
+                        </label>
+                        <label className="block">
+                          <div className="text-xs text-muted-foreground">Tier 2</div>
+                          <Combobox
+                            value={tier2}
+                            onValueChange={(v) => {
+                              setTier2(v);
+                              setTier3(null);
+                              setTier4(null);
+                            }}
+                            options={tier2Options}
+                            disabled={!tierType || !tier1}
+                            placeholder="Seleccionar…"
+                          />
+                        </label>
+                        <label className="block">
+                          <div className="text-xs text-muted-foreground">Tier 3</div>
+                          <Combobox
+                            value={tier3}
+                            onValueChange={(v) => {
+                              setTier3(v);
+                              setTier4(null);
+                            }}
+                            options={tier3Options}
+                            disabled={!tierType || !tier1 || !tier2}
+                            placeholder="Seleccionar…"
+                          />
+                        </label>
+                        <label className="block">
+                          <div className="text-xs text-muted-foreground">Tier 4</div>
+                          <Combobox
+                            value={tier4}
+                            onValueChange={(v) => setTier4(v)}
+                            options={tier4Options}
+                            disabled={!tierType || !tier1 || !tier2 || !tier3}
+                            placeholder="Seleccionar…"
+                          />
+                        </label>
+                        <div className="md:col-span-2 flex items-center justify-between gap-2">
+                          <div className="text-xs text-muted-foreground">
+                            {leaf ? (
+                              <>
+                                Seleccionado: <span className="text-foreground">{tierPathLabelFor(leaf)}</span>
+                              </>
+                            ) : (
+                              "Completa los 4 niveles para continuar."
+                            )}
+                          </div>
+                          <Button disabled={!leaf} onClick={() => leaf && openService(leaf)}>
+                            Continuar
+                          </Button>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+          {!isEndUser ? (
+            grouped.length === 0 ? (
             <Card className="tech-border">
               <CardHeader>
                 <CardTitle>Sin servicios</CardTitle>
@@ -450,7 +669,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                 )}
               </CardContent>
             </Card>
-          ) : (
+            ) : (
             grouped.map(([group, items]) => (
               <div key={group}>
                 <div className="mb-3 flex items-center justify-between">
@@ -463,6 +682,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                     const sub = svc.subcategory_id ? subcategoryNameById.get(svc.subcategory_id) : null;
                     const displayName = isEndUser ? userNameFor(svc) ?? svc.name : svc.name;
                     const displayDesc = isEndUser ? userDescriptionFor(svc) ?? svc.description ?? null : svc.description ?? null;
+                    const tierLabel = [svc.tier2, svc.tier3, svc.tier4].filter((p) => typeof p === "string" && p.trim().length > 0).join(" · ");
                     return (
                       <MotionItem key={svc.id} id={svc.id}>
                         <Card className="tech-border">
@@ -474,6 +694,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                                 <TicketTypeBadge type={svc.ticket_type} />
                                 <TicketPriorityBadge priority={svc.default_priority} />
                                 {sub ? <Badge variant="outline">{sub}</Badge> : null}
+                                {tierLabel ? <Badge variant="outline">{tierLabel}</Badge> : null}
                                 {!isEndUser && userNameFor(svc) ? <Badge variant="outline">Usuario: {userNameFor(svc)}</Badge> : null}
                               </div>
                             </div>
@@ -493,7 +714,8 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                 </MotionList>
               </div>
             ))
-          )}
+            )
+          ) : null}
         </div>
       )}
 
@@ -612,7 +834,8 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
                     <div className="grid gap-3">
                       <label className="block">
                         <div className="text-xs text-muted-foreground">Título</div>
-                        <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+                        <Input value={title} readOnly={isEndUser} onChange={(e) => setTitle(e.target.value)} />
+                        {isEndUser ? <div className="mt-1 text-xs text-muted-foreground">Se genera automáticamente según tu selección.</div> : null}
                       </label>
 
                       <label className="block">

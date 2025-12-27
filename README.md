@@ -26,10 +26,28 @@ En tu proyecto Supabase ejecuta (SQL Editor o Supabase CLI) las migraciones:
 - `supabase/migrations/001_init.sql`
 - `supabase/migrations/002_analytics.sql`
 - `supabase/migrations/003_profiles_rls.sql`
+- `supabase/migrations/006_service_catalog.sql`
+- `supabase/migrations/015_service_catalog_user_friendly.sql`
+- `supabase/migrations/017_sla_business_hours.sql`
+- `supabase/migrations/018_kpi_sla_exclusions.sql`
+- `supabase/migrations/019_service_catalog_tiers.sql`
 
 Opcional (datos ejemplo):
 
 - `supabase/seed.sql`
+
+### 2.1) Importar catálogo real (Tier 1..4)
+
+Exporta tu Excel a CSV y asegúrate de tener columnas:
+
+- `Tipo de Ticket` (Incidente/Requerimiento)
+- `Tier 1`, `Tier 2`, `Tier 3`, `Tier 4`
+
+Luego importa (requiere `.env` con `SUPABASE_*` service role):
+
+```bash
+npm run import:catalog -- ./ruta/al/catalogo.csv --department <DEPARTMENT_UUID>
+```
 
 Para que Realtime funcione en la UI (suscripciones `postgres_changes`), habilita la replicación de:
 
@@ -112,7 +130,14 @@ Luego abre `http://localhost:3000`.
 ## Notas
 
 - La gamificación se actualiza automáticamente en DB al pasar tickets a `Cerrado` (puntos + rank).
-- `sla_deadline` se calcula en DB en el `insert` según `slas` activo (prefiere SLA por departamento y usa global como fallback).
+- SLA en **horas hábiles**:
+  - Configuración por departamento en `business_calendars` + feriados en `business_holidays` (por defecto 08:00–18:00 lun–vie).
+  - Los deadlines (`response_deadline`, `sla_deadline`, `ola_*`) se calculan en DB al crear el ticket usando horas hábiles.
+  - Estado `Planificado` **pausa** el contador (se extienden deadlines al salir de `Planificado`).
+  - Campo de exclusión/justificación para tickets fuera de SLA: RPC `ticket_set_sla_exclusion(ticket_id, excluded, reason)`.
+  - Vista `tickets_sla_live` expone semáforo/termómetro (`*_traffic_light`, `*_pct_used`, `*_remaining_minutes`).
+  - Retroactividad: por defecto los cambios de calendario/SLA no son retroactivos (deadlines quedan almacenados); el despliegue recalcula solo tickets abiertos.
+- Export (sábana CSV): API `GET /api/tickets/export.csv` (requiere supervisor/admin).
 
 ## Screens principales
 

@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseBrowser";
 import type { Profile, Ticket } from "@/lib/types";
-import { KanbanStatuses, type KanbanStatus, priorityBadge, slaBadge } from "@/lib/constants";
+import { KanbanStatuses, type KanbanStatus, priorityBadge, slaBadgeFromTrafficLight } from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,15 @@ function groupByStatus(tickets: Ticket[]) {
   return map;
 }
 
+function formatMins(mins: number | null | undefined) {
+  if (mins == null || !Number.isFinite(mins) || mins < 0) return "—";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.round(mins / 60);
+  if (hours < 48) return `${hours}h`;
+  const days = Math.round(hours / 24);
+  return `${days}d`;
+}
+
 export function AgentKanban({ profile }: { profile: Profile }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [onlyMine, setOnlyMine] = useState(true);
@@ -36,16 +45,17 @@ export function AgentKanban({ profile }: { profile: Profile }) {
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<KanbanStatus | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const now = new Date();
 
   async function load() {
     setLoading(true);
     setError(null);
     const q = supabase
-      .from("tickets")
-      .select("id,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,sla_deadline,first_response_at,resolved_at,closed_at")
+      .from("tickets_sla_live")
+      .select(
+        "id,department_id,type,title,description,status,priority,category_id,subcategory_id,metadata,requester_id,assignee_id,created_at,updated_at,sla_deadline,sla_remaining_minutes,sla_traffic_light,sla_pct_used,first_response_at,resolved_at,closed_at"
+      )
       .eq("department_id", profile.department_id!)
-      .in("status", ["Nuevo", "Asignado", "En Progreso", "Pendiente Info", "Resuelto"])
+      .in("status", ["Nuevo", "Asignado", "En Progreso", "Pendiente Info", "Planificado", "Resuelto"])
       .order("created_at", { ascending: false })
       .limit(200);
     if (onlyMine) q.eq("assignee_id", profile.id);
@@ -228,8 +238,10 @@ export function AgentKanban({ profile }: { profile: Profile }) {
                             </div>
 
                             <div className="mt-2 flex items-center justify-between gap-2">
-                              <div className={cn("rounded-full px-2 py-1 text-[11px]", slaBadge(now, t.sla_deadline))}>
-                                {t.sla_deadline ? `SLA ${new Date(t.sla_deadline).toLocaleString()}` : "SLA n/a"}
+                              <div className={cn("rounded-full px-2 py-1 text-[11px]", slaBadgeFromTrafficLight(t.sla_traffic_light))}>
+                                {t.sla_deadline
+                                  ? `SLA ${formatMins(t.sla_remaining_minutes)} · ${Math.round((t.sla_pct_used ?? 0) as number)}%`
+                                  : "SLA n/a"}
                               </div>
                               <div className="flex items-center gap-2">
                                 {!t.assignee_id && (

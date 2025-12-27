@@ -36,7 +36,7 @@ async function pickLeastLoadedAgent(supabase: ReturnType<typeof createSupabaseAd
     .from("tickets")
     .select("assignee_id")
     .eq("department_id", departmentId)
-    .in("status", ["Nuevo", "Asignado", "En Progreso", "Pendiente Info"]);
+    .in("status", ["Nuevo", "Asignado", "En Progreso", "Pendiente Info", "Planificado"]);
   if (openErr) throw openErr;
 
   const loadByAgent = new Map<string, number>();

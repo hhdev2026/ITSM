@@ -1,7 +1,18 @@
-export const TicketStatuses = ["Pendiente Aprobación", "Nuevo", "Asignado", "En Progreso", "Pendiente Info", "Resuelto", "Cerrado", "Rechazado"] as const;
+export const TicketStatuses = [
+  "Pendiente Aprobación",
+  "Nuevo",
+  "Asignado",
+  "En Progreso",
+  "Pendiente Info",
+  "Planificado",
+  "Resuelto",
+  "Cerrado",
+  "Rechazado",
+  "Cancelado",
+] as const;
 export type TicketStatus = (typeof TicketStatuses)[number];
 
-export const KanbanStatuses = ["Nuevo", "Asignado", "En Progreso", "Pendiente Info", "Resuelto"] as const;
+export const KanbanStatuses = ["Nuevo", "Asignado", "En Progreso", "Pendiente Info", "Planificado", "Resuelto"] as const;
 export type KanbanStatus = (typeof KanbanStatuses)[number];
 
 export const TicketPriorities = ["Crítica", "Alta", "Media", "Baja"] as const;
@@ -26,5 +37,15 @@ export function slaBadge(now: Date, slaDeadline: string | null) {
   const ms = d.getTime() - now.getTime();
   if (ms <= 0) return "bg-rose-500/20 text-rose-200 ring-1 ring-rose-500/30";
   if (ms <= 2 * 60 * 60 * 1000) return "bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/30";
+  return "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-500/30";
+}
+
+export type SlaTrafficLight = "green" | "yellow" | "red" | "closed" | "excluded" | null;
+
+export function slaBadgeFromTrafficLight(light: SlaTrafficLight | undefined) {
+  if (!light) return "bg-zinc-800/60 text-zinc-200 ring-1 ring-zinc-700";
+  if (light === "excluded" || light === "closed") return "bg-zinc-800/60 text-zinc-200 ring-1 ring-zinc-700";
+  if (light === "red") return "bg-rose-500/20 text-rose-200 ring-1 ring-rose-500/30";
+  if (light === "yellow") return "bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/30";
   return "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-500/30";
 }
