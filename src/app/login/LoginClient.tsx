@@ -15,31 +15,20 @@ import { InlineAlert } from "@/components/feedback/InlineAlert";
 export function LoginClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const canSubmit = useMemo(() => email.includes("@") && password.length >= 6 && (mode === "login" || fullName.trim().length >= 3), [email, password, mode, fullName]);
+  const canSubmit = useMemo(() => email.includes("@") && password.length >= 6, [email, password]);
   const nextPath = searchParams.get("next") || "/app";
 
   async function submit() {
     setBusy(true);
     setError(null);
     try {
-      if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { full_name: fullName } },
-        });
-        if (error) throw error;
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
       router.replace(nextPath);
     } catch (e: unknown) {
       setError(errorMessage(e) ?? "No se pudo autenticar");
@@ -59,25 +48,10 @@ export function LoginClient() {
         <Card className="tech-border tech-glow">
           <CardHeader>
             <CardTitle>Iniciar sesión</CardTitle>
-            <CardDescription>Accede a tu portal de soporte.</CardDescription>
+            <CardDescription>Accede a tu portal de soporte. Si no tienes cuenta, solicita acceso a tu administrador.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant={mode === "login" ? "default" : "outline"} onClick={() => setMode("login")}>
-                Ingresar
-              </Button>
-              <Button variant={mode === "signup" ? "default" : "outline"} onClick={() => setMode("signup")}>
-                Crear cuenta
-              </Button>
-            </div>
-
             <div className="grid gap-3">
-              {mode === "signup" ? (
-                <label className="block">
-                  <div className="text-xs text-muted-foreground">Nombre completo</div>
-                  <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
-                </label>
-              ) : null}
               <label className="block">
                 <div className="text-xs text-muted-foreground">Email</div>
                 <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
@@ -91,7 +65,7 @@ export function LoginClient() {
               {error ? <InlineAlert variant="error" description={error} /> : null}
 
               <Button disabled={!canSubmit || busy} onClick={submit} className={cn("w-full", busy && "opacity-90")}>
-                {busy ? "Procesando…" : mode === "login" ? "Ingresar" : "Crear cuenta"}
+                {busy ? "Procesando…" : "Ingresar"}
               </Button>
             </div>
           </CardContent>
