@@ -37,7 +37,7 @@ export const SheetContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed z-50 h-dvh w-full max-w-xl border border-border bg-background shadow-2xl",
+        "fixed z-50 h-dvh w-full max-w-xl glass-surface shadow-2xl",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:duration-200 data-[state=open]:duration-200",
         side === "right"
@@ -61,4 +61,3 @@ export const SheetContent = React.forwardRef<
   </SheetPortal>
 ));
 SheetContent.displayName = DialogPrimitive.Content.displayName;
-

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Profile } from "@/lib/types";
 import { Logo } from "./Logo";
 import { signOut } from "@/lib/hooks";
@@ -76,9 +76,11 @@ function NavItem({
 
 export function AppShell({ profile, children }: { profile: Profile; children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
   const { open, setOpen } = useCommandPalette();
   const [collapsed, setCollapsed] = React.useState(false);
+  const reduceMotion = useReducedMotion();
 
   React.useEffect(() => {
     const raw = localStorage.getItem("itsm.sidebarCollapsed");
@@ -323,8 +325,20 @@ export function AppShell({ profile, children }: { profile: Profile; children: Re
 
             <main className="min-w-0 flex-1 px-4 py-6 md:px-6">
               <div className="tech-border tech-glow rounded-2xl p-[1px]">
-                <div className="rounded-2xl bg-background/80 backdrop-blur">
-                  <div className="p-4 md:p-6">{children}</div>
+                <div className="glass-surface rounded-2xl">
+                  <div className="p-4 md:p-6">
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.div
+                        key={pathname}
+                        initial={reduceMotion ? false : { opacity: 0, y: 10, filter: "blur(4px)" }}
+                        animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: "blur(0px)" }}
+                        exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8, filter: "blur(4px)" }}
+                        transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                      >
+                        {children}
+                      </motion.div>
+                    </AnimatePresence>
+                  </div>
                 </div>
               </div>
             </main>
