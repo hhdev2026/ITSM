@@ -839,6 +839,7 @@ $$;
 
 drop policy if exists profiles_select_self on public.profiles;
 drop policy if exists profiles_admin_select on public.profiles;
+drop policy if exists profiles_select_visible on public.profiles;
 
 create policy profiles_select_visible on public.profiles
 for select to authenticated
@@ -849,7 +850,6 @@ using (
 );
 
 commit;
-
 begin;
 
 create table if not exists public.subcategories (
