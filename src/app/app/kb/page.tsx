@@ -17,6 +17,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { MotionItem, MotionList } from "@/components/motion/MotionList";
+import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { EmptyState } from "@/components/feedback/EmptyState";
+import { BookOpen } from "lucide-react";
 
 type Article = {
   id: string;
@@ -156,7 +159,7 @@ export default function KnowledgeBasePage() {
                 Publicar
               </label>
               {error ? (
-                <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div>
+                <InlineAlert variant="error" description={error} />
               ) : null}
               <Button disabled={!canCreate || creating} onClick={() => void createArticle(profile)}>
                 {creating ? "Creando…" : "Crear"}
@@ -177,12 +180,12 @@ export default function KnowledgeBasePage() {
           </CardHeader>
           <CardContent>
             {error ? (
-              <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div>
+              <InlineAlert variant="error" description={error} />
             ) : null}
             {loading ? (
               <div className="text-sm text-muted-foreground">Cargando…</div>
             ) : articles.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">No hay artículos.</div>
+              <EmptyState title="Sin artículos" description="Aún no hay contenido publicado para este departamento." icon={<BookOpen className="h-5 w-5" />} />
             ) : (
               <MotionList className="divide-y divide-border">
                 {articles.map((a) => (

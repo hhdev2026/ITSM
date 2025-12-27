@@ -19,6 +19,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MotionItem, MotionList } from "@/components/motion/MotionList";
 import { TicketPriorityBadge, TicketStatusBadge, TicketTypeBadge } from "@/components/tickets/TicketBadges";
+import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { EmptyState } from "@/components/feedback/EmptyState";
+import { Inbox } from "lucide-react";
 
 type ApprovalRow = {
   id: string;
@@ -139,7 +142,7 @@ export function ApprovalsInbox({ profile }: { profile: Profile }) {
       </div>
 
       {error ? (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div>
+        <InlineAlert variant="error" description={error} />
       ) : null}
 
       {loading ? (
@@ -157,12 +160,7 @@ export function ApprovalsInbox({ profile }: { profile: Profile }) {
           ))}
         </div>
       ) : approvals.length === 0 ? (
-        <Card className="tech-border">
-          <CardHeader>
-            <CardTitle>Sin pendientes</CardTitle>
-            <CardDescription>No tienes aprobaciones pendientes por ahora.</CardDescription>
-          </CardHeader>
-        </Card>
+        <EmptyState title="Sin pendientes" description="No tienes aprobaciones pendientes por ahora." icon={<Inbox className="h-5 w-5" />} />
       ) : (
         <MotionList className="grid gap-3 md:grid-cols-2">
           {approvals.map((a) => {

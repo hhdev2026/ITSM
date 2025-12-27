@@ -5,6 +5,7 @@ import { useProfile, useSession } from "@/lib/hooks";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { UserAdmin } from "@/features/admin/UserAdmin";
+import { InlineAlert } from "@/components/feedback/InlineAlert";
 
 export default function AdminUsersPage() {
   const router = useRouter();
@@ -23,9 +24,7 @@ export default function AdminUsersPage() {
   if (profile.role !== "admin") {
     return (
       <AppShell profile={profile}>
-        <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-foreground">
-          No tienes permisos para administrar usuarios.
-        </div>
+        <InlineAlert variant="error" title="Acceso denegado" description="No tienes permisos para administrar usuarios." />
       </AppShell>
     );
   }
@@ -36,4 +35,3 @@ export default function AdminUsersPage() {
     </AppShell>
   );
 }
-

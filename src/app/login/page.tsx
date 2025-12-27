@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
+import { InlineAlert } from "@/components/feedback/InlineAlert";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -117,7 +118,7 @@ export default function LoginPage() {
                 </label>
 
                 {error ? (
-                  <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div>
+                  <InlineAlert variant="error" description={error} />
                 ) : null}
 
                 <Button disabled={!canSubmit || busy} onClick={submit} className={cn("w-full", busy && "opacity-90")}>

@@ -16,6 +16,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { EmptyState } from "@/components/feedback/EmptyState";
+import { Clock } from "lucide-react";
 
 type Sla = {
   id: string;
@@ -173,7 +176,9 @@ export default function SlasPage() {
                 Activo
               </label>
               {error ? (
-                <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground md:col-span-4">{error}</div>
+                <div className="md:col-span-4">
+                  <InlineAlert variant="error" description={error} />
+                </div>
               ) : null}
               <div className="md:col-span-4">
                 <Button disabled={!canCreate || saving} onClick={() => void create(profile)}>
@@ -198,7 +203,7 @@ export default function SlasPage() {
             {loading ? (
               <div className="text-sm text-muted-foreground">Cargando…</div>
             ) : slas.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No hay SLAs.</div>
+              <EmptyState title="Sin SLAs" description="Crea un SLA para tu departamento o usa el global." icon={<Clock className="h-5 w-5" />} />
             ) : (
               <div className="divide-y divide-border">
                 {slas.map((s) => (

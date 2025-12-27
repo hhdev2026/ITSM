@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { InlineEmpty } from "@/components/feedback/InlineEmpty";
 import { RefreshCcw, UserCheck } from "lucide-react";
 
 function groupByStatus(tickets: Ticket[]) {
@@ -172,9 +174,7 @@ export function AgentKanban({ profile }: { profile: Profile }) {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">
-          {error}
-        </div>
+        <InlineAlert variant="error" description={error} />
       )}
 
       {loading ? (
@@ -218,9 +218,7 @@ export function AgentKanban({ profile }: { profile: Profile }) {
 
                 <div className="mt-3 space-y-2">
                   {list.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                      Suelta aquí
-                    </div>
+                    <InlineEmpty title="Suelta aquí" description="Arrastra un ticket a esta columna." className="py-5" />
                   ) : (
                     <AnimatePresence initial={false}>
                       {list.map((t) => (

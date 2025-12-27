@@ -12,6 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MotionItem, MotionList } from "@/components/motion/MotionList";
 import { TicketPriorityBadge, TicketStatusBadge, TicketTypeBadge } from "@/components/tickets/TicketBadges";
+import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { EmptyState } from "@/components/feedback/EmptyState";
+import { Ticket as TicketIcon } from "lucide-react";
 
 export function UserDashboard({ profile }: { profile: Profile }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -103,7 +106,7 @@ export function UserDashboard({ profile }: { profile: Profile }) {
           </CardHeader>
           <CardContent>
             {error ? (
-              <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div>
+              <InlineAlert variant="error" description={error} />
             ) : null}
 
             {loading ? (
@@ -113,7 +116,7 @@ export function UserDashboard({ profile }: { profile: Profile }) {
                 <Skeleton className="h-14 w-full" />
               </div>
             ) : tickets.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">Aún no tienes tickets.</div>
+              <EmptyState title="Aún no tienes tickets" description="Crea uno desde el catálogo para comenzar." icon={<TicketIcon className="h-5 w-5" />} />
             ) : (
               <MotionList className="divide-y divide-border">
                 {tickets.map((t) => (

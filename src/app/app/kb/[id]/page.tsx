@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { InlineAlert } from "@/components/feedback/InlineAlert";
 
 type Article = {
   id: string;
@@ -129,9 +130,7 @@ export default function ArticlePage() {
           }
         />
 
-        {error ? (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div>
-        ) : null}
+        {error ? <InlineAlert variant="error" description={error} /> : null}
         {loading ? (
           <div className="text-sm text-muted-foreground">Cargando…</div>
         ) : !article ? (

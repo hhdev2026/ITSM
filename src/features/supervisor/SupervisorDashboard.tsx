@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { InlineAlert } from "@/components/feedback/InlineAlert";
 
 type KpiData = {
   range: { start: string; end: string };
@@ -190,9 +191,7 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
         </CardContent>
       </Card>
 
-      {error ? (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div>
-      ) : null}
+      {error ? <InlineAlert variant="error" description={error} /> : null}
 
       {loading ? (
         <div className="text-sm text-muted-foreground">Cargando…</div>

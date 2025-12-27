@@ -33,6 +33,9 @@ import { Check, ChevronDown, Copy, RefreshCcw, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { MotionItem, MotionList } from "@/components/motion/MotionList";
 import { TicketPriorityBadge, TicketStatusBadge, TicketTypeBadge } from "@/components/tickets/TicketBadges";
+import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { InlineEmpty } from "@/components/feedback/InlineEmpty";
+import { MessageSquare } from "lucide-react";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
@@ -372,7 +375,7 @@ export default function TicketDetailPage() {
           </div>
         </div>
 
-        {error ? <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div> : null}
+        {error ? <InlineAlert variant="error" description={error} /> : null}
 
         {loading ? (
           <div className="text-sm text-muted-foreground">Cargando…</div>
@@ -399,7 +402,7 @@ export default function TicketDetailPage() {
                 <CardContent>
                   <div className="space-y-3">
                     {comments.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">Sin comentarios.</div>
+                      <InlineEmpty title="Sin comentarios" description="Aún no hay actividad en este ticket." icon={<MessageSquare className="h-5 w-5" />} className="py-10" />
                     ) : (
                       <MotionList className="space-y-3">
                         {comments.map((c) => (

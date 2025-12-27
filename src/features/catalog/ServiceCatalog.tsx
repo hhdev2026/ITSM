@@ -36,6 +36,9 @@ import {
 } from "@/components/icons/catalog-icons";
 import { MotionItem, MotionList } from "@/components/motion/MotionList";
 import { TicketPriorityBadge, TicketTypeBadge } from "@/components/tickets/TicketBadges";
+import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { InlineEmpty } from "@/components/feedback/InlineEmpty";
+import { SlidersHorizontal } from "lucide-react";
 
 type Impact = "Alto" | "Medio" | "Bajo";
 type Urgency = "Alta" | "Media" | "Baja";
@@ -425,7 +428,7 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
       </div>
 
       {error ? (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div>
+        <InlineAlert variant="error" description={error} />
       ) : null}
 
       {loading ? (
@@ -698,8 +701,8 @@ export function ServiceCatalog({ profile, initialQuery }: { profile: Profile; in
 
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     {selectedFields.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-border px-3 py-8 text-center text-sm text-muted-foreground md:col-span-2">
-                        Sin campos adicionales.
+                      <div className="md:col-span-2">
+                        <InlineEmpty title="Sin campos adicionales" description="Este servicio no requiere datos extra." icon={<SlidersHorizontal className="h-5 w-5" />} />
                       </div>
                     ) : (
                       selectedFields.map((f) => {

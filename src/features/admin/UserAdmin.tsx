@@ -18,6 +18,9 @@ import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/cn";
 import { Check, ChevronDown, Plus, RefreshCcw, ShieldBan, ShieldCheck } from "lucide-react";
 import { MotionItem, MotionList } from "@/components/motion/MotionList";
+import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { EmptyState } from "@/components/feedback/EmptyState";
+import { Users } from "lucide-react";
 
 type Role = "user" | "agent" | "supervisor" | "admin";
 const Roles: Role[] = ["user", "agent", "supervisor", "admin"];
@@ -405,7 +408,7 @@ export function UserAdmin({ adminProfile }: { adminProfile: Profile }) {
         </div>
       </div>
 
-      {error ? <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-foreground">{error}</div> : null}
+      {error ? <InlineAlert variant="error" description={error} /> : null}
 
       <Card className="tech-border">
         <CardHeader>
@@ -447,12 +450,7 @@ export function UserAdmin({ adminProfile }: { adminProfile: Profile }) {
       {loading ? (
         <div className="text-sm text-muted-foreground">Cargando…</div>
       ) : users.length === 0 ? (
-        <Card className="tech-border">
-          <CardHeader>
-            <CardTitle>Sin resultados</CardTitle>
-            <CardDescription>No hay usuarios que coincidan con el filtro.</CardDescription>
-          </CardHeader>
-        </Card>
+        <EmptyState title="Sin resultados" description="No hay usuarios que coincidan con el filtro." icon={<Users className="h-5 w-5" />} />
       ) : (
         <MotionList className="grid gap-3 lg:grid-cols-2">
           {users.map((u) => (
