@@ -144,7 +144,7 @@ on conflict do nothing;
 insert into public.asset_models (department_id, manufacturer, name)
 select
   a.department_id,
-  nullif(trim(coalesce(a.manufacturer, '')), '') as manufacturer,
+  min(nullif(trim(coalesce(a.manufacturer, '')), '')) as manufacturer,
   min(trim(a.model)) as name
 from public.assets a
 where a.model is not null
@@ -155,8 +155,8 @@ on conflict do nothing;
 insert into public.asset_subcategories (department_id, asset_type, category, name)
 select
   a.department_id,
-  nullif(trim(coalesce(a.asset_type, '')), '') as asset_type,
-  nullif(trim(coalesce(a.category, '')), '') as category,
+  min(nullif(trim(coalesce(a.asset_type, '')), '')) as asset_type,
+  min(nullif(trim(coalesce(a.category, '')), '')) as category,
   min(trim(a.subcategory)) as name
 from public.assets a
 where a.subcategory is not null
@@ -165,4 +165,3 @@ group by a.department_id, lower(trim(coalesce(a.asset_type, ''))), lower(trim(co
 on conflict do nothing;
 
 commit;
-
