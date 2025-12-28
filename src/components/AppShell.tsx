@@ -105,11 +105,11 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
             { href: "/app/catalog", label: "Crear ticket", icon: IconCatalog },
           ],
         },
-        { title: "Activos", items: [{ href: "/app/assets", label: "Mis equipos", icon: IconAssets }] },
+        { title: "Activos", items: [{ href: "/app/assets", label: "Mis equipos", icon: IconAssets }, { href: "/app/connect-device", label: "Conectar mi PC", icon: IconAssets }] },
         {
           title: "Soporte",
           items: [
-            { href: "/app/chat", label: "Chat con soporte", icon: IconChat },
+            { href: "/app/messages", label: "Chat con soporte", icon: IconChat },
             { href: "/app/kb", label: "Ayuda", icon: IconKb },
           ],
         },
@@ -121,7 +121,7 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
           title: "Operación",
           items: [
             { href: "/app", label: "Bandeja", icon: IconKanban },
-            { href: "/app/chats", label: "Chats", icon: IconChat },
+            { href: "/app/messages", label: "Chats", icon: IconChat },
             { href: "/app/approvals", label: "Aprobaciones", icon: IconApprovals },
           ],
         },
@@ -136,7 +136,7 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
         items: [
           { href: "/app/dispatch", label: "Centro de mando", icon: IconKanban },
           { href: "/app/tickets", label: "Seguimiento de tickets", icon: IconTickets },
-          { href: "/app/chats", label: "Chats", icon: IconChat },
+          { href: "/app/messages", label: "Chats", icon: IconChat },
           { href: "/app/approvals", label: "Aprobaciones", icon: IconApprovals },
         ],
       },

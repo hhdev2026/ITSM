@@ -224,6 +224,34 @@ async function ensureDeviceGroupExists(groupName: string) {
   }
 }
 
+function parseUserIdFromDeviceGroupName(groupName: string | null | undefined) {
+  if (!groupName) return null;
+  const raw = groupName.trim();
+  const m = /^usr-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(raw);
+  return m?.[1] ?? null;
+}
+
+async function ensureAssetAssignmentForUser(supabaseAdmin: SupabaseClient, opts: { assetId: string; userId: string }) {
+  const { data, error } = await supabaseAdmin
+    .from("asset_assignments")
+    .select("id")
+    .eq("asset_id", opts.assetId)
+    .eq("user_id", opts.userId)
+    .is("ended_at", null)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (data?.id) return;
+
+  const { error: insErr } = await supabaseAdmin.from("asset_assignments").insert({
+    asset_id: opts.assetId,
+    user_id: opts.userId,
+    role: "principal",
+    notes: "Auto-asignado por MeshCentral (enrolamiento del usuario).",
+  });
+  if (insErr) throw insErr;
+}
+
 function spawnMeshCtrlShowEvents(env: MeshCtrlEnv, filter: string) {
   const meshctrlPath = getMeshCtrlPath();
   const argv = [
@@ -416,6 +444,11 @@ class MeshCentralAutoSyncService {
           platform,
         });
 
+        const targetUserId = parseUserIdFromDeviceGroupName(node.groupname ?? null);
+        if (assetId && targetUserId) {
+          await ensureAssetAssignmentForUser(this.opts.supabaseAdmin, { assetId, userId: targetUserId });
+        }
+
         const serial = scan.serial_number?.trim() ?? "";
         if (serial) this.bus.emit("asset_upserted", { nodeId: normalized, serialNumber: serial, assetId, receivedAt: new Date().toISOString() });
       } catch (e) {
@@ -436,6 +469,10 @@ function getService(opts: { env: Env; supabaseAdmin: SupabaseClient }) {
 const InviteBodySchema = z.object({
   hours: z.coerce.number().int().min(0).max(24 * 30).default(24),
   flags: z.coerce.number().int().min(0).max(2).default(0),
+});
+
+const SelfInviteBodySchema = z.object({
+  hours: z.coerce.number().int().min(1).max(24 * 7).default(24),
 });
 
 const TechOnboardingSchema = z.object({
@@ -462,6 +499,37 @@ export function registerMeshCentralOnboarding(app: express.Express, opts: { env:
 
   const service = getService({ env: opts.env, supabaseAdmin: opts.supabaseAdmin });
   void service.start();
+
+  // User self-enrollment: generate a per-user invite link so we can auto-assign the discovered asset to them.
+  app.post("/api/meshcentral/invite/self", requireAuth, async (req, res) => {
+    try {
+      const authed = req as AuthedRequest;
+      const parsed = SelfInviteBodySchema.safeParse(req.body ?? {});
+      if (!parsed.success) return res.status(400).json({ error: "invalid_body", details: parsed.error.flatten() });
+      if (!opts.env.MESHCENTRAL_URL || !opts.env.MESHCENTRAL_USER || !opts.env.MESHCENTRAL_PASS) return res.status(500).json({ error: "meshcentral_not_configured" });
+
+      const groupName = `usr-${authed.auth.userId}`;
+      const hours = parsed.data.hours;
+      const flags = 0;
+
+      await ensureDeviceGroupExists(groupName);
+
+      const { stdout, exitCode, stderr } = await runMeshCtrl("generateinvitelink", ["--group", groupName, "--hours", String(hours), "--flags", String(flags)]);
+      if (exitCode !== 0) return res.status(502).json({ error: "meshcentral_error", details: stderr.trim() || stdout.trim() });
+
+      const url = stdout
+        .split(/\r?\n/g)
+        .map((l) => l.trim())
+        .find((l) => /^https?:\/\//i.test(l));
+      if (!url) return res.status(502).json({ error: "meshcentral_invalid_response" });
+
+      res.setHeader("Cache-Control", "no-store");
+      return res.json({ url, groupName, hours, flags });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "bad_request";
+      res.status(400).json({ error: message });
+    }
+  });
 
   app.get("/api/meshcentral/status", requireAuth, requireRole(["agent", "supervisor", "admin"]), async (req, res) => {
     const authed = req as AuthedRequest;
