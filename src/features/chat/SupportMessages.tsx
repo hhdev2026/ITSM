@@ -46,6 +46,7 @@ function meshNodeIdFromMetadata(meta: unknown): string | null {
 export function SupportMessages({ profile }: { profile: Profile }) {
   const isUser = profile.role === "user";
   const canRemote = profile.role === "agent" || profile.role === "supervisor";
+  const canTypeClose = profile.role === "agent" || profile.role === "supervisor";
   const deptId = profile.department_id;
 
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
@@ -74,6 +75,11 @@ export function SupportMessages({ profile }: { profile: Profile }) {
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [acting, setActing] = useState<string | null>(null);
+
+  // Close w/ tipification
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closeCode, setCloseCode] = useState<string>("resuelto");
+  const [closeNotes, setCloseNotes] = useState<string>("");
 
   // Remote modal
   const [remoteOpen, setRemoteOpen] = useState(false);
@@ -362,6 +368,41 @@ export function SupportMessages({ profile }: { profile: Profile }) {
     }
   }
 
+  async function closeThreadTyped() {
+    if (!selectedThreadId) return;
+    setActing("close");
+    setThreadError(null);
+    try {
+      const { error } = await supabase.rpc("chat_close_thread_typed", {
+        p_thread_id: selectedThreadId,
+        p_code: closeCode,
+        p_notes: closeNotes.trim() || null,
+      });
+      if (error) throw error;
+      toast.success("Chat cerrado");
+      setCloseOpen(false);
+      setCloseNotes("");
+    } catch (e: unknown) {
+      const msg = errorMessage(e);
+      setThreadError(msg);
+      toast.error("No se pudo cerrar", { description: msg });
+    } finally {
+      setActing(null);
+    }
+  }
+
+  const closeOptions = useMemo(
+    () => [
+      { value: "resuelto", label: "Resuelto" },
+      { value: "informacion_entregada", label: "Información entregada" },
+      { value: "derivado", label: "Derivado / escalado" },
+      { value: "no_responde", label: "Usuario no responde" },
+      { value: "fuera_de_alcance", label: "Fuera de alcance" },
+      { value: "duplicado", label: "Duplicado" },
+    ],
+    []
+  );
+
   async function send() {
     const clean = body.trim();
     if (!clean) return;
@@ -634,9 +675,15 @@ export function SupportMessages({ profile }: { profile: Profile }) {
               ) : null}
 
               {selectedThread ? (
-                <Button size="sm" variant="outline" disabled={acting === "close"} onClick={() => void closeThread()}>
-                  {acting === "close" ? "Cerrando…" : "Cerrar"}
-                </Button>
+                canTypeClose && (selectedThread.assigned_agent_id === profile.id || profile.role === "supervisor") ? (
+                  <Button size="sm" variant="outline" disabled={acting === "close"} onClick={() => setCloseOpen(true)}>
+                    {acting === "close" ? "Cerrando…" : "Cerrar"}
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" disabled={acting === "close"} onClick={() => void closeThread()}>
+                    {acting === "close" ? "Cerrando…" : "Cerrar"}
+                  </Button>
+                )
               ) : null}
 
               {!isUser && canRemote && selectedThread ? (
@@ -733,6 +780,46 @@ export function SupportMessages({ profile }: { profile: Profile }) {
                 {remoteDeviceId ? <RemoteSessionView deviceId={remoteDeviceId} title="Sesión remota" className="w-full" /> : null}
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={closeOpen} onOpenChange={setCloseOpen}>
+        <DialogContent className="max-w-xl">
+          <div className="space-y-4 p-5">
+            <div>
+              <div className="text-sm font-semibold">Cerrar chat</div>
+              <div className="mt-1 text-xs text-muted-foreground">Selecciona una tipificación para mantener reporte y trazabilidad.</div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">Tipificación</div>
+              <select
+                value={closeCode}
+                onChange={(e) => setCloseCode(e.target.value)}
+                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+              >
+                {closeOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <label className="block">
+              <div className="text-xs text-muted-foreground">Notas (opcional)</div>
+              <Textarea value={closeNotes} onChange={(e) => setCloseNotes(e.target.value)} rows={3} placeholder="Ej: Se configuró VPN y se validó conexión." />
+            </label>
+
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => setCloseOpen(false)} disabled={acting === "close"}>
+                Cancelar
+              </Button>
+              <Button onClick={() => void closeThreadTyped()} disabled={acting === "close"}>
+                {acting === "close" ? "Cerrando…" : "Cerrar chat"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

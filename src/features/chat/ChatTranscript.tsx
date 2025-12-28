@@ -20,6 +20,20 @@ function dayLabel(iso: string) {
   return d.toLocaleDateString([], { weekday: "short", year: "numeric", month: "short", day: "numeric" });
 }
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
+function closureLabel(code: string) {
+  if (code === "resuelto") return "Resuelto";
+  if (code === "informacion_entregada") return "Información entregada";
+  if (code === "derivado") return "Derivado / escalado";
+  if (code === "no_responde") return "Usuario no responde";
+  if (code === "fuera_de_alcance") return "Fuera de alcance";
+  if (code === "duplicado") return "Duplicado";
+  return code;
+}
+
 export function ChatTranscript({
   meId,
   messages,
@@ -86,12 +100,23 @@ export function ChatTranscript({
                 : e.event_type === "closed"
                   ? "Cerrado"
                   : "Creado";
+
+          const closure =
+            e.event_type === "closed" && isRecord(e.details) && isRecord(e.details.closure) ? (e.details.closure as Record<string, unknown>) : null;
+          const closureCode = closure && typeof closure.code === "string" ? closure.code : null;
+          const closureNotes = closure && typeof closure.notes === "string" ? closure.notes : null;
+          const closureText = closureCode ? closureLabel(closureCode) : null;
+
           return (
             <div key={`event-${e.id}`} className="flex items-center justify-center">
               <div className="rounded-2xl border border-border bg-background/50 px-3 py-2 text-[12px] text-muted-foreground">
-                <span className="text-foreground">{label}</span>
+                <span className="text-foreground">
+                  {label}
+                  {closureText ? <span className="text-muted-foreground"> · {closureText}</span> : null}
+                </span>
                 {actor ? <span> · {displayName(actor)}</span> : null}
                 <span className="ml-2 opacity-70">{timeLabel(e.created_at)}</span>
+                {closureNotes ? <div className="mt-1 text-[11px] text-muted-foreground/90">{closureNotes}</div> : null}
               </div>
             </div>
           );
