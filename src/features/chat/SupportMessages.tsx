@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ChatEvent, ChatMessage, ChatThread, Profile } from "@/lib/types";
+import type { AgentPresence, AgentPresenceStatus, ChatEvent, ChatMessage, ChatThread, Profile } from "@/lib/types";
 import { supabase } from "@/lib/supabaseBrowser";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
@@ -16,13 +16,14 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/cn";
 import { ChatTranscript } from "@/features/chat/ChatTranscript";
-import { chatStatusBadge, displayName } from "@/features/chat/chat-ui";
+import { MetricTile, chatStatusBadge, displayName, presenceBadge } from "@/features/chat/chat-ui";
 import { RemoteSessionView } from "@/components/RemoteSessionView";
 import { toast } from "sonner";
 import { CheckCircle2, Laptop, MessageCircle, Monitor, RefreshCcw, Users } from "lucide-react";
 
 type ProfileLite = Pick<Profile, "id" | "full_name" | "email" | "role">;
 type RemoteDeviceLite = { id: string; name: string; protocol: "rdp" | "vnc"; mesh_node_id: string | null };
+type AgentWorkStatus = { profile_id: string; department_id: string | null; status: string; note: string | null; updated_at: string };
 
 function errorMessage(e: unknown) {
   if (e instanceof Error) return e.message;
@@ -47,6 +48,7 @@ export function SupportMessages({ profile }: { profile: Profile }) {
   const isUser = profile.role === "user";
   const canRemote = profile.role === "agent" || profile.role === "supervisor";
   const canTypeClose = profile.role === "agent" || profile.role === "supervisor";
+  const isAgentish = profile.role === "agent" || profile.role === "supervisor";
   const deptId = profile.department_id;
 
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
@@ -75,6 +77,13 @@ export function SupportMessages({ profile }: { profile: Profile }) {
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [acting, setActing] = useState<string | null>(null);
+
+  // Agent status (turno) + chat presence
+  const [agentPresence, setAgentPresence] = useState<AgentPresence | null>(null);
+  const [workStatus, setWorkStatus] = useState<AgentWorkStatus | null>(null);
+  const [workActing, setWorkActing] = useState(false);
+  const [kpiLoading, setKpiLoading] = useState(false);
+  const [kpis, setKpis] = useState<{ chatsTakenToday: number; chatsClosedToday: number; ticketsClosedToday: number; ticketsOpenMine: number } | null>(null);
 
   // Close w/ tipification
   const [closeOpen, setCloseOpen] = useState(false);
@@ -151,6 +160,44 @@ export function SupportMessages({ profile }: { profile: Profile }) {
       }
     });
   }, [deptId, profile.email, profile.full_name, profile.id, profile.role]);
+
+  const PresenceOptions: AgentPresenceStatus[] = useMemo(() => ["Disponible", "Ocupado", "Ausente", "Offline"], []);
+
+  const loadAgentStatus = useCallback(async () => {
+    if (!isAgentish) return;
+    const [{ data: pres }, { data: ws }] = await Promise.all([
+      supabase.from("agent_presence").select("profile_id,department_id,status,capacity,updated_at").eq("profile_id", profile.id).maybeSingle(),
+      supabase.from("agent_work_status").select("profile_id,department_id,status,note,updated_at").eq("profile_id", profile.id).maybeSingle(),
+    ]);
+    setAgentPresence((pres ?? null) as AgentPresence | null);
+    setWorkStatus((ws ?? null) as AgentWorkStatus | null);
+  }, [isAgentish, profile.id]);
+
+  const loadMyKpis = useCallback(async () => {
+    if (!isAgentish) return;
+    setKpiLoading(true);
+    try {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const startIso = start.toISOString();
+
+      const [taken, closedChats, closedTickets, openMine] = await Promise.all([
+        supabase.from("chat_threads").select("id", { count: "exact", head: true }).eq("assigned_agent_id", profile.id).gte("accepted_at", startIso),
+        supabase.from("chat_threads").select("id", { count: "exact", head: true }).eq("assigned_agent_id", profile.id).gte("closed_at", startIso),
+        supabase.from("tickets").select("id", { count: "exact", head: true }).eq("assignee_id", profile.id).gte("closed_at", startIso),
+        supabase.from("tickets").select("id", { count: "exact", head: true }).eq("assignee_id", profile.id).in("status", ["Asignado", "En Progreso", "Pendiente Info", "Planificado"]),
+      ]);
+
+      setKpis({
+        chatsTakenToday: taken.count ?? 0,
+        chatsClosedToday: closedChats.count ?? 0,
+        ticketsClosedToday: closedTickets.count ?? 0,
+        ticketsOpenMine: openMine.count ?? 0,
+      });
+    } finally {
+      setKpiLoading(false);
+    }
+  }, [isAgentish, profile.id]);
 
   const loadLeft = useCallback(async () => {
     setLeftError(null);
@@ -290,12 +337,14 @@ export function SupportMessages({ profile }: { profile: Profile }) {
   useEffect(() => {
     void loadLeft();
     loadPresence();
+    void loadAgentStatus();
+    void loadMyKpis();
     return () => {
       const ch = presenceChannelRef.current;
       presenceChannelRef.current = null;
       if (ch) void supabase.removeChannel(ch);
     };
-  }, [loadLeft, loadPresence]);
+  }, [loadAgentStatus, loadLeft, loadMyKpis, loadPresence]);
 
   useEffect(() => {
     if (!deptId) return;
@@ -315,6 +364,17 @@ export function SupportMessages({ profile }: { profile: Profile }) {
   }, [deptId, isUser, loadLeft, profile.id]);
 
   useEffect(() => {
+    if (!isAgentish) return;
+    void loadAgentStatus();
+    const channel = supabase
+      .channel(`rt-agent-status-${profile.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "agent_presence", filter: `profile_id=eq.${profile.id}` }, () => void loadAgentStatus())
+      .on("postgres_changes", { event: "*", schema: "public", table: "agent_work_status", filter: `profile_id=eq.${profile.id}` }, () => void loadAgentStatus())
+      .subscribe();
+    return () => void supabase.removeChannel(channel);
+  }, [isAgentish, loadAgentStatus, profile.id]);
+
+  useEffect(() => {
     void loadThread();
     if (!selectedThreadId) return;
     const channel = supabase
@@ -325,6 +385,34 @@ export function SupportMessages({ profile }: { profile: Profile }) {
       .subscribe();
     return () => void supabase.removeChannel(channel);
   }, [loadThread, selectedThreadId]);
+
+  async function setPresenceStatus(next: AgentPresenceStatus) {
+    if (!isAgentish) return;
+    try {
+      const { error } = await supabase.rpc("chat_set_presence", { p_status: next, p_capacity: agentPresence?.capacity ?? 3 });
+      if (error) throw error;
+      toast.success(`Chat: ${next}`);
+      await loadAgentStatus();
+    } catch (e: unknown) {
+      toast.error("No se pudo actualizar presencia", { description: errorMessage(e) });
+    }
+  }
+
+  async function setWork(next: string) {
+    if (!isAgentish) return;
+    setWorkActing(true);
+    try {
+      const { error } = await supabase.rpc("agent_set_work_status", { p_status: next, p_note: null });
+      if (error) throw error;
+      toast.success(`Estado: ${next}`);
+      await loadAgentStatus();
+      await loadMyKpis();
+    } catch (e: unknown) {
+      toast.error("No se pudo actualizar estado", { description: errorMessage(e) });
+    } finally {
+      setWorkActing(false);
+    }
+  }
 
   async function takeThread() {
     if (!selectedThreadId) return;
@@ -529,6 +617,65 @@ export function SupportMessages({ profile }: { profile: Profile }) {
 
       {leftError ? <InlineAlert variant="error" description={leftError} /> : null}
       {threadError ? <InlineAlert variant="error" description={threadError} /> : null}
+
+      {isAgentish ? (
+        <Card className="tech-border">
+          <CardHeader className="flex-row items-start justify-between gap-4">
+            <div className="min-w-0">
+              <CardTitle>Turno y disponibilidad</CardTitle>
+              <CardDescription>Marca tu turno (almuerzo/descanso/fin) y tu disponibilidad de chat.</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className={cn("border", presenceBadge(agentPresence?.status ?? "Offline"))}>
+                Chat: {agentPresence?.status ?? "Offline"}
+              </Badge>
+              <Badge variant="outline" className="border">
+                Turno: {workStatus?.status ?? "—"}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <MetricTile label="Chats tomados hoy" value={kpiLoading ? "…" : String(kpis?.chatsTakenToday ?? 0)} />
+              <MetricTile label="Chats cerrados hoy" value={kpiLoading ? "…" : String(kpis?.chatsClosedToday ?? 0)} />
+              <MetricTile label="Tickets cerrados hoy" value={kpiLoading ? "…" : String(kpis?.ticketsClosedToday ?? 0)} />
+              <MetricTile label="Tickets asignados abiertos" value={kpiLoading ? "…" : String(kpis?.ticketsOpenMine ?? 0)} />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-xs text-muted-foreground">Turno</div>
+              <Button size="sm" variant="outline" disabled={workActing} onClick={() => void setWork("En turno")}>
+                Inicio turno
+              </Button>
+              <Button size="sm" variant="outline" disabled={workActing} onClick={() => void setWork("Descanso")}>
+                Descanso
+              </Button>
+              <Button size="sm" variant="outline" disabled={workActing} onClick={() => void setWork("Almuerzo")}>
+                Almuerzo
+              </Button>
+              <Button size="sm" variant="outline" disabled={workActing} onClick={() => void setWork("Baño")}>
+                Baño
+              </Button>
+              <Button size="sm" disabled={workActing} onClick={() => void setWork("Fin turno")}>
+                Fin turno
+              </Button>
+              <Button size="sm" variant="outline" disabled={kpiLoading} onClick={() => void loadMyKpis()}>
+                <RefreshCcw className={cn("h-4 w-4", kpiLoading && "animate-spin")} />
+                KPIs
+              </Button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-xs text-muted-foreground">Chat</div>
+              {PresenceOptions.map((s) => (
+                <Button key={s} size="sm" variant={agentPresence?.status === s ? "default" : "outline"} onClick={() => void setPresenceStatus(s)}>
+                  {s}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[380px_1fr]">
         <Card className="tech-border">
