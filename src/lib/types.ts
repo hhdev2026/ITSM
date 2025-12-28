@@ -69,6 +69,7 @@ export type Asset = {
   id: string;
   department_id: string;
   site_id?: string | null;
+  mesh_node_id?: string | null;
   asset_tag: number;
   name: string;
   serial_number: string | null;

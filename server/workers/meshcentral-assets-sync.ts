@@ -130,19 +130,35 @@ async function resolveDepartmentIdByName(supabase: ReturnType<typeof createSupab
   return exact?.id ?? list[0]?.id ?? null;
 }
 
-type ExistingAsset = { id: string; serial_number: string | null; metadata: unknown };
+type ExistingAsset = { id: string; serial_number: string | null; mesh_node_id: string | null; metadata: unknown };
 
 async function loadExistingMetadataBySerial(supabase: ReturnType<typeof createSupabaseAdmin>, departmentId: string, serials: string[]) {
   const map = new Map<string, ExistingAsset>();
   for (const batch of chunk(serials, 200)) {
     const { data, error } = await supabase
       .from("assets")
-      .select("id,serial_number,metadata")
+      .select("id,serial_number,mesh_node_id,metadata")
       .eq("department_id", departmentId)
       .in("serial_number", batch);
     if (error) throw error;
     for (const a of (data ?? []) as ExistingAsset[]) {
       if (a.serial_number) map.set(a.serial_number, a);
+    }
+  }
+  return map;
+}
+
+async function loadExistingMetadataByMeshNodeId(supabase: ReturnType<typeof createSupabaseAdmin>, departmentId: string, nodeIds: string[]) {
+  const map = new Map<string, ExistingAsset>();
+  for (const batch of chunk(nodeIds, 200)) {
+    const { data, error } = await supabase
+      .from("assets")
+      .select("id,serial_number,mesh_node_id,metadata")
+      .eq("department_id", departmentId)
+      .in("mesh_node_id", batch);
+    if (error) throw error;
+    for (const a of (data ?? []) as ExistingAsset[]) {
+      if (a.mesh_node_id) map.set(a.mesh_node_id, a);
     }
   }
   return map;
@@ -178,13 +194,13 @@ async function tick(supabase: ReturnType<typeof createSupabaseAdmin>, env: Env) 
     }
   }
 
-  const withSerial = scanned.filter((s) => typeof s.serial_number === "string" && s.serial_number.length > 0) as Array<
-    ScannedNode & { serial_number: string }
-  >;
-  const serials = withSerial.map((s) => s.serial_number);
-  const existingBySerial = await loadExistingMetadataBySerial(supabase, departmentId, serials);
+  const withSerial = scanned.filter((s) => typeof s.serial_number === "string" && s.serial_number.length > 0) as Array<ScannedNode & { serial_number: string }>;
+  const withoutSerial = scanned.filter((s) => !s.serial_number) as Array<ScannedNode & { serial_number: null }>;
 
-  const rows = withSerial.map((s) => {
+  const existingBySerial = withSerial.length ? await loadExistingMetadataBySerial(supabase, departmentId, withSerial.map((s) => s.serial_number)) : new Map();
+  const existingByNode = withoutSerial.length ? await loadExistingMetadataByMeshNodeId(supabase, departmentId, withoutSerial.map((s) => s.nodeId)) : new Map();
+
+  const rows = scanned.map((s) => {
     const scan = s.scan;
     const name = (scan.hostname?.trim() || s.node.name || s.nodeId).toString();
     const platform = inferPlatform(s.node);
@@ -200,16 +216,21 @@ async function tick(supabase: ReturnType<typeof createSupabaseAdmin>, env: Env) 
       last_scan: scan,
     };
 
-    const existing = existingBySerial.get(s.serial_number);
-    const merged = mergeMetadata(existing?.metadata, meshcentralMeta);
+    const existing = s.serial_number ? existingBySerial.get(s.serial_number) : undefined;
+    const fallback = existingByNode.get(s.nodeId);
+    const merged = mergeMetadata((existing ?? fallback)?.metadata, meshcentralMeta);
+    const conn = typeof s.node.conn === "number" ? (s.node.conn ?? 0) : 0;
+    const connectivity_status = conn !== 0 ? "Online" : "Offline";
 
     return {
       department_id: departmentId,
       serial_number: s.serial_number,
+      mesh_node_id: s.nodeId,
       name,
       manufacturer: scan.manufacturer ?? null,
       model: scan.model ?? null,
       asset_type: platform === "windows" ? "Windows" : platform === "mac" ? "Mac" : platform === "linux" ? "Linux" : null,
+      connectivity_status,
       last_seen_at: now,
       last_ip: typeof s.node.ip === "string" ? s.node.ip : null,
       last_hostname: scan.hostname ?? null,
@@ -219,13 +240,21 @@ async function tick(supabase: ReturnType<typeof createSupabaseAdmin>, env: Env) 
 
   let upserted = 0;
 
-  for (const batch of chunk(rows, 200)) {
+  const rowsBySerial = rows.filter((r) => typeof r.serial_number === "string" && r.serial_number.length > 0);
+  const rowsByNode = rows.filter((r) => !r.serial_number);
+
+  for (const batch of chunk(rowsBySerial, 200)) {
     const { data, error } = await supabase.from("assets").upsert(batch, { onConflict: "department_id,serial_number" }).select("id");
     if (error) throw error;
     upserted += (data ?? []).length;
   }
+  for (const batch of chunk(rowsByNode, 200)) {
+    const { data, error } = await supabase.from("assets").upsert(batch, { onConflict: "department_id,mesh_node_id" }).select("id");
+    if (error) throw error;
+    upserted += (data ?? []).length;
+  }
 
-  const skipped = scanned.filter((s) => !s.serial_number).length;
+  const skipped = 0;
   return { departmentId, total: nodes.length, scanned: scanned.length, upserted, skippedNoSerial: skipped };
 }
 

@@ -15,8 +15,9 @@ import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/error";
 import { useProfile, useSession } from "@/lib/hooks";
 import { supabase } from "@/lib/supabaseBrowser";
-import type { Asset } from "@/lib/types";
+import type { Asset, Profile } from "@/lib/types";
 import { formatAssetTag } from "@/lib/assetTag";
+import { UserAssets } from "@/features/assets/UserAssets";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Map, Plus, RefreshCcw, Upload } from "lucide-react";
@@ -26,6 +27,7 @@ type AssetRow = Pick<
   | "id"
   | "department_id"
   | "asset_tag"
+  | "mesh_node_id"
   | "name"
   | "serial_number"
   | "asset_type"
@@ -79,6 +81,22 @@ export default function AssetsPage() {
   const { loading: sessionLoading, session } = useSession();
   const { loading: profileLoading, profile, error: profileError } = useProfile(session?.user.id);
 
+  if (sessionLoading || profileLoading) return <AppBootScreen />;
+  if (!session) return <AppNoticeScreen title="Inicia sesión" description="Debes iniciar sesión para ver activos." />;
+  if (!profile) return <AppNoticeScreen title="No se pudo cargar tu perfil" description={profileError ?? "Intenta nuevamente."} />;
+
+  if (profile.role === "user") {
+    return (
+      <AppShell profile={profile}>
+        <UserAssets profile={profile} />
+      </AppShell>
+    );
+  }
+
+  return <AssetsInventory profile={profile} />;
+}
+
+function AssetsInventory({ profile }: { profile: Profile }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<AssetRow[]>([]);
@@ -89,17 +107,16 @@ export default function AssetsPage() {
   const [region, setRegion] = useState<string>("__all__");
   const [comuna, setComuna] = useState<string>("__all__");
 
-  const canManage = profile?.role === "admin" || profile?.role === "supervisor";
+  const canManage = profile.role === "admin" || profile.role === "supervisor";
 
   const load = useCallback(async () => {
-    if (!profile) return;
     setLoading(true);
     setError(null);
     try {
       let query = supabase
         .from("assets")
         .select(
-          "id,department_id,asset_tag,name,serial_number,asset_type,category,subcategory,region,comuna,building,floor,room,lifecycle_status,connectivity_status,last_seen_at,failure_risk_pct,created_at,updated_at"
+          "id,department_id,asset_tag,mesh_node_id,name,serial_number,asset_type,category,subcategory,region,comuna,building,floor,room,lifecycle_status,connectivity_status,last_seen_at,failure_risk_pct,created_at,updated_at"
         )
         .order("updated_at", { ascending: false })
         .limit(500);
@@ -122,7 +139,7 @@ export default function AssetsPage() {
     } finally {
       setLoading(false);
     }
-  }, [profile, q, life, conn, region, comuna]);
+  }, [q, life, conn, region, comuna]);
 
   useEffect(() => {
     void load();
@@ -152,19 +169,17 @@ export default function AssetsPage() {
     const online = rows.filter((r) => r.connectivity_status === "Online").length;
     const offline = rows.filter((r) => r.connectivity_status === "Offline" || r.connectivity_status === "Crítico").length;
     const repair = rows.filter((r) => r.lifecycle_status === "En reparación").length;
-    return { total, online, offline, repair };
+    const mesh = rows.filter((r) => !!r.mesh_node_id).length;
+    const manual = Math.max(0, total - mesh);
+    return { total, online, offline, repair, mesh, manual };
   }, [rows]);
-
-  if (sessionLoading || profileLoading) return <AppBootScreen />;
-  if (!session) return <AppNoticeScreen title="Inicia sesión" description="Debes iniciar sesión para ver activos." />;
-  if (!profile) return <AppNoticeScreen title="No se pudo cargar tu perfil" description={profileError ?? "Intenta nuevamente."} />;
 
   return (
     <AppShell profile={profile}>
       <div className="space-y-5">
         <PageHeader
-          title={profile.role === "user" ? "Mis activos" : "Activos"}
-          description={profile.role === "user" ? "Equipos y licencias asignados a ti." : "Inventario y gestión de activos IT."}
+          title="Activos"
+          description="Inventario y gestión de activos IT (incluye MeshCentral)."
           actions={
             <>
               {canManage ? (
@@ -280,6 +295,14 @@ export default function AssetsPage() {
                   <div className="text-lg font-semibold">{loading ? "…" : stats.total}</div>
                 </div>
                 <div className="rounded-xl border border-border bg-muted/30 p-3">
+                  <div className="text-xs text-muted-foreground">MeshCentral</div>
+                  <div className="text-lg font-semibold">{loading ? "…" : stats.mesh}</div>
+                </div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3">
+                  <div className="text-xs text-muted-foreground">Manual</div>
+                  <div className="text-lg font-semibold">{loading ? "…" : stats.manual}</div>
+                </div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3">
                   <div className="text-xs text-muted-foreground">Offline/Crítico</div>
                   <div className="text-lg font-semibold">{loading ? "…" : stats.offline}</div>
                 </div>
@@ -357,6 +380,11 @@ export default function AssetsPage() {
                             {a.asset_type ? <Badge variant="outline">{a.asset_type}</Badge> : null}
                             <AssetLifecycleBadge status={a.lifecycle_status} />
                             <AssetConnectivityBadge status={a.connectivity_status} />
+                            {a.mesh_node_id ? (
+                              <Badge className="bg-[hsl(var(--brand-cyan))]/12 text-[hsl(var(--brand-cyan))] ring-1 ring-[hsl(var(--brand-cyan))]/25">
+                                MeshCentral
+                              </Badge>
+                            ) : null}
                             {a.failure_risk_pct >= 80 ? <Badge className="bg-rose-500/15 text-rose-200 ring-1 ring-rose-500/25">Riesgo alto</Badge> : null}
                           </div>
                           <div className="mt-2 truncate text-base font-semibold">{a.name}</div>

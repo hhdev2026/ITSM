@@ -20,7 +20,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Copy, Laptop, Link as LinkIcon, RefreshCcw } from "lucide-react";
 
 type InviteResponse = { url: string; groupName: string; hours: number; flags: 0 | 1 | 2 };
-type AssetLite = Pick<Asset, "id" | "name" | "serial_number" | "asset_type" | "connectivity_status" | "updated_at">;
+type AssetLite = Pick<Asset, "id" | "name" | "serial_number" | "asset_type" | "connectivity_status" | "updated_at" | "mesh_node_id">;
+type AssignmentRow = { id: string; assigned_at: string; asset: AssetLite | null };
 
 function apiBaseUrl() {
   return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -107,12 +108,15 @@ export default function ConnectDevicePage() {
     setAssetsError(null);
     try {
       const { data, error } = await supabase
-        .from("assets")
-        .select("id,name,serial_number,asset_type,connectivity_status,updated_at")
-        .order("updated_at", { ascending: false })
+        .from("asset_assignments")
+        .select("id,assigned_at,asset:assets(id,name,serial_number,asset_type,connectivity_status,updated_at,mesh_node_id)")
+        .eq("user_id", profile.id)
+        .is("ended_at", null)
+        .order("assigned_at", { ascending: false })
         .limit(20);
       if (error) throw error;
-      setAssets((data ?? []) as unknown as AssetLite[]);
+      const list = ((data ?? []) as unknown as AssignmentRow[]).map((r) => r.asset).filter((a): a is AssetLite => !!a);
+      setAssets(list);
     } catch (e) {
       setAssetsError(errorMessage(e));
       setAssets([]);
@@ -268,9 +272,16 @@ export default function ConnectDevicePage() {
                               {a.asset_type ?? "Equipo"} {a.serial_number ? `· S/N ${a.serial_number}` : ""}
                             </div>
                           </div>
-                          <Badge variant="outline" className="border">
-                            {a.connectivity_status}
-                          </Badge>
+                          <div className="flex flex-col items-end gap-2">
+                            <Badge variant="outline" className="border">
+                              {a.connectivity_status}
+                            </Badge>
+                            {a.mesh_node_id ? (
+                              <Badge className="bg-[hsl(var(--brand-cyan))]/12 text-[hsl(var(--brand-cyan))] ring-1 ring-[hsl(var(--brand-cyan))]/25">
+                                MeshCentral
+                              </Badge>
+                            ) : null}
+                          </div>
                         </div>
                       </Link>
                     ))}
@@ -284,4 +295,3 @@ export default function ConnectDevicePage() {
     </AppShell>
   );
 }
-

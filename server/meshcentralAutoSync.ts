@@ -139,18 +139,28 @@ async function upsertAssetFromScan(opts: {
   type ExistingAssetRow = { id: string; metadata: unknown };
   type UpsertResRow = { id: string };
   const now = new Date().toISOString();
-  const serial = opts.scan.serial_number?.trim() ?? "";
-  if (!serial) return null;
+  const serial = opts.scan.serial_number?.trim() ? opts.scan.serial_number.trim() : null;
 
-  const { data: existing, error: exErr } = await opts.supabaseAdmin
-    .from("assets")
-    .select("id,metadata")
-    .eq("department_id", opts.departmentId)
-    .eq("serial_number", serial)
-    .maybeSingle();
-  if (exErr) throw exErr;
-
-  const existingRow = (existing as ExistingAssetRow | null) ?? null;
+  let existingRow: ExistingAssetRow | null = null;
+  if (serial) {
+    const { data: existing, error: exErr } = await opts.supabaseAdmin
+      .from("assets")
+      .select("id,metadata")
+      .eq("department_id", opts.departmentId)
+      .eq("serial_number", serial)
+      .maybeSingle();
+    if (exErr) throw exErr;
+    existingRow = (existing as ExistingAssetRow | null) ?? null;
+  } else {
+    const { data: existing, error: exErr } = await opts.supabaseAdmin
+      .from("assets")
+      .select("id,metadata")
+      .eq("department_id", opts.departmentId)
+      .eq("mesh_node_id", opts.nodeId)
+      .maybeSingle();
+    if (exErr) throw exErr;
+    existingRow = (existing as ExistingAssetRow | null) ?? null;
+  }
 
   const meshcentralMeta: Record<string, unknown> = {
     node_id: opts.nodeId,
@@ -174,15 +184,17 @@ async function upsertAssetFromScan(opts: {
     model: opts.scan.model ?? null,
     asset_type:
       opts.platform === "windows" ? "Windows" : opts.platform === "mac" ? "Mac" : opts.platform === "linux" ? "Linux" : (null as string | null),
+    connectivity_status: "Online",
     last_seen_at: now,
     last_ip: typeof opts.node.ip === "string" ? opts.node.ip : null,
     last_hostname: opts.scan.hostname ?? null,
+    mesh_node_id: opts.nodeId,
     metadata: merged,
   };
 
   const { data, error } = await opts.supabaseAdmin
     .from("assets")
-    .upsert(row, { onConflict: "department_id,serial_number" })
+    .upsert(row, { onConflict: serial ? "department_id,serial_number" : "department_id,mesh_node_id" })
     .select("id")
     .maybeSingle();
   if (error) throw error;
