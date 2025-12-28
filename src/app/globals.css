@@ -3,6 +3,7 @@
 @import "leaflet/dist/leaflet.css";
 
 :root {
+  --ui-scale: 0.85;
   --brand-cyan: 188 92% 45%;
   --brand-blue: 213 94% 54%;
   --brand-violet: 268 92% 60%;
@@ -41,7 +42,7 @@
   --accent-foreground: 240 5.9% 10%;
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
-  --radius: 14px;
+  --radius: calc(14px * var(--ui-scale));
 
   --sidebar: 0 0% 100%;
   --sidebar-foreground: 240 10% 3.9%;
@@ -110,6 +111,10 @@
 }
 
 @layer base {
+  html {
+    font-size: calc(100% * var(--ui-scale));
+  }
+
   * {
     @apply border-border;
   }

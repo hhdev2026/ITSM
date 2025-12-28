@@ -145,7 +145,7 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
         items: [
           { href: "/app/assets", label: "Activos", icon: IconAssets },
           { href: "/app/onboarding", label: "Onboarding", icon: IconCatalog },
-          { href: "/app/slas", label: "SLAs", icon: IconSla },
+          { href: "/app/settings", label: "Configuración", icon: IconSla },
         ],
       },
       { title: "Conocimiento", items: [{ href: "/app/kb", label: "Base de conocimiento", icon: IconKb }] },

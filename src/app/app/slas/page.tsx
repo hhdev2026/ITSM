@@ -117,8 +117,8 @@ export default function SlasPage() {
     <AppShell profile={profile}>
       <div className="space-y-6">
         <PageHeader
-          title="SLAs / OLAs"
-          description="Configura tiempos oficiales (MDA + operación) por prioridad."
+          title="Configuración SLA / OLA"
+          description="Define tiempos por prioridad. Impacta deadlines, semáforos y reportes."
           actions={
             <Button asChild variant="outline">
               <Link href="/app">Volver</Link>
@@ -136,7 +136,7 @@ export default function SlasPage() {
               setBasis("business");
             }}
           >
-            SLA (MDA)
+            SLA (cara al usuario)
           </Button>
           <Button
             variant={mode === "OLA" ? "secondary" : "outline"}
@@ -147,10 +147,23 @@ export default function SlasPage() {
               setBasis("business");
             }}
           >
-            OLA (Operación)
+            OLA (interno)
           </Button>
-          <Badge variant="outline">Horario hábil: lun-vie 08:00–18:00</Badge>
+          <Badge variant="outline">Horario: usa el calendario del departamento</Badge>
         </div>
+
+        <Card className="tech-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-[hsl(var(--brand-cyan))]" />
+              ¿Qué significa SLA vs OLA?
+            </CardTitle>
+            <CardDescription>
+              <span className="text-foreground">SLA</span> es el compromiso que ve el usuario (ej: “respondemos en 2 horas”).{" "}
+              <span className="text-foreground">OLA</span> es el compromiso interno entre equipos/niveles para cumplir el SLA (ej: “nivel 1 responde en 1 hora y escala si aplica”).
+            </CardDescription>
+          </CardHeader>
+        </Card>
 
         {!canWrite ? (
           <Card className="tech-border">
@@ -165,8 +178,8 @@ export default function SlasPage() {
               <CardTitle>Nuevo {mode}</CardTitle>
               <CardDescription>
                 {mode === "SLA"
-                  ? "MDA: Respuesta máx 2h y resolución remota máx 8h (horas hábiles)."
-                  : "Operación: Nivel 1 (1h) + escalamiento nivel 2 (1h adicional) (horas hábiles)."}
+                  ? "Ejemplo típico: responder en 2h y resolver en 8h (en horario hábil)."
+                  : "Ejemplo típico: responder en 1h y resolver en 2h (compromiso interno)."}
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-5">
