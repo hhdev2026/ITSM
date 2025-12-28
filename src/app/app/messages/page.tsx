@@ -3,6 +3,7 @@
 import { AppShell } from "@/components/AppShell";
 import { AppBootScreen, AppNoticeScreen } from "@/components/layout/AppStates";
 import { SupportMessages } from "@/features/chat/SupportMessages";
+import { ChatAdminDashboard } from "@/features/chat/ChatAdminDashboard";
 import { useProfile, useSession } from "@/lib/hooks";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -23,8 +24,7 @@ export default function MessagesPage() {
 
   return (
     <AppShell profile={profile}>
-      <SupportMessages profile={profile} />
+      {profile.role === "admin" ? <ChatAdminDashboard profile={profile} /> : <SupportMessages profile={profile} />}
     </AppShell>
   );
 }
-

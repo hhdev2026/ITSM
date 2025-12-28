@@ -45,7 +45,7 @@ function meshNodeIdFromMetadata(meta: unknown): string | null {
 
 export function SupportMessages({ profile }: { profile: Profile }) {
   const isUser = profile.role === "user";
-  const canRemote = profile.role === "agent" || profile.role === "supervisor" || profile.role === "admin";
+  const canRemote = profile.role === "agent" || profile.role === "supervisor";
   const deptId = profile.department_id;
 
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
@@ -739,4 +739,3 @@ export function SupportMessages({ profile }: { profile: Profile }) {
     </div>
   );
 }
-

@@ -2,7 +2,6 @@
 
 import { AppShell } from "@/components/AppShell";
 import { AppBootScreen, AppNoticeScreen } from "@/components/layout/AppStates";
-import { UserChat } from "@/features/chat/UserChat";
 import { useProfile, useSession } from "@/lib/hooks";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -19,7 +18,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (sessionLoading || profileLoading) return;
     if (!session || !profile) return;
-    if (profile.role !== "user") router.replace("/app/chats");
+    router.replace("/app/messages");
   }, [profile, profileLoading, router, session, sessionLoading]);
 
   if (sessionLoading || profileLoading) return <AppBootScreen label="Cargando chat…" />;
@@ -29,7 +28,7 @@ export default function ChatPage() {
 
   return (
     <AppShell profile={profile}>
-      {profile.role === "user" ? <UserChat profile={profile} /> : null}
+      <AppBootScreen label="Redirigiendo…" />
     </AppShell>
   );
 }

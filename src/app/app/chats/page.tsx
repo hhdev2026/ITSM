@@ -2,8 +2,6 @@
 
 import { AppShell } from "@/components/AppShell";
 import { AppBootScreen, AppNoticeScreen } from "@/components/layout/AppStates";
-import { ChatAdminDashboard } from "@/features/chat/ChatAdminDashboard";
-import { ChatsInbox } from "@/features/chat/ChatsInbox";
 import { useProfile, useSession } from "@/lib/hooks";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -20,7 +18,7 @@ export default function ChatsPage() {
   useEffect(() => {
     if (sessionLoading || profileLoading) return;
     if (!session || !profile) return;
-    if (profile.role === "user") router.replace("/app/chat");
+    router.replace("/app/messages");
   }, [profile, profileLoading, router, session, sessionLoading]);
 
   if (sessionLoading || profileLoading) return <AppBootScreen label="Cargando chats…" />;
@@ -30,8 +28,7 @@ export default function ChatsPage() {
 
   return (
     <AppShell profile={profile}>
-      {profile.role === "admin" ? <ChatAdminDashboard profile={profile} /> : null}
-      {profile.role !== "user" && profile.role !== "admin" ? <ChatsInbox profile={profile} /> : null}
+      <AppBootScreen label="Redirigiendo…" />
     </AppShell>
   );
 }
