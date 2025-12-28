@@ -88,6 +88,24 @@ export function SlaLineChart({ data }: { data: Point[] }) {
 }
 
 export function TimeLineChart({ data }: { data: Point[] }) {
+  const hasAny = React.useMemo(
+    () =>
+      data.some((p) => {
+        const resp = p.avg_response_hours;
+        const resol = p.avg_resolution_hours;
+        return (typeof resp === "number" && Number.isFinite(resp)) || (typeof resol === "number" && Number.isFinite(resol));
+      }),
+    [data]
+  );
+
+  if (!hasAny) {
+    return (
+      <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
+        Sin datos de tiempos para este rango.
+      </div>
+    );
+  }
+
   return (
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">

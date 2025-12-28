@@ -22,6 +22,7 @@ export function Combobox({
   placeholder = "Seleccionar…",
   searchPlaceholder = "Buscar…",
   emptyText = "Sin resultados.",
+  allowCustom = false,
   className,
 }: {
   value: string | null;
@@ -31,10 +32,26 @@ export function Combobox({
   placeholder?: string;
   searchPlaceholder?: string;
   emptyText?: string;
+  allowCustom?: boolean;
   className?: string;
 }) {
   const [open, setOpen] = React.useState(false);
-  const selected = value ? options.find((o) => o.value === value) ?? null : null;
+  const [query, setQuery] = React.useState("");
+  const selected = value ? options.find((o) => o.value === value) ?? { value, label: value } : null;
+
+  React.useEffect(() => {
+    if (open) setQuery("");
+  }, [open]);
+
+  const canCreate = React.useMemo(() => {
+    if (!allowCustom) return false;
+    const q = query.trim();
+    if (!q) return false;
+    if (value && q === value) return false;
+    const norm = (s: string) => s.trim().toLowerCase();
+    const qn = norm(q);
+    return !options.some((o) => norm(o.value) === qn || norm(o.label) === qn);
+  }, [allowCustom, options, query, value]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -51,11 +68,22 @@ export function Combobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[--radix-popover-trigger-width] p-0">
-        <CommandPrimitive>
+        <CommandPrimitive
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && canCreate) {
+              const q = query.trim();
+              if (!q) return;
+              onValueChange(q);
+              setOpen(false);
+            }
+          }}
+        >
           <div className="flex items-center gap-2 border-b border-border px-3 py-2">
             <Search className="h-4 w-4 text-muted-foreground" />
             <CommandPrimitive.Input
               placeholder={searchPlaceholder}
+              value={query}
+              onValueChange={setQuery}
               className="h-8 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
@@ -64,6 +92,24 @@ export function Combobox({
               {emptyText}
             </CommandPrimitive.Empty>
             <CommandPrimitive.Group>
+              {canCreate ? (
+                <CommandPrimitive.Item
+                  value={`__create__ ${query}`}
+                  onSelect={() => {
+                    const q = query.trim();
+                    if (!q) return;
+                    onValueChange(q);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "flex cursor-default select-none items-center gap-2 rounded-lg px-3 py-2 text-sm",
+                    "aria-selected:bg-accent aria-selected:text-accent-foreground"
+                  )}
+                >
+                  <div className="h-4 w-4" />
+                  Usar: <span className="font-medium">{query.trim()}</span>
+                </CommandPrimitive.Item>
+              ) : null}
               {options.map((o) => (
                 <CommandPrimitive.Item
                   key={o.value}
@@ -107,4 +153,3 @@ export function Combobox({
     </Popover>
   );
 }
-

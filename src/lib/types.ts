@@ -68,6 +68,7 @@ export type AssetLifecycleStatus = "Activo" | "En reparación" | "Retirado" | "D
 export type Asset = {
   id: string;
   department_id: string;
+  site_id?: string | null;
   asset_tag: number;
   name: string;
   serial_number: string | null;
@@ -90,6 +91,21 @@ export type Asset = {
   last_seen_at: string | null;
   failure_risk_pct: number;
   tags: string[] | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AssetSite = {
+  id: string;
+  department_id: string;
+  name: string;
+  region: string | null;
+  comuna: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  radius_m: number;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;

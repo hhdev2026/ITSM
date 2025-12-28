@@ -12,8 +12,10 @@ import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { errorMessage } from "@/lib/error";
 import { useProfile, useSession } from "@/lib/hooks";
 import { supabase } from "@/lib/supabaseBrowser";
+import type { AssetSite } from "@/lib/types";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Crosshair } from "lucide-react";
 
 const LifecycleOptions: ComboboxOption[] = [
   { value: "Activo", label: "Activo" },
@@ -21,6 +23,72 @@ const LifecycleOptions: ComboboxOption[] = [
   { value: "Retirado", label: "Retirado" },
   { value: "Descartado", label: "Descartado" },
 ];
+
+const AssetTypeOptions: ComboboxOption[] = [
+  { value: "Laptop", label: "Laptop", keywords: "notebook portatil portátil" },
+  { value: "Desktop", label: "Desktop", keywords: "pc torre workstation" },
+  { value: "Monitor", label: "Monitor" },
+  { value: "Impresora", label: "Impresora", keywords: "printer" },
+  { value: "Scanner", label: "Scanner" },
+  { value: "Router", label: "Router" },
+  { value: "Switch", label: "Switch" },
+  { value: "AP WiFi", label: "AP WiFi", keywords: "access point punto de acceso" },
+  { value: "Servidor", label: "Servidor", keywords: "server" },
+  { value: "UPS", label: "UPS", keywords: "no-break nobreak" },
+  { value: "Teléfono", label: "Teléfono", keywords: "telefono teléfono IP voip" },
+  { value: "Tablet", label: "Tablet" },
+  { value: "Licencia", label: "Licencia", keywords: "software subscription suscripción" },
+  { value: "Cuenta", label: "Cuenta", keywords: "acceso usuario" },
+  { value: "Suscripción", label: "Suscripción", keywords: "subscription software" },
+  { value: "Otro", label: "Otro" },
+];
+
+const AssetCategoryOptions: ComboboxOption[] = [
+  { value: "Hardware", label: "Hardware" },
+  { value: "Software", label: "Software" },
+  { value: "Otro", label: "Otro" },
+];
+
+function suggestCategoryForType(assetType: string) {
+  const t = assetType.trim().toLowerCase();
+  if (!t) return "";
+  const software = ["licencia", "suscripción", "suscripcion", "cuenta", "software", "aplicación", "aplicacion"];
+  if (software.some((k) => t.includes(k))) return "Software";
+  const hardware = [
+    "laptop",
+    "notebook",
+    "desktop",
+    "pc",
+    "workstation",
+    "monitor",
+    "impresora",
+    "scanner",
+    "router",
+    "switch",
+    "wifi",
+    "access point",
+    "ap",
+    "servidor",
+    "server",
+    "ups",
+    "teléfono",
+    "telefono",
+    "tablet",
+  ];
+  if (hardware.some((k) => t.includes(k))) return "Hardware";
+  return "Otro";
+}
+
+function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number) {
+  const R = 6371e3;
+  const rad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = rad(bLat - aLat);
+  const dLng = rad(bLng - aLng);
+  const s1 = Math.sin(dLat / 2);
+  const s2 = Math.sin(dLng / 2);
+  const x = s1 * s1 + Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * s2 * s2;
+  return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
 
 export default function NewAssetPage() {
   const { loading: sessionLoading, session } = useSession();
@@ -35,12 +103,16 @@ export default function NewAssetPage() {
   const [serial, setSerial] = useState("");
   const [assetType, setAssetType] = useState("");
   const [category, setCategory] = useState("");
+  const [categoryTouched, setCategoryTouched] = useState(false);
   const [subcategory, setSubcategory] = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [model, setModel] = useState("");
   const [lifecycle, setLifecycle] = useState("Activo");
   const [region, setRegion] = useState("");
   const [comuna, setComuna] = useState("");
+  const [siteId, setSiteId] = useState<string>("");
+  const [sites, setSites] = useState<AssetSite[]>([]);
+  const [sitesError, setSitesError] = useState<string | null>(null);
   const [building, setBuilding] = useState("");
   const [floor, setFloor] = useState("");
   const [room, setRoom] = useState("");
@@ -48,8 +120,103 @@ export default function NewAssetPage() {
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
   const [description, setDescription] = useState("");
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoNote, setGeoNote] = useState<string | null>(null);
 
   const isValid = useMemo(() => name.trim().length >= 2, [name]);
+
+  useEffect(() => {
+    const suggested = suggestCategoryForType(assetType);
+    if (!suggested) return;
+    if (!categoryTouched) setCategory(suggested);
+  }, [assetType, categoryTouched]);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadSites() {
+      if (!profile?.department_id) return;
+      setSitesError(null);
+      const { data, error } = await supabase
+        .from("asset_sites")
+        .select("id,department_id,name,region,comuna,address,latitude,longitude,radius_m,metadata,created_at,updated_at")
+        .eq("department_id", profile.department_id)
+        .order("name")
+        .limit(2000);
+      if (!alive) return;
+      if (error) {
+        setSites([]);
+        setSitesError(error.message);
+        return;
+      }
+      setSites((data ?? []) as unknown as AssetSite[]);
+    }
+    void loadSites();
+    return () => {
+      alive = false;
+    };
+  }, [profile?.department_id]);
+
+  const siteOptions = useMemo<ComboboxOption[]>(
+    () => sites.map((s) => ({ value: s.id, label: s.name, description: [s.comuna, s.region].filter(Boolean).join(" · ") })),
+    [sites]
+  );
+
+  function applySite(s: AssetSite) {
+    setSiteId(s.id);
+    setGeoNote(null);
+    if (s.region) setRegion(s.region);
+    if (s.comuna) setComuna(s.comuna);
+    if (s.address) setAddress(s.address);
+    if (s.latitude != null) setLat(String(s.latitude));
+    if (s.longitude != null) setLng(String(s.longitude));
+  }
+
+  async function onGeolocate() {
+    setGeoLoading(true);
+    setGeoNote(null);
+    setError(null);
+    try {
+      if (!navigator.geolocation) throw new Error("Geolocalización no disponible en este dispositivo.");
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 12_000, maximumAge: 60_000 });
+      });
+      const nextLat = Number(pos.coords.latitude);
+      const nextLng = Number(pos.coords.longitude);
+      if (!Number.isFinite(nextLat) || !Number.isFinite(nextLng)) throw new Error("No se pudo leer tu ubicación.");
+
+      setLat(nextLat.toFixed(6));
+      setLng(nextLng.toFixed(6));
+
+      const res = await fetch(`/api/geocode/reverse?lat=${encodeURIComponent(String(nextLat))}&lng=${encodeURIComponent(String(nextLng))}`);
+      const body = (await res.json()) as { region?: string | null; comuna?: string | null; address?: string | null; error?: string };
+      if (!res.ok) throw new Error(body?.error ?? "No se pudo traducir la ubicación.");
+
+      if (typeof body.region === "string") setRegion(body.region);
+      if (typeof body.comuna === "string") setComuna(body.comuna);
+      if (typeof body.address === "string") setAddress(body.address);
+
+      const candidates = sites
+        .map((s) => {
+          if (s.latitude == null || s.longitude == null) return null;
+          const radius = Number.isFinite(s.radius_m) ? s.radius_m : 250;
+          const d = distanceMeters(nextLat, nextLng, Number(s.latitude), Number(s.longitude));
+          return { site: s, d, radius };
+        })
+        .filter(Boolean) as Array<{ site: AssetSite; d: number; radius: number }>;
+      candidates.sort((a, b) => a.d - b.d);
+      const best = candidates.find((c) => c.d <= c.radius) ?? null;
+      if (best) {
+        setSiteId(best.site.id);
+        setGeoNote(`Sucursal detectada: ${best.site.name} (${Math.round(best.d)}m)`);
+      } else {
+        setGeoNote("Ubicación guardada. No se detectó una sucursal cercana.");
+      }
+    } catch (e: unknown) {
+      setGeoNote(e instanceof Error ? e.message : "No se pudo geolocalizar.");
+    } finally {
+      setGeoLoading(false);
+    }
+  }
 
   async function onCreate() {
     if (!profile) return;
@@ -68,6 +235,7 @@ export default function NewAssetPage() {
         lifecycle_status: lifecycle,
         region: region.trim() || null,
         comuna: comuna.trim() || null,
+        site_id: siteId.trim() || null,
         building: building.trim() || null,
         floor: floor.trim() || null,
         room: room.trim() || null,
@@ -133,11 +301,42 @@ export default function NewAssetPage() {
             </label>
             <label className="block">
               <div className="text-xs text-muted-foreground">Tipo</div>
-              <Input value={assetType} onChange={(e) => setAssetType(e.target.value)} placeholder="Ej: Laptop, Impresora, Switch…" />
+              <Combobox
+                value={assetType.trim() ? assetType : null}
+                onValueChange={(v) => setAssetType(v ?? "")}
+                options={AssetTypeOptions}
+                allowCustom
+                placeholder="Ej: Laptop, Impresora, Switch…"
+                searchPlaceholder="Buscar tipo…"
+              />
             </label>
             <label className="block">
               <div className="text-xs text-muted-foreground">Categoría</div>
-              <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ej: Hardware, Software, Licencia" />
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <Combobox
+                    value={category.trim() ? category : null}
+                    onValueChange={(v) => {
+                      setCategory(v ?? "");
+                      setCategoryTouched(true);
+                    }}
+                    options={AssetCategoryOptions}
+                    allowCustom
+                    placeholder="Hardware / Software / Otro"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!categoryTouched}
+                  onClick={() => {
+                    setCategoryTouched(false);
+                    setCategory(suggestCategoryForType(assetType));
+                  }}
+                >
+                  Auto
+                </Button>
+              </div>
             </label>
             <label className="block">
               <div className="text-xs text-muted-foreground">Subcategoría</div>
@@ -157,6 +356,17 @@ export default function NewAssetPage() {
             </label>
 
             <div className="lg:col-span-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-medium">Ubicación</div>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" onClick={onGeolocate} disabled={geoLoading}>
+                    <Crosshair className="h-4 w-4" />
+                    {geoLoading ? "Ubicando…" : "Geolocalizar"}
+                  </Button>
+                </div>
+              </div>
+              {geoNote ? <div className="mt-2 text-sm text-muted-foreground">{geoNote}</div> : null}
+              {sitesError ? <div className="mt-2 text-xs text-muted-foreground">Sucursales: {sitesError}</div> : null}
               <div className="grid gap-4 lg:grid-cols-3">
                 <label className="block">
                   <div className="text-xs text-muted-foreground">Región</div>
@@ -167,8 +377,19 @@ export default function NewAssetPage() {
                   <Input value={comuna} onChange={(e) => setComuna(e.target.value)} placeholder="Ej: Santiago" />
                 </label>
                 <label className="block">
-                  <div className="text-xs text-muted-foreground">Edificio/Sucursal</div>
-                  <Input value={building} onChange={(e) => setBuilding(e.target.value)} placeholder="Ej: Torre A" />
+                  <div className="text-xs text-muted-foreground">Sucursal/Local</div>
+                  <Combobox
+                    value={siteId.trim() ? siteId : null}
+                    onValueChange={(v) => {
+                      const next = v ?? "";
+                      setSiteId(next);
+                      const s = sites.find((x) => x.id === next) ?? null;
+                      if (s) applySite(s);
+                    }}
+                    options={siteOptions}
+                    placeholder={siteOptions.length ? "Seleccionar…" : "Sin sucursales"}
+                    disabled={!siteOptions.length}
+                  />
                 </label>
                 <label className="block">
                   <div className="text-xs text-muted-foreground">Piso</div>
@@ -181,6 +402,10 @@ export default function NewAssetPage() {
                 <label className="block">
                   <div className="text-xs text-muted-foreground">Dirección</div>
                   <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Ej: Av. Siempre Viva 123" />
+                </label>
+                <label className="block">
+                  <div className="text-xs text-muted-foreground">Edificio/Detalle</div>
+                  <Input value={building} onChange={(e) => setBuilding(e.target.value)} placeholder="Ej: Torre A" />
                 </label>
                 <label className="block">
                   <div className="text-xs text-muted-foreground">Latitud</div>
