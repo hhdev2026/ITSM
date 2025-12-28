@@ -111,6 +111,36 @@ export type AssetSite = {
   updated_at: string;
 };
 
+export type AssetManufacturer = {
+  id: string;
+  department_id: string;
+  name: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AssetModel = {
+  id: string;
+  department_id: string;
+  manufacturer: string | null;
+  name: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AssetSubcategory = {
+  id: string;
+  department_id: string;
+  asset_type: string | null;
+  category: string | null;
+  name: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
 export type AssetAssignmentRole = "principal" | "secundario" | "responsable";
 
 export type AssetAssignment = {

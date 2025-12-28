@@ -17,7 +17,7 @@ import { formatAssetTag } from "@/lib/assetTag";
 import { errorMessage } from "@/lib/error";
 import { useProfile, useSession } from "@/lib/hooks";
 import { supabase } from "@/lib/supabaseBrowser";
-import type { Asset, AssetAlert, AssetAssignment, Profile } from "@/lib/types";
+import type { Asset, AssetAlert, AssetAssignment, AssetManufacturer, AssetModel, AssetSubcategory, Profile } from "@/lib/types";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -82,6 +82,11 @@ export default function AssetDetailPage() {
   const [lng, setLng] = useState("");
   const [description, setDescription] = useState("");
   const [adminNotes, setAdminNotes] = useState("");
+
+  const [manufacturers, setManufacturers] = useState<AssetManufacturer[]>([]);
+  const [models, setModels] = useState<AssetModel[]>([]);
+  const [subcategories, setSubcategories] = useState<AssetSubcategory[]>([]);
+  const [picklistsError, setPicklistsError] = useState<string | null>(null);
 
   const assigneeByRole = useMemo(() => {
     const open = assignments.filter((a) => !a.ended_at);
@@ -174,11 +179,121 @@ export default function AssetDetailPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    let alive = true;
+    async function loadPicklists() {
+      if (!profile?.department_id) return;
+      setPicklistsError(null);
+
+      const [mRes, moRes, scRes] = await Promise.all([
+        supabase
+          .from("asset_manufacturers")
+          .select("id,department_id,name,metadata,created_at,updated_at")
+          .eq("department_id", profile.department_id)
+          .order("name")
+          .limit(5000),
+        supabase
+          .from("asset_models")
+          .select("id,department_id,manufacturer,name,metadata,created_at,updated_at")
+          .eq("department_id", profile.department_id)
+          .order("name")
+          .limit(5000),
+        supabase
+          .from("asset_subcategories")
+          .select("id,department_id,asset_type,category,name,metadata,created_at,updated_at")
+          .eq("department_id", profile.department_id)
+          .order("name")
+          .limit(5000),
+      ]);
+
+      if (!alive) return;
+      if (mRes.error || moRes.error || scRes.error) {
+        setManufacturers([]);
+        setModels([]);
+        setSubcategories([]);
+        setPicklistsError((mRes.error ?? moRes.error ?? scRes.error)?.message ?? "No se pudieron cargar catálogos.");
+        return;
+      }
+      setManufacturers((mRes.data ?? []) as unknown as AssetManufacturer[]);
+      setModels((moRes.data ?? []) as unknown as AssetModel[]);
+      setSubcategories((scRes.data ?? []) as unknown as AssetSubcategory[]);
+    }
+    void loadPicklists();
+    return () => {
+      alive = false;
+    };
+  }, [profile?.department_id]);
+
+  const manufacturerOptions = useMemo<ComboboxOption[]>(
+    () => manufacturers.map((m) => ({ value: m.name, label: m.name })),
+    [manufacturers]
+  );
+
+  const modelOptions = useMemo<ComboboxOption[]>(() => {
+    const mfg = manufacturer.trim().toLowerCase();
+    const filtered = mfg ? models.filter((x) => (x.manufacturer ?? "").trim().toLowerCase() === mfg || !x.manufacturer) : models;
+    return filtered.map((m) => ({ value: m.name, label: m.name, description: m.manufacturer ? `Marca: ${m.manufacturer}` : null }));
+  }, [manufacturer, models]);
+
+  const subcategoryOptions = useMemo<ComboboxOption[]>(() => {
+    const t = assetType.trim().toLowerCase();
+    const c = category.trim().toLowerCase();
+    const filtered = subcategories.filter((s) => {
+      const st = (s.asset_type ?? "").trim().toLowerCase();
+      const sc = (s.category ?? "").trim().toLowerCase();
+      if (st && t && st !== t) return false;
+      if (sc && c && sc !== c) return false;
+      return true;
+    });
+    return filtered.map((s) => ({ value: s.name, label: s.name }));
+  }, [assetType, category, subcategories]);
+
   const profileById = useMemo(() => {
     const m = new Map<string, Pick<Profile, "email" | "full_name" | "role">>();
     for (const p of profiles) m.set(p.id, p);
     return m;
   }, [profiles]);
+
+  async function learnPicklists() {
+    if (!profile?.department_id) return;
+    const dept = profile.department_id;
+
+    const promises: Array<Promise<unknown>> = [];
+    if (manufacturer.trim()) {
+      promises.push(
+        (async () => {
+          await supabase
+            .from("asset_manufacturers")
+            .upsert({ department_id: dept, name: manufacturer.trim() }, { onConflict: "department_id,name_norm" });
+        })()
+      );
+    }
+    if (model.trim()) {
+      promises.push(
+        (async () => {
+          await supabase
+            .from("asset_models")
+            .upsert({ department_id: dept, manufacturer: manufacturer.trim() || null, name: model.trim() }, { onConflict: "department_id,manufacturer_norm,name_norm" });
+        })()
+      );
+    }
+    if (subcategory.trim()) {
+      promises.push(
+        (async () => {
+          await supabase
+            .from("asset_subcategories")
+            .upsert(
+              { department_id: dept, asset_type: assetType.trim() || null, category: category.trim() || null, name: subcategory.trim() },
+              { onConflict: "department_id,asset_type_norm,category_norm,name_norm" }
+            );
+        })()
+      );
+    }
+
+    if (promises.length) {
+      await Promise.allSettled(promises);
+    }
+  }
 
   async function onSave() {
     if (!assetId) return;
@@ -208,6 +323,7 @@ export default function AssetDetailPage() {
       const { data, error } = await supabase.from("assets").update(patch).eq("id", assetId).select("*").single();
       if (error) throw error;
       setAsset(data as unknown as Asset);
+      await learnPicklists();
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -282,6 +398,7 @@ export default function AssetDetailPage() {
         />
 
         {error ? <InlineAlert variant="error" title="Error" description={error} /> : null}
+        {picklistsError ? <InlineAlert variant="info" title="Catálogos" description={picklistsError} /> : null}
 
         {loading && !asset ? (
           <div className="space-y-3">
@@ -342,15 +459,33 @@ export default function AssetDetailPage() {
                     </label>
                     <label className="block">
                       <div className="text-xs text-muted-foreground">Subcategoría</div>
-                      <Input value={subcategory} onChange={(e) => setSubcategory(e.target.value)} disabled={!canManage} />
+                      <Combobox
+                        value={subcategory.trim() ? subcategory : null}
+                        onValueChange={(v) => setSubcategory(v ?? "")}
+                        options={subcategoryOptions}
+                        allowCustom
+                        disabled={!canManage}
+                      />
                     </label>
                     <label className="block">
                       <div className="text-xs text-muted-foreground">Marca</div>
-                      <Input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} disabled={!canManage} />
+                      <Combobox
+                        value={manufacturer.trim() ? manufacturer : null}
+                        onValueChange={(v) => setManufacturer(v ?? "")}
+                        options={manufacturerOptions}
+                        allowCustom
+                        disabled={!canManage}
+                      />
                     </label>
                     <label className="block">
                       <div className="text-xs text-muted-foreground">Modelo</div>
-                      <Input value={model} onChange={(e) => setModel(e.target.value)} disabled={!canManage} />
+                      <Combobox
+                        value={model.trim() ? model : null}
+                        onValueChange={(v) => setModel(v ?? "")}
+                        options={modelOptions}
+                        allowCustom
+                        disabled={!canManage}
+                      />
                     </label>
                   </div>
 

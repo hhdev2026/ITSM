@@ -12,7 +12,7 @@ import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { errorMessage } from "@/lib/error";
 import { useProfile, useSession } from "@/lib/hooks";
 import { supabase } from "@/lib/supabaseBrowser";
-import type { AssetSite } from "@/lib/types";
+import type { AssetManufacturer, AssetModel, AssetSite, AssetSubcategory } from "@/lib/types";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Crosshair } from "lucide-react";
@@ -113,6 +113,10 @@ export default function NewAssetPage() {
   const [siteId, setSiteId] = useState<string>("");
   const [sites, setSites] = useState<AssetSite[]>([]);
   const [sitesError, setSitesError] = useState<string | null>(null);
+  const [manufacturers, setManufacturers] = useState<AssetManufacturer[]>([]);
+  const [models, setModels] = useState<AssetModel[]>([]);
+  const [subcategories, setSubcategories] = useState<AssetSubcategory[]>([]);
+  const [picklistsError, setPicklistsError] = useState<string | null>(null);
   const [building, setBuilding] = useState("");
   const [floor, setFloor] = useState("");
   const [room, setRoom] = useState("");
@@ -156,10 +160,80 @@ export default function NewAssetPage() {
     };
   }, [profile?.department_id]);
 
+  useEffect(() => {
+    let alive = true;
+    async function loadPicklists() {
+      if (!profile?.department_id) return;
+      setPicklistsError(null);
+
+      const [mRes, moRes, scRes] = await Promise.all([
+        supabase
+          .from("asset_manufacturers")
+          .select("id,department_id,name,metadata,created_at,updated_at")
+          .eq("department_id", profile.department_id)
+          .order("name")
+          .limit(5000),
+        supabase
+          .from("asset_models")
+          .select("id,department_id,manufacturer,name,metadata,created_at,updated_at")
+          .eq("department_id", profile.department_id)
+          .order("name")
+          .limit(5000),
+        supabase
+          .from("asset_subcategories")
+          .select("id,department_id,asset_type,category,name,metadata,created_at,updated_at")
+          .eq("department_id", profile.department_id)
+          .order("name")
+          .limit(5000),
+      ]);
+      if (!alive) return;
+      if (mRes.error || moRes.error || scRes.error) {
+        setManufacturers([]);
+        setModels([]);
+        setSubcategories([]);
+        setPicklistsError((mRes.error ?? moRes.error ?? scRes.error)?.message ?? "No se pudieron cargar catálogos.");
+        return;
+      }
+      setManufacturers((mRes.data ?? []) as unknown as AssetManufacturer[]);
+      setModels((moRes.data ?? []) as unknown as AssetModel[]);
+      setSubcategories((scRes.data ?? []) as unknown as AssetSubcategory[]);
+    }
+    void loadPicklists();
+    return () => {
+      alive = false;
+    };
+  }, [profile?.department_id]);
+
   const siteOptions = useMemo<ComboboxOption[]>(
     () => sites.map((s) => ({ value: s.id, label: s.name, description: [s.comuna, s.region].filter(Boolean).join(" · ") })),
     [sites]
   );
+
+  const manufacturerOptions = useMemo<ComboboxOption[]>(
+    () => manufacturers.map((m) => ({ value: m.name, label: m.name })),
+    [manufacturers]
+  );
+
+  const modelOptions = useMemo<ComboboxOption[]>(() => {
+    const mfg = manufacturer.trim().toLowerCase();
+    const filtered = mfg
+      ? models.filter((x) => (x.manufacturer ?? "").trim().toLowerCase() === mfg || !x.manufacturer)
+      : models;
+    return filtered.map((m) => ({ value: m.name, label: m.name, description: m.manufacturer ? `Marca: ${m.manufacturer}` : null }));
+  }, [manufacturer, models]);
+
+  const subcategoryOptions = useMemo<ComboboxOption[]>(() => {
+    const t = assetType.trim().toLowerCase();
+    const c = category.trim().toLowerCase();
+    const filtered = subcategories.filter((s) => {
+      const st = (s.asset_type ?? "").trim().toLowerCase();
+      const sc = (s.category ?? "").trim().toLowerCase();
+      if (st && t && st !== t) return false;
+      if (sc && c && sc !== c) return false;
+      return true;
+    });
+    return filtered.map((s) => ({ value: s.name, label: s.name }));
+  }, [assetType, category, subcategories]);
 
   function applySite(s: AssetSite) {
     setSiteId(s.id);
@@ -218,6 +292,46 @@ export default function NewAssetPage() {
     }
   }
 
+  async function learnPicklists() {
+    if (!profile?.department_id) return;
+    const dept = profile.department_id;
+
+    const promises: Array<Promise<unknown>> = [];
+    if (manufacturer.trim()) {
+      promises.push(
+        (async () => {
+          await supabase
+            .from("asset_manufacturers")
+            .upsert({ department_id: dept, name: manufacturer.trim() }, { onConflict: "department_id,name_norm" });
+        })()
+      );
+    }
+    if (model.trim()) {
+      promises.push(
+        (async () => {
+          await supabase
+            .from("asset_models")
+            .upsert({ department_id: dept, manufacturer: manufacturer.trim() || null, name: model.trim() }, { onConflict: "department_id,manufacturer_norm,name_norm" });
+        })()
+      );
+    }
+    if (subcategory.trim()) {
+      promises.push(
+        (async () => {
+          await supabase
+            .from("asset_subcategories")
+            .upsert(
+              { department_id: dept, asset_type: assetType.trim() || null, category: category.trim() || null, name: subcategory.trim() },
+              { onConflict: "department_id,asset_type_norm,category_norm,name_norm" }
+            );
+        })()
+      );
+    }
+    if (promises.length) {
+      await Promise.allSettled(promises);
+    }
+  }
+
   async function onCreate() {
     if (!profile) return;
     setSaving(true);
@@ -247,6 +361,7 @@ export default function NewAssetPage() {
 
       const { data, error } = await supabase.from("assets").insert(payload).select("id").single();
       if (error) throw error;
+      await learnPicklists();
       window.location.href = `/app/assets/${data.id}`;
     } catch (e) {
       setError(errorMessage(e));
@@ -340,7 +455,13 @@ export default function NewAssetPage() {
             </label>
             <label className="block">
               <div className="text-xs text-muted-foreground">Subcategoría</div>
-              <Input value={subcategory} onChange={(e) => setSubcategory(e.target.value)} placeholder="Ej: Dell, HP, Kyocera…" />
+              <Combobox
+                value={subcategory.trim() ? subcategory : null}
+                onValueChange={(v) => setSubcategory(v ?? "")}
+                options={subcategoryOptions}
+                allowCustom
+                placeholder="Ej: Notebook, Impresora Láser…"
+              />
             </label>
             <label className="block">
               <div className="text-xs text-muted-foreground">Estado (ciclo de vida)</div>
@@ -348,11 +469,23 @@ export default function NewAssetPage() {
             </label>
             <label className="block">
               <div className="text-xs text-muted-foreground">Marca</div>
-              <Input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="Ej: Dell" />
+              <Combobox
+                value={manufacturer.trim() ? manufacturer : null}
+                onValueChange={(v) => setManufacturer(v ?? "")}
+                options={manufacturerOptions}
+                allowCustom
+                placeholder="Ej: Dell"
+              />
             </label>
             <label className="block">
               <div className="text-xs text-muted-foreground">Modelo</div>
-              <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="Ej: XPS 13" />
+              <Combobox
+                value={model.trim() ? model : null}
+                onValueChange={(v) => setModel(v ?? "")}
+                options={modelOptions}
+                allowCustom
+                placeholder="Ej: XPS 13"
+              />
             </label>
 
             <div className="lg:col-span-2">
@@ -367,6 +500,7 @@ export default function NewAssetPage() {
               </div>
               {geoNote ? <div className="mt-2 text-sm text-muted-foreground">{geoNote}</div> : null}
               {sitesError ? <div className="mt-2 text-xs text-muted-foreground">Sucursales: {sitesError}</div> : null}
+              {picklistsError ? <div className="mt-2 text-xs text-muted-foreground">Catálogos: {picklistsError}</div> : null}
               <div className="grid gap-4 lg:grid-cols-3">
                 <label className="block">
                   <div className="text-xs text-muted-foreground">Región</div>
