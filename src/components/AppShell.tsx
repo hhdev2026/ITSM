@@ -125,7 +125,7 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
             { href: "/app/approvals", label: "Aprobaciones", icon: IconApprovals },
           ],
         },
-        { title: "Gestión", items: [{ href: "/app/assets", label: "Activos", icon: IconAssets }] },
+        { title: "Gestión", items: [{ href: "/app/assets", label: "Activos", icon: IconAssets }, { href: "/app/onboarding", label: "Onboarding", icon: IconCatalog }] },
         { title: "Conocimiento", items: [{ href: "/app/kb", label: "Base de conocimiento", icon: IconKb }] },
       ];
     }
@@ -144,6 +144,7 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
         title: "Gestión",
         items: [
           { href: "/app/assets", label: "Activos", icon: IconAssets },
+          { href: "/app/onboarding", label: "Onboarding", icon: IconCatalog },
           { href: "/app/slas", label: "SLAs", icon: IconSla },
         ],
       },

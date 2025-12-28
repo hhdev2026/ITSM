@@ -2,22 +2,31 @@ import "./dotenv";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
+import * as http from "http";
 import pinoHttp from "pino-http";
 import { loadEnv } from "./env";
 import { requireAuth, requireRole, type AuthedRequest } from "./auth";
 import { getChatKpis, getChatTrends, getKpis, getTrends, parseAnalyticsQuery, parseTrendsQuery } from "./analytics";
 import { createSupabaseAdmin } from "./supabase";
+import { attachRemoteTunnelWs, registerRemoteRoutes } from "./remote";
+import { registerMeshCentralOnboarding } from "./meshcentralAutoSync";
 
 const env = loadEnv();
 const supabaseAdmin = env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : null;
 
 const app = express();
 app.use(helmet());
-app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+const corsOrigins = env.CORS_ORIGIN.split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+app.use(cors({ origin: corsOrigins.length ? corsOrigins : env.CORS_ORIGIN, credentials: true }));
 app.use(express.json({ limit: "10mb" }));
 app.use(pinoHttp());
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
+
+registerRemoteRoutes(app, { env, supabaseAdmin });
+registerMeshCentralOnboarding(app, { env, supabaseAdmin });
 
 function hasAssetsSecret(req: express.Request) {
   const header = req.header("x-assets-secret") ?? "";
@@ -588,6 +597,9 @@ app.get("/api/tickets/export.csv", requireAuth, requireRole(["supervisor", "admi
   }
 });
 
-app.listen(env.PORT, () => {
+const server = http.createServer(app);
+attachRemoteTunnelWs(server, { env, supabaseAdmin });
+
+server.listen(env.PORT, () => {
   console.log(`[api] listening on :${env.PORT}`);
 });

@@ -1,0 +1,35 @@
+services:
+  guacd:
+    image: guacamole/guacd:1.5.5
+    container_name: itsm-guacd
+    restart: unless-stopped
+    ports:
+      - "4822:4822"
+    networks:
+      - itsm
+
+  meshcentral:
+    image: ghcr.io/ylianst/meshcentral:latest
+    container_name: itsm-meshcentral
+    restart: unless-stopped
+    ports:
+      - "4430:443"
+    environment:
+      - HOSTNAME=localhost
+      - ALLOW_NEW_ACCOUNTS=false
+      - IFRAME=true
+    volumes:
+      - meshcentral-data:/opt/meshcentral/meshcentral-data
+      - meshcentral-files:/opt/meshcentral/meshcentral-files
+      - meshcentral-backup:/opt/meshcentral/meshcentral-backup
+    networks:
+      - itsm
+
+networks:
+  itsm:
+    driver: bridge
+
+volumes:
+  meshcentral-data:
+  meshcentral-files:
+  meshcentral-backup:

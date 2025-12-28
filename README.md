@@ -36,7 +36,16 @@ Opcional (datos ejemplo):
 
 - `supabase/seed.sql`
 
-### 2.1) Importar catálogo real (Tier 1..4)
+### 2.1) Control remoto (Guacamole + MeshCentral) [dev]
+
+- Aplica la migración `supabase/migrations/029_remote_devices.sql`.
+- Levanta servicios locales: `docker compose up -d` (MeshCentral queda en `https://localhost:4430`).
+- Configura en `.env` (API) las variables `GUACD_*`, `REMOTE_TUNNEL_*` y `REMOTE_CREDENTIALS_KEY` (ver `.env.example`).
+- Para generar el JSON encriptado de `remote_devices.credentials`, usa `tsx server/scripts/encrypt-remote-credentials.ts '<JSON>'`.
+- Para sincronizar inventario desde MeshCentral a `assets`, configura `MESHCENTRAL_*` y ejecuta `npm run dev:meshcentral-sync`.
+- Onboarding UI (botones): `http://localhost:3000/app/onboarding` (crear link de agente + crear técnico ITSM+MeshCentral).
+
+### 2.2) Importar catálogo real (Tier 1..4)
 
 Exporta tu Excel a CSV y asegúrate de tener columnas:
 
