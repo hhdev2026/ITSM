@@ -18,6 +18,9 @@ const EnvSchema = z.object({
 
   // MeshCentral (inventory + onboarding)
   MESHCENTRAL_URL: z.string().min(1).optional(),
+  // Public base URL used for invite links shown to users (useful behind port-maps/reverse proxies).
+  // Example (dev): https://localhost:4430
+  MESHCENTRAL_PUBLIC_URL: z.string().url().optional(),
   MESHCENTRAL_USER: z.string().min(1).optional(),
   MESHCENTRAL_PASS: z.string().min(1).optional(),
   MESHCENTRAL_TOKEN: z.string().trim().min(1).optional(),

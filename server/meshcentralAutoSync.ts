@@ -31,6 +31,38 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
 }
 
+function meshcentralPublicBaseUrl(env: Env) {
+  const explicit = env.MESHCENTRAL_PUBLIC_URL?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+
+  const raw = env.MESHCENTRAL_URL?.trim();
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol === "wss:") u.protocol = "https:";
+    else if (u.protocol === "ws:") u.protocol = "http:";
+    u.pathname = "";
+    u.search = "";
+    u.hash = "";
+    return u.toString().replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+}
+
+function rewriteUrlToPublicBase(rawUrl: string, publicBase: string | null) {
+  if (!publicBase) return rawUrl;
+  try {
+    const u = new URL(rawUrl);
+    const b = new URL(publicBase);
+    u.protocol = b.protocol;
+    u.host = b.host;
+    return u.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
 function parseKeyValueOutput(output: string): ScanResult {
   const res: ScanResult = {};
   const lines = output
@@ -527,17 +559,19 @@ export function registerMeshCentralOnboarding(app: express.Express, opts: { env:
       const groupName = `usr-${authed.auth.userId}`;
       const hours = parsed.data.hours;
       const flags = 0;
+      const publicBase = meshcentralPublicBaseUrl(opts.env);
 
       await ensureDeviceGroupExists(groupName);
 
       const { stdout, exitCode, stderr } = await runMeshCtrl("generateinvitelink", ["--group", groupName, "--hours", String(hours), "--flags", String(flags)]);
       if (exitCode !== 0) return res.status(502).json({ error: "meshcentral_error", details: stderr.trim() || stdout.trim() });
 
-      const url = stdout
+      const rawUrl = stdout
         .split(/\r?\n/g)
         .map((l) => l.trim())
         .find((l) => /^https?:\/\//i.test(l));
-      if (!url) return res.status(502).json({ error: "meshcentral_invalid_response" });
+      if (!rawUrl) return res.status(502).json({ error: "meshcentral_invalid_response" });
+      const url = rewriteUrlToPublicBase(rawUrl, publicBase);
 
       res.setHeader("Cache-Control", "no-store");
       return res.json({ url, groupName, hours, flags });
@@ -582,17 +616,19 @@ export function registerMeshCentralOnboarding(app: express.Express, opts: { env:
 
       const groupName = opts.env.MESHCENTRAL_DEVICEGROUP_NAME;
       const { hours, flags } = parsed.data;
+      const publicBase = meshcentralPublicBaseUrl(opts.env);
 
       await ensureDeviceGroupExists(groupName);
 
       const { stdout, exitCode, stderr } = await runMeshCtrl("generateinvitelink", ["--group", groupName, "--hours", String(hours), "--flags", String(flags)]);
       if (exitCode !== 0) return res.status(502).json({ error: "meshcentral_error", details: stderr.trim() || stdout.trim() });
 
-      const url = stdout
+      const rawUrl = stdout
         .split(/\r?\n/g)
         .map((l) => l.trim())
         .find((l) => /^https?:\/\//i.test(l));
-      if (!url) return res.status(502).json({ error: "meshcentral_invalid_response" });
+      if (!rawUrl) return res.status(502).json({ error: "meshcentral_invalid_response" });
+      const url = rewriteUrlToPublicBase(rawUrl, publicBase);
 
       res.setHeader("Cache-Control", "no-store");
       return res.json({ url, groupName, hours, flags });

@@ -44,6 +44,7 @@ Opcional (datos ejemplo):
 - Para generar el JSON encriptado de `remote_devices.credentials`, usa `tsx server/scripts/encrypt-remote-credentials.ts '<JSON>'`.
 - Para sincronizar inventario desde MeshCentral a `assets`, configura `MESHCENTRAL_*` y ejecuta `npm run dev:meshcentral-sync`.
 - Onboarding UI (botones): `http://localhost:3000/app/onboarding` (crear link de agente + crear técnico ITSM+MeshCentral).
+  - Tip: si tu `docker-compose` expone MeshCentral en `https://localhost:4430`, define `MESHCENTRAL_PUBLIC_URL=https://localhost:4430` para que los links de invitación salgan con el puerto correcto.
 
 ### 2.2) Importar catálogo real (Tier 1..4)
 
