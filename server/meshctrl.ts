@@ -56,7 +56,10 @@ export async function runMeshCtrl(action: string, args: string[], opts?: { timeo
   if (env.MESHCENTRAL_TOKEN) argv.push("--token", env.MESHCENTRAL_TOKEN);
 
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
-  if (env.MESHCENTRAL_INSECURE_TLS) childEnv.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+  if (env.MESHCENTRAL_INSECURE_TLS) {
+    childEnv.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+    childEnv.NODE_NO_WARNINGS = "1";
+  }
 
   return await new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve, reject) => {
     const child = spawn(process.execPath, argv, { env: childEnv });

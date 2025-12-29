@@ -281,7 +281,10 @@ function spawnMeshCtrlShowEvents(env: MeshCtrlEnv, filter: string) {
   if (env.MESHCENTRAL_TOKEN) argv.push("--token", env.MESHCENTRAL_TOKEN);
 
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
-  if (env.MESHCENTRAL_INSECURE_TLS) childEnv.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+  if (env.MESHCENTRAL_INSECURE_TLS) {
+    childEnv.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+    childEnv.NODE_NO_WARNINGS = "1";
+  }
   return spawn(process.execPath, argv, { env: childEnv });
 }
 
@@ -407,6 +410,7 @@ class MeshCentralAutoSyncService {
       child.stdout.on("data", (d) => parser.feed(d));
       child.stderr.on("data", (d) => {
         const msg = String(d).trim();
+        if (msg.includes("NODE_TLS_REJECT_UNAUTHORIZED") && msg.includes("makes TLS connections and HTTPS requests insecure")) return;
         if (msg) this.setState({ lastError: msg });
       });
       child.on("close", () => {
