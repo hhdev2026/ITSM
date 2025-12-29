@@ -46,6 +46,13 @@ Opcional (datos ejemplo):
 - Onboarding UI (botones): `http://localhost:3000/app/onboarding` (crear link de agente + crear técnico ITSM+MeshCentral).
   - Tip: si tu `docker-compose` expone MeshCentral en `https://localhost:4430`, define `MESHCENTRAL_PUBLIC_URL=https://localhost:4430` para que los links de invitación salgan con el puerto correcto.
 
+### 2.1.1) NetLock RMM (migración en curso)
+
+- Configura variables `NETLOCK_*` + `RMM_PROVIDER=netlock` (ver `.env.example`).
+- Endpoints API:
+  - `POST /api/netlock/enroll/self` (genera instalador one-click y devuelve un link temporal de descarga).
+  - `POST /api/netlock/verify/self` (verifica si el dispositivo quedó conectado y lo registra en `assets`).
+
 ### 2.2) Importar catálogo real (Tier 1..4)
 
 Exporta tu Excel a CSV y asegúrate de tener columnas:

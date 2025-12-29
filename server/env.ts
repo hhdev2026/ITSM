@@ -27,6 +27,29 @@ const EnvSchema = z.object({
   MESHCENTRAL_INSECURE_TLS: z.coerce.boolean().default(false),
   MESHCENTRAL_DEVICEGROUP_NAME: z.string().trim().min(1).default("TI"),
   MESHCENTRAL_DEFAULT_DEPARTMENT_NAME: z.string().trim().min(1).default("TI"),
+
+  // RMM provider selection
+  RMM_PROVIDER: z.enum(["meshcentral", "netlock"]).default("meshcentral"),
+
+  // NetLock RMM (self-hosted)
+  NETLOCK_FILE_SERVER_URL: z.string().url().optional(),
+  NETLOCK_FILE_SERVER_API_KEY: z.string().min(8).optional(),
+  NETLOCK_INSECURE_TLS: z.coerce.boolean().default(false),
+  // Used to generate server_config.json for the installer
+  NETLOCK_SSL: z.coerce.boolean().default(true),
+  NETLOCK_PACKAGE_GUID: z.string().uuid().optional(),
+  NETLOCK_TENANT_GUID: z.string().uuid().optional(),
+  NETLOCK_LOCATION_GUID: z.string().uuid().optional(),
+  NETLOCK_LANGUAGE: z.string().trim().min(2).max(10).default("es"),
+  NETLOCK_COMMUNICATION_SERVERS: z.string().trim().min(1).optional(),
+  NETLOCK_REMOTE_SERVERS: z.string().trim().min(1).optional(),
+  NETLOCK_UPDATE_SERVERS: z.string().trim().min(1).optional(),
+  NETLOCK_TRUST_SERVERS: z.string().trim().min(1).optional(),
+  NETLOCK_FILE_SERVERS: z.string().trim().min(1).optional(),
+
+  // Ephemeral download tokens for installer links
+  RMM_INSTALLER_JWT_SECRET: z.string().min(32).optional(),
+  RMM_INSTALLER_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(24 * 60 * 60).default(10 * 60),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

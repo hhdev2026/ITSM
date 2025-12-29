@@ -23,6 +23,12 @@ type StatusResponse = {
   configured?: boolean;
   connectivity?: { ok: boolean; checkedAt: string; error: string | null } | null;
 };
+type NetlockStatusResponse = {
+  provider: "netlock";
+  configured: boolean;
+  connectivity: { ok: boolean; checkedAt: string; error: string | null } | null;
+  details?: { connected?: number };
+};
 type TechResponse = {
   itsm: { userId: string; email: string; full_name: string; role: "agent" | "supervisor"; department_id: string };
   meshcentral: { username: string; tempPassword: string; groupName: string };
@@ -42,6 +48,10 @@ export default function OnboardingPage() {
   const [statusLoading, setStatusLoading] = React.useState(false);
   const [status, setStatus] = React.useState<StatusResponse | null>(null);
   const [statusError, setStatusError] = React.useState<string | null>(null);
+
+  const [netlockLoading, setNetlockLoading] = React.useState(false);
+  const [netlock, setNetlock] = React.useState<NetlockStatusResponse | null>(null);
+  const [netlockError, setNetlockError] = React.useState<string | null>(null);
 
   const [inviteLoading, setInviteLoading] = React.useState(false);
   const [inviteError, setInviteError] = React.useState<string | null>(null);
@@ -76,6 +86,21 @@ export default function OnboardingPage() {
       setStatusError(e instanceof Error ? e.message : "No se pudo consultar el estado.");
     } finally {
       setStatusLoading(false);
+    }
+  }
+
+  async function loadNetlockStatus() {
+    if (!token) return;
+    setNetlockLoading(true);
+    setNetlockError(null);
+    try {
+      const data = await apiFetch<NetlockStatusResponse>(token, "/api/netlock/status");
+      setNetlock(data);
+    } catch (e: unknown) {
+      setNetlock(null);
+      setNetlockError(e instanceof Error ? e.message : "No se pudo consultar el estado de NetLock.");
+    } finally {
+      setNetlockLoading(false);
     }
   }
 
@@ -232,6 +257,47 @@ export default function OnboardingPage() {
               {status?.connectivity?.error ? <div className="text-xs text-amber-200/90">MeshCentral: {status.connectivity.error}</div> : null}
               {status?.lastError ? <div className="text-xs text-amber-200/90">Último error: {status.lastError}</div> : null}
               {status?.lastEventAt ? <div className="text-xs text-muted-foreground">Último evento: {new Date(status.lastEventAt).toLocaleString()}</div> : null}
+            </CardContent>
+          </div>
+        </Card>
+
+        <Card className="tech-border rounded-3xl p-[1px]">
+          <div className="rounded-3xl glass-surface">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <RefreshCcw className={cn("h-4 w-4 text-[hsl(var(--brand-cyan))]", netlockLoading && "animate-spin")} /> Estado NetLock RMM
+              </CardTitle>
+              <CardDescription>Comprueba conectividad con el Files server (API key) para generación de instaladores y verificación.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {netlockError ? <InlineAlert variant="error" title="No se pudo consultar" description={netlockError} /> : null}
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button variant="outline" onClick={loadNetlockStatus} disabled={!token || netlockLoading}>
+                  Estado NetLock
+                </Button>
+              </div>
+
+              {netlock ? (
+                <div className="flex items-center justify-between rounded-2xl border border-border bg-background/40 px-3 py-2">
+                  <div className="text-xs text-muted-foreground">Conectividad</div>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      netlock.connectivity?.ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-amber-500/30 bg-amber-500/10 text-amber-100"
+                    )}
+                  >
+                    {netlock.connectivity?.ok ? "OK" : "Revisar"}
+                  </Badge>
+                </div>
+              ) : (
+                <Badge variant="outline">Sin estado</Badge>
+              )}
+
+              {netlock?.connectivity?.error ? <div className="text-xs text-amber-200/90">NetLock: {netlock.connectivity.error}</div> : null}
+              {typeof netlock?.details?.connected === "number" ? (
+                <div className="text-xs text-muted-foreground">Conectados: {netlock.details.connected}</div>
+              ) : null}
             </CardContent>
           </div>
         </Card>

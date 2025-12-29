@@ -10,6 +10,7 @@ import { getChatKpis, getChatTrends, getKpis, getTrends, parseAnalyticsQuery, pa
 import { createSupabaseAdmin } from "./supabase";
 import { attachRemoteTunnelWs, registerRemoteRoutes } from "./remote";
 import { registerMeshCentralOnboarding } from "./meshcentralAutoSync";
+import { registerNetlockRmmRoutes } from "./rmm/netlock";
 
 const env = loadEnv();
 const supabaseAdmin = env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : null;
@@ -27,6 +28,7 @@ app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 registerRemoteRoutes(app, { env, supabaseAdmin });
 registerMeshCentralOnboarding(app, { env, supabaseAdmin });
+registerNetlockRmmRoutes(app, { env, supabaseAdmin });
 
 function hasAssetsSecret(req: express.Request) {
   const header = req.header("x-assets-secret") ?? "";
