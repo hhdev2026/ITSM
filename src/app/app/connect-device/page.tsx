@@ -20,7 +20,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Copy, Laptop, Link as LinkIcon, RefreshCcw } from "lucide-react";
 
-type NetlockEnrollResponse = { url: string; expiresInSeconds: number; correlationKey: string; hint?: string | null };
+type NetlockEnrollResponse = { url: string; configUrl?: string; expiresInSeconds: number; correlationKey: string; hint?: string | null };
 type NetlockVerifyResponse = { ok: boolean; assetId: string | null; message?: string | null };
 type AssetLite = Pick<Asset, "id" | "name" | "serial_number" | "asset_type" | "connectivity_status" | "updated_at" | "mesh_node_id">;
 type AssignmentRow = { id: string; assigned_at: string; asset: AssetLite | null };
@@ -38,11 +38,12 @@ export default function ConnectDevicePage() {
   const [inviteHours, setInviteHours] = useState(24);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
-  const [invite, setInvite] = useState<{ url: string; hint?: string | null; correlationKey?: string | null } | null>(null);
+  const [invite, setInvite] = useState<{ url: string; configUrl?: string | null; hint?: string | null; correlationKey?: string | null } | null>(null);
 
   const [deviceName, setDeviceName] = useState("");
   const [arch, setArch] = useState<"win-x64" | "win-arm64" | "linux-x64" | "linux-arm64" | "osx-x64" | "osx-arm64">("osx-arm64");
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
+  const [accessKey, setAccessKey] = useState("");
 
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [assetsError, setAssetsError] = useState<string | null>(null);
@@ -69,7 +70,13 @@ export default function ConnectDevicePage() {
         method: "POST",
         body: JSON.stringify({ hours: inviteHours, architecture: arch, deviceName: deviceName.trim() || undefined }),
       });
-      setInvite({ url: data.url, hint: data.hint ?? null, correlationKey: data.correlationKey });
+      setInvite({ url: data.url, configUrl: data.configUrl ?? null, hint: data.hint ?? null, correlationKey: data.correlationKey });
+      setAccessKey(data.correlationKey);
+      try {
+        localStorage.setItem("netlock_last_access_key", data.correlationKey);
+      } catch {
+        // ignore
+      }
     } catch (e: unknown) {
       setInviteError(e instanceof Error ? e.message : "No se pudo generar el enlace.");
     } finally {
@@ -82,11 +89,18 @@ export default function ConnectDevicePage() {
     setAssetsError(null);
     setVerifyMsg(null);
 
-    if (invite?.correlationKey) {
+    const key = accessKey.trim() || invite?.correlationKey?.trim() || "";
+    if (!key) {
+      setVerifyMsg("Primero prepara el instalador (o pega el código de verificación).");
+      await loadMyAssets();
+      return;
+    }
+
+    if (key) {
       try {
         const data = await apiFetch<NetlockVerifyResponse>(token, "/api/netlock/verify/self", {
           method: "POST",
-          body: JSON.stringify({ accessKey: invite.correlationKey, deviceName: deviceName.trim() || undefined }),
+          body: JSON.stringify({ accessKey: key, deviceName: deviceName.trim() || undefined }),
         });
         setVerifyMsg(data.ok ? "Listo: equipo detectado y asociado." : (data.message ?? "Aún no aparece conectado."));
       } catch (e: unknown) {
@@ -131,7 +145,30 @@ export default function ConnectDevicePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
 
+  useEffect(() => {
+    try {
+      const last = localStorage.getItem("netlock_last_access_key");
+      if (last && !accessKey) setAccessKey(last);
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const hint = useMemo(() => invite?.hint ?? null, [invite?.hint]);
+  const installScriptUrl = useMemo(() => {
+    if (!invite?.url) return null;
+    if (arch.startsWith("osx-")) return invite.url.replace("/api/netlock/installer/", "/api/netlock/install-script/macos/");
+    if (arch.startsWith("linux-")) return invite.url.replace("/api/netlock/installer/", "/api/netlock/install-script/linux/");
+    return null;
+  }, [invite?.url, arch]);
+
+  function download(url: string) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.rel = "noreferrer";
+    a.click();
+  }
 
   if (sessionLoading || profileLoading) return <AppBootScreen label="Preparando…" />;
   if (!session) return <AppNoticeScreen title="Inicia sesión" description="Debes iniciar sesión para registrar tu equipo." />;
@@ -205,9 +242,22 @@ export default function ConnectDevicePage() {
                   </div>
                 </div>
 
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Input
+                    value={accessKey}
+                    onChange={(e) => setAccessKey(e.target.value)}
+                    placeholder="Código de verificación (se autocompleta)"
+                    spellCheck={false}
+                  />
+                  <Button variant="outline" onClick={() => void copy(accessKey)} disabled={!accessKey.trim()}>
+                    <Copy className="h-4 w-4" />
+                    Copiar código
+                  </Button>
+                </div>
+
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Button onClick={generateInvite} disabled={!token || inviteLoading}>
-                    {inviteLoading ? "Generando…" : "Generar link"}
+                    {inviteLoading ? "Preparando…" : "Preparar instalador"}
                   </Button>
                   <Button variant="outline" onClick={() => void verify()} disabled={assetsLoading}>
                     <RefreshCcw className={cn("h-4 w-4", assetsLoading && "animate-spin")} />
@@ -217,16 +267,45 @@ export default function ConnectDevicePage() {
 
                 {invite?.url ? (
                   <div className="rounded-2xl border border-border bg-background/40 p-3">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0">
-                        <div className="text-xs text-muted-foreground">Enlace de instalación</div>
-                        <div className="mt-1 break-all text-sm">{invite.url}</div>
-                        {hint ? <div className="mt-2 text-xs text-muted-foreground">{hint}</div> : null}
+                        <div className="text-xs text-muted-foreground">Descargas</div>
+                        <div className="mt-1 text-sm text-foreground">Listo. Descarga y ejecuta el instalador (1 archivo).</div>
                       </div>
-                      <Button size="icon" variant="outline" onClick={() => void copy(invite.url)} title="Copiar">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => void copy(invite.correlationKey ? `Código: ${invite.correlationKey}` : invite.url)}
+                        title="Copiar código"
+                      >
                         <Copy className="h-4 w-4" />
                       </Button>
                     </div>
+
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                      <Button variant="default" onClick={() => download(invite.url)}>
+                        Descargar ZIP
+                      </Button>
+                      {installScriptUrl ? (
+                        <Button variant="outline" onClick={() => download(installScriptUrl)}>
+                          {arch.startsWith("osx-") ? "Instalador automático (macOS)" : "Instalador automático (Linux)"}
+                        </Button>
+                      ) : null}
+                      {invite.configUrl ? (
+                        <Button variant="outline" onClick={() => download(invite.configUrl!)}>
+                          Descargar server_config.json
+                        </Button>
+                      ) : null}
+                    </div>
+
+                    {accessKey.trim() ? (
+                      <div className="mt-3 rounded-xl border border-border bg-background/30 px-3 py-2 text-xs">
+                        <span className="text-muted-foreground">Código de verificación: </span>
+                        <span className="font-mono text-foreground">{accessKey.trim()}</span>
+                      </div>
+                    ) : null}
+
+                    {hint ? <div className="mt-2 text-xs text-muted-foreground">{hint}</div> : null}
                   </div>
                 ) : null}
 
@@ -236,8 +315,8 @@ export default function ConnectDevicePage() {
                     Pasos rápidos
                   </div>
                   <ol className="mt-2 list-decimal space-y-1 pl-5">
-                    <li>Genera el link y ábrelo en tu PC.</li>
-                    <li>Instala el agente y espera que termine.</li>
+                    <li>Toca “Preparar instalador”.</li>
+                    <li>Descarga y ejecuta el instalador (o el “Instalador automático”).</li>
                     <li>Vuelve aquí y toca “Verificar” (o revisa “Mis equipos”).</li>
                   </ol>
                 </div>

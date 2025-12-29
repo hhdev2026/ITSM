@@ -3,6 +3,8 @@ services:
     image: mysql:8.0
     container_name: netlock-mysql
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:3307:3306"
     environment:
       MYSQL_ROOT_PASSWORD: "netlock-dev"
       MYSQL_DATABASE: "netlock"
@@ -19,10 +21,11 @@ services:
 
   netlock-rmm-server:
     image: nicomak101/netlock-rmm-server:latest
+    platform: linux/amd64
     container_name: netlock-rmm-server
     restart: unless-stopped
     ports:
-      - "7080:7080"
+      - "127.0.0.1:7080:7080"
     environment:
       - TZ=America/Santiago
     volumes:
@@ -36,10 +39,11 @@ services:
 
   netlock-rmm-web-console:
     image: nicomak101/netlock-rmm-web-console:latest
+    platform: linux/amd64
     container_name: netlock-rmm-web-console
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
     environment:
       - TZ=America/Santiago
     volumes:

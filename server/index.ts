@@ -10,6 +10,7 @@ import { getChatKpis, getChatTrends, getKpis, getTrends, parseAnalyticsQuery, pa
 import { createSupabaseAdmin } from "./supabase";
 import { registerNetlockRmmRoutes } from "./rmm/netlock";
 import { registerOnboardingRoutes } from "./onboarding";
+import { z } from "zod";
 
 const env = loadEnv();
 const supabaseAdmin = env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : null;
@@ -50,6 +51,63 @@ async function resolveSingleDepartmentId() {
 app.get("/api/me", requireAuth, (req, res) => {
   const authed = req as AuthedRequest;
   res.json({ userId: authed.auth.userId, role: authed.auth.role, departmentId: authed.auth.departmentId, email: authed.auth.email });
+});
+
+const SelfLocationSchema = z.object({
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
+  region: z.string().trim().max(120).optional(),
+  comuna: z.string().trim().max(120).optional(),
+  address: z.string().trim().max(300).optional(),
+});
+
+app.post("/api/assets/:id/location/self", requireAuth, async (req, res) => {
+  try {
+    if (!supabaseAdmin) return res.status(500).json({ error: "service_role_required" });
+    const authed = req as AuthedRequest;
+    const assetId = String(req.params.id ?? "").trim();
+    if (!assetId) return res.status(400).json({ error: "asset_id_required" });
+
+    const parsed = SelfLocationSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ error: "invalid_body", details: parsed.error.flatten() });
+
+    const { data: asset, error: aErr } = await supabaseAdmin.from("assets").select("id,department_id").eq("id", assetId).maybeSingle();
+    if (aErr) throw aErr;
+    if (!asset) return res.status(404).json({ error: "asset_not_found" });
+
+    const sameDept = !!authed.auth.departmentId && authed.auth.departmentId === asset.department_id;
+    const privileged = ["agent", "supervisor", "admin"].includes(authed.auth.role) && sameDept;
+    if (!privileged) {
+      const { data: asg, error: asgErr } = await supabaseAdmin
+        .from("asset_assignments")
+        .select("id")
+        .eq("asset_id", assetId)
+        .eq("user_id", authed.auth.userId)
+        .is("ended_at", null)
+        .limit(1);
+      if (asgErr) throw asgErr;
+      if (!asg || asg.length === 0) return res.status(403).json({ error: "forbidden" });
+    }
+
+    const nowIso = new Date().toISOString();
+    const { error: updErr } = await supabaseAdmin
+      .from("assets")
+      .update({
+        latitude: parsed.data.lat,
+        longitude: parsed.data.lng,
+        region: parsed.data.region ?? null,
+        comuna: parsed.data.comuna ?? null,
+        address: parsed.data.address ?? null,
+        updated_at: nowIso,
+      })
+      .eq("id", assetId);
+    if (updErr) throw updErr;
+
+    return res.json({ ok: true, assetId });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "bad_request";
+    res.status(400).json({ error: message });
+  }
 });
 
 app.post("/api/assets/sync", requireAuthOrAssetsSecret, async (req, res) => {

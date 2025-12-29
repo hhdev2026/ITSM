@@ -18,6 +18,7 @@ import { cn } from "@/lib/cn";
 import { ChatTranscript } from "@/features/chat/ChatTranscript";
 import { MetricTile, chatStatusBadge, displayName, presenceBadge } from "@/features/chat/chat-ui";
 import { toast } from "sonner";
+import { NetlockRemotePanel } from "@/components/netlock/NetlockRemotePanel";
 import { CheckCircle2, Laptop, MessageCircle, Monitor, RefreshCcw, Users } from "lucide-react";
 
 type ProfileLite = Pick<Profile, "id" | "full_name" | "email" | "role">;
@@ -90,6 +91,7 @@ export function SupportMessages({ profile }: { profile: Profile }) {
   const [remoteError, setRemoteError] = useState<string | null>(null);
   const [remoteAssets, setRemoteAssets] = useState<RemoteAssetLite[]>([]);
   const [remoteAssetId, setRemoteAssetId] = useState<string | null>(null);
+  const [remoteEmbedOpen, setRemoteEmbedOpen] = useState(false);
 
   const filteredAgents = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -539,6 +541,7 @@ export function SupportMessages({ profile }: { profile: Profile }) {
     setRemoteLoading(true);
     setRemoteAssets([]);
     setRemoteAssetId(null);
+    setRemoteEmbedOpen(true);
 
     try {
       const requesterId = selectedThread.requester_id;
@@ -937,20 +940,20 @@ export function SupportMessages({ profile }: { profile: Profile }) {
 
                     <Button
                       onClick={() => {
-                        const consoleUrl = process.env.NEXT_PUBLIC_NETLOCK_CONSOLE_URL ?? "";
-                        if (!consoleUrl) {
-                          toast.error("Falta configuración", { description: "Configura NEXT_PUBLIC_NETLOCK_CONSOLE_URL para abrir NetLock." });
-                          return;
-                        }
-                        window.open(`${consoleUrl.replace(/\/+$/, "")}/devices`, "_blank", "noopener,noreferrer");
+                        setRemoteEmbedOpen(true);
                         const key = selectedRemoteAsset.mesh_node_id;
-                        if (key) toast.message("NetLock abierto", { description: `Busca el equipo por Access Key: ${key}` });
-                        else toast.message("NetLock abierto", { description: "Busca el equipo por nombre/serial." });
+                        if (key) toast.message("Soporte remoto", { description: `Busca el equipo por Access Key: ${key}` });
                       }}
                     >
                       <Monitor className="h-4 w-4" />
-                      Abrir en NetLock
+                      Tomar control remoto
                     </Button>
+
+                    {remoteEmbedOpen ? (
+                      <div className="pt-2">
+                        <NetlockRemotePanel accessKey={selectedRemoteAsset.mesh_node_id ?? null} heightClassName="h-[520px]" />
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

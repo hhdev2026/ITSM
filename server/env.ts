@@ -1,6 +1,16 @@
 import "./dotenv";
 import { z } from "zod";
 
+const BoolSchema = z.preprocess((value) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value !== "string") return value;
+  const s = value.trim().toLowerCase();
+  if (["1", "true", "t", "yes", "y", "on"].includes(s)) return true;
+  if (["0", "false", "f", "no", "n", "off", ""].includes(s)) return false;
+  return value;
+}, z.boolean());
+
 const EnvSchema = z.object({
   PORT: z.coerce.number().default(4000),
   SUPABASE_URL: z.string().url(),
@@ -12,9 +22,12 @@ const EnvSchema = z.object({
   // NetLock RMM (self-hosted)
   NETLOCK_FILE_SERVER_URL: z.string().url().optional(),
   NETLOCK_FILE_SERVER_API_KEY: z.string().min(8).optional(),
-  NETLOCK_INSECURE_TLS: z.coerce.boolean().default(false),
+  NETLOCK_INSECURE_TLS: BoolSchema.default(false),
+  // Optional: direct DB access for verification (recommended in dev to detect devices reliably).
+  NETLOCK_MYSQL_URL: z.string().trim().min(1).optional(),
+  NETLOCK_AUTO_AUTHORIZE_ON_VERIFY: BoolSchema.default(true),
   // Used to generate server_config.json for the installer
-  NETLOCK_SSL: z.coerce.boolean().default(false),
+  NETLOCK_SSL: BoolSchema.default(false),
   NETLOCK_PACKAGE_GUID: z.string().uuid().optional(),
   NETLOCK_TENANT_GUID: z.string().uuid().optional(),
   NETLOCK_LOCATION_GUID: z.string().uuid().optional(),

@@ -28,10 +28,18 @@ function extractApiError(data: unknown): string | null {
   const raw = typeof err === "string" ? err.trim() : "";
   if (!raw) return null;
 
+  if (raw.startsWith("netlock_create_installer_failed:")) {
+    return "NetLock rechazó la creación del instalador. Revisa `NETLOCK_FILE_SERVER_API_KEY` (debe coincidir con `files_api_key` de NetLock) y que `NETLOCK_FILE_SERVER_URL` apunte al server correcto.";
+  }
+
   const friendly: Record<string, string> = {
     forbidden: "No tienes permiso para esta acción.",
     netlock_not_configured:
       "NetLock RMM no está configurado en la API (revisa NETLOCK_FILE_SERVER_URL / NETLOCK_FILE_SERVER_API_KEY / NETLOCK_* y RMM_INSTALLER_JWT_SECRET).",
+    netlock_unreachable:
+      "No se pudo conectar con NetLock (puede estar iniciando/reiniciando o descargando paquetes). Revisa `docker logs netlock-rmm-server` y vuelve a intentar cuando diga “Server started”.",
+    netlock_installer_packages_missing:
+      "NetLock no tiene paquetes de instalador cargados para generar el ZIP (installer.package.*). Configura el Members Portal API key en NetLock y reinicia los contenedores.",
     service_role_required: "La API requiere SUPABASE_SERVICE_ROLE_KEY para esta acción.",
     rmm_installer_jwt_secret_required: "Falta configurar RMM_INSTALLER_JWT_SECRET en la API.",
     invalid_body: "Datos inválidos.",

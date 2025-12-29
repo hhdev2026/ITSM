@@ -4,6 +4,8 @@ Aplicación web de **Service Desk / Mesa de Servicios (ITSM)** inspirada en ITIL
 - UI moderna (Next.js + Tailwind) con dashboard tipo Kanban para agentes.
 - Analytics para supervisión (KPIs: volumen, MTTR, SLA, pendientes, carga, FCR).
 - Automatizaciones (workflows) con un worker Node.js.
+- Inventario de activos con sincronización/import + monitoreo de conectividad (alertas básicas).
+- Chat de soporte con disponibilidad del agente + soporte remoto (RMM NetLock).
 
 ## Getting Started
 
@@ -18,19 +20,15 @@ Completa los valores:
 
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXT_PUBLIC_API_BASE_URL` (por defecto `http://localhost:4000`)
+- `CORS_ORIGIN` (por defecto `http://localhost:3000`)
+- `ASSETS_WEBHOOK_SECRET` (ingesta de activos sin login vía header `x-assets-secret`)
 
 ### 2) Base de datos (Supabase)
 
-En tu proyecto Supabase ejecuta (SQL Editor o Supabase CLI) las migraciones:
+En tu proyecto Supabase ejecuta (SQL Editor o Supabase CLI) **todas** las migraciones en orden:
 
-- `supabase/migrations/001_init.sql`
-- `supabase/migrations/002_analytics.sql`
-- `supabase/migrations/003_profiles_rls.sql`
-- `supabase/migrations/006_service_catalog.sql`
-- `supabase/migrations/015_service_catalog_user_friendly.sql`
-- `supabase/migrations/017_sla_business_hours.sql`
-- `supabase/migrations/018_kpi_sla_exclusions.sql`
-- `supabase/migrations/019_service_catalog_tiers.sql`
+- `supabase/migrations/*` (001…035)
 
 Opcional (datos ejemplo):
 
@@ -39,9 +37,20 @@ Opcional (datos ejemplo):
 ### 2.1) RMM (NetLock) [dev]
 
 - Levanta NetLock local: `docker compose up -d` (Web Console: `http://localhost:8080`, Server/Files: `http://localhost:7080`).
+- En `docker-compose.yml` los puertos se publican solo en `127.0.0.1` (localhost). Si necesitas acceso desde otra máquina, ajusta el bind.
+- En dev, `docker-compose.yml` expone MySQL en `127.0.0.1:3307` para que la API pueda verificar equipos contra la tabla `devices` (ver `NETLOCK_MYSQL_URL` en `.env.example`).
+- En Mac Apple Silicon (ARM), las imágenes de NetLock se ejecutan como `linux/amd64` (emulación), puede ser más lento.
+- Tip (macOS): si el agente no logra conectar usando `localhost`, usa `127.0.0.1` en `NETLOCK_*_SERVERS` y `NETLOCK_FILE_SERVER_URL` (evita problemas de IPv6 `::1`).
+- Tip (macOS Apple Silicon): el instalador descargado puede ser bloqueado por AMFI si está completamente sin firma. Solución rápida: `xattr -dr com.apple.quarantine <archivo>` y `codesign --force --sign - --no-strict <archivo>`.
+- Tip (macOS Apple Silicon): los servicios del agente (`/usr/local/bin/0x101_Cyber_Security/NetLock_RMM/*_Agent/NetLock_RMM_Agent_*`) también pueden quedar sin firma y ser “killed”. Fírmalos y reinicia servicios: `sudo codesign --force --sign - --no-strict /usr/local/bin/0x101_Cyber_Security/NetLock_RMM/*_Agent/NetLock_RMM_Agent_*` + `sudo launchctl kickstart -k system/com.netlock.rmm.agentcomm` (repite para `agentremote`/`agenthealth`).
 - Configura variables `NETLOCK_*` + `NEXT_PUBLIC_NETLOCK_CONSOLE_URL` (ver `.env.example`).
 - Onboarding usuario: `http://localhost:3000/app/connect-device` (genera instalador, instala y luego “Verificar”).
 - Soporte remoto: en el chat, botón “Tomar control” abre `NEXT_PUBLIC_NETLOCK_CONSOLE_URL/devices`.
+
+#### Troubleshooting (RMM)
+
+- Error `netlock_create_installer_failed:401`: la API key de NetLock no coincide. Revisa `NETLOCK_FILE_SERVER_API_KEY` vs `files_api_key` en la DB de NetLock.
+- Error `netlock_installer_packages_missing`: NetLock no tiene cargados los `installer.package.*`. Configura tu **Members Portal API key** en NetLock y reinicia los contenedores.
 
 ### 2.2) Importar catálogo real (Tier 1..4)
 
@@ -58,7 +67,10 @@ npm run import:catalog -- ./ruta/al/catalogo.csv --department <DEPARTMENT_UUID>
 
 Para que Realtime funcione en la UI (suscripciones `postgres_changes`), habilita la replicación de:
 
-- `tickets`, `comments`, `knowledge_base`
+- `tickets`, `comments`, `ticket_approvals`, `ticket_events`
+- `knowledge_base`
+- `chat_threads`, `chat_messages`, `chat_events`, `agent_presence`, `agent_work_status`
+- `asset_assignments`
 
 ### 3) Roles y multi-departamento
 
@@ -117,6 +129,18 @@ Worker de workflows (automatizaciones):
 npm run dev:workflows
 ```
 
+Worker de monitoreo de activos (conectividad + alertas):
+
+```bash
+npm run dev:assets-monitor
+```
+
+Worker NetLock sync (inventario/telemetría desde NetLock -> Supabase):
+
+```bash
+npm run dev:netlock-sync
+```
+
 Worker de problemas (detección básica de recurrencia):
 
 ```bash
@@ -132,6 +156,7 @@ Luego abre `http://localhost:3000`.
 - **Express API**: endpoints de analytics (usa `rpc(kpi_dashboard)`) y base para servicios backend.
 - **Workers**:
   - `server/workers/workflows.ts`: monitorea `tickets` (Realtime) y ejecuta acciones según `workflows`.
+  - `server/workers/assets-monitor.ts`: recalcula conectividad por `last_seen_at` y abre/cierra alertas de activos.
   - `server/workers/problem-linker.ts`: crea `problems` por recurrencia (scaffold).
 
 ## Notas
@@ -145,6 +170,7 @@ Luego abre `http://localhost:3000`.
   - Vista `tickets_sla_live` expone semáforo/termómetro (`*_traffic_light`, `*_pct_used`, `*_remaining_minutes`).
   - Retroactividad: por defecto los cambios de calendario/SLA no son retroactivos (deadlines quedan almacenados); el despliegue recalcula solo tickets abiertos.
 - Export (sábana CSV): API `GET /api/tickets/export.csv` (requiere supervisor/admin).
+- Export (inventario CSV): API `GET /api/assets/export.csv` (requiere supervisor/admin).
 
 ## Screens principales
 

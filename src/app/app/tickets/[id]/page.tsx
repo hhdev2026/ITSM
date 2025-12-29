@@ -18,7 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { errorMessage } from "@/lib/error";
-import { Check, ChevronDown, Clock, Copy, MessageSquare, RefreshCcw, UserPlus } from "lucide-react";
+import { Check, ChevronDown, Clock, Copy, MessageSquare, RefreshCcw, UserPlus, Monitor } from "lucide-react";
 import { toast } from "sonner";
 import { MotionItem, MotionList } from "@/components/motion/MotionList";
 import { TicketPriorityBadge, TicketStatusBadge, TicketTypeBadge } from "@/components/tickets/TicketBadges";
@@ -27,6 +27,8 @@ import { InlineEmpty } from "@/components/feedback/InlineEmpty";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AppBootScreen } from "@/components/layout/AppStates";
 import { formatTicketNumber } from "@/lib/ticketNumber";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { NetlockRemotePanel } from "@/components/netlock/NetlockRemotePanel";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
@@ -60,6 +62,15 @@ type TicketEvent = {
   to_assignee_id: string | null;
   details: Record<string, unknown> | null;
   created_at: string;
+};
+
+type RemoteAssetLite = {
+  id: string;
+  name: string;
+  serial_number: string | null;
+  asset_type: string | null;
+  connectivity_status: string;
+  mesh_node_id: string | null;
 };
 
 function approvalKindLabel(kind: string) {
@@ -114,6 +125,12 @@ export default function TicketDetailPage() {
   const [solutionNotes, setSolutionNotes] = useState<string>("");
   const [closureCode, setClosureCode] = useState<Ticket["closure_code"]>(null);
 
+  const [remoteOpen, setRemoteOpen] = useState(false);
+  const [remoteLoading, setRemoteLoading] = useState(false);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
+  const [remoteAssets, setRemoteAssets] = useState<RemoteAssetLite[]>([]);
+  const [remoteAssetId, setRemoteAssetId] = useState<string | null>(null);
+
   const canModerate = profile?.role === "agent" || profile?.role === "supervisor" || profile?.role === "admin";
   const canReassign = profile?.role === "supervisor" || profile?.role === "admin";
   const isEndUser = profile?.role === "user";
@@ -121,6 +138,55 @@ export default function TicketDetailPage() {
   useEffect(() => {
     if (!sessionLoading && !session) router.replace("/login");
   }, [sessionLoading, session, router]);
+
+  const remoteOptions = useMemo(() => {
+    return remoteAssets.map((a) => ({ value: a.id, label: a.name, description: a.connectivity_status }));
+  }, [remoteAssets]);
+
+  const selectedRemoteAsset = useMemo(() => remoteAssets.find((a) => a.id === remoteAssetId) ?? null, [remoteAssetId, remoteAssets]);
+
+  const openRemote = useCallback(async () => {
+    if (!canModerate) return;
+    if (!ticket?.requester_id) return;
+    setRemoteOpen(true);
+    setRemoteError(null);
+    setRemoteLoading(true);
+    setRemoteAssets([]);
+    setRemoteAssetId(null);
+
+    try {
+      const requesterId = ticket.requester_id;
+      const { data: assignments, error: aaErr } = await supabase
+        .from("asset_assignments")
+        .select("asset_id")
+        .eq("user_id", requesterId)
+        .is("ended_at", null)
+        .limit(25);
+      if (aaErr) throw aaErr;
+
+      const assetIds = (assignments ?? []) as Array<{ asset_id: string }>;
+      if (!assetIds.length) return;
+
+      const { data: assets, error: aErr } = await supabase
+        .from("assets")
+        .select("id,name,serial_number,asset_type,connectivity_status,mesh_node_id")
+        .in(
+          "id",
+          assetIds.map((r) => r.asset_id)
+        )
+        .order("updated_at", { ascending: false })
+        .limit(25);
+      if (aErr) throw aErr;
+
+      const list = (assets ?? []) as unknown as RemoteAssetLite[];
+      setRemoteAssets(list);
+      setRemoteAssetId(list[0]?.id ?? null);
+    } catch (e: unknown) {
+      setRemoteError(errorMessage(e));
+    } finally {
+      setRemoteLoading(false);
+    }
+  }, [canModerate, ticket?.requester_id]);
 
   const load = useCallback(async () => {
     if (!ticketId) return;
@@ -471,6 +537,12 @@ export default function TicketDetailPage() {
                 <RefreshCcw className="h-4 w-4" />
                 Actualizar
               </Button>
+              {canModerate ? (
+                <Button variant="outline" onClick={() => void openRemote()} disabled={!ticket?.requester_id}>
+                  <Monitor className="h-4 w-4" />
+                  Soporte remoto
+                </Button>
+              ) : null}
               {ticketId ? (
                 <Button
                   variant="outline"
@@ -487,6 +559,33 @@ export default function TicketDetailPage() {
             </>
           }
         />
+
+        <Dialog open={remoteOpen} onOpenChange={setRemoteOpen}>
+          <DialogContent className="max-w-6xl p-0">
+            <div className="space-y-4 p-5">
+              <div>
+                <div className="text-sm font-semibold">Soporte remoto</div>
+                <div className="mt-1 text-xs text-muted-foreground">Selecciona un equipo del solicitante y toma control vía NetLock.</div>
+              </div>
+
+              {remoteError ? <InlineAlert variant="error" description={remoteError} /> : null}
+
+              {remoteLoading ? (
+                <Skeleton className="h-10 w-64" />
+              ) : remoteAssets.length === 0 ? (
+                <InlineEmpty title="Sin equipos asociados" description="Este usuario aún no tiene equipos asignados. Pídele que registre su PC en “Conectar mi PC”." />
+              ) : (
+                <div className="space-y-4">
+                  <div className="max-w-md space-y-1">
+                    <div className="text-xs text-muted-foreground">Equipo</div>
+                    <Combobox value={remoteAssetId} onValueChange={(v) => setRemoteAssetId(v)} options={remoteOptions} placeholder="Seleccionar…" searchPlaceholder="Buscar equipo…" />
+                  </div>
+                  {selectedRemoteAsset ? <NetlockRemotePanel accessKey={selectedRemoteAsset.mesh_node_id ?? null} heightClassName="h-[520px]" /> : null}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {error ? <InlineAlert variant="error" description={error} /> : null}
 
