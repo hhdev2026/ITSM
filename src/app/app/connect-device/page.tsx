@@ -20,17 +20,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Copy, Laptop, Link as LinkIcon, RefreshCcw } from "lucide-react";
 
-type MeshInviteResponse = { url: string; groupName: string; hours: number; flags: 0 | 1 | 2 };
 type NetlockEnrollResponse = { url: string; expiresInSeconds: number; correlationKey: string; hint?: string | null };
 type NetlockVerifyResponse = { ok: boolean; assetId: string | null; message?: string | null };
 type AssetLite = Pick<Asset, "id" | "name" | "serial_number" | "asset_type" | "connectivity_status" | "updated_at" | "mesh_node_id">;
 type AssignmentRow = { id: string; assigned_at: string; asset: AssetLite | null };
-
-type RmmProvider = "meshcentral" | "netlock";
-
-function rmmProvider(): RmmProvider {
-  return (process.env.NEXT_PUBLIC_RMM_PROVIDER as RmmProvider | undefined) ?? "meshcentral";
-}
 
 function displayName(p: Pick<Profile, "full_name" | "email"> | null | undefined) {
   if (!p) return "—";
@@ -41,7 +34,6 @@ export default function ConnectDevicePage() {
   const token = useAccessToken();
   const { loading: sessionLoading, session } = useSession();
   const { loading: profileLoading, profile, error: profileError } = useProfile(session?.user.id);
-  const provider = rmmProvider();
 
   const [inviteHours, setInviteHours] = useState(24);
   const [inviteLoading, setInviteLoading] = useState(false);
@@ -73,19 +65,11 @@ export default function ConnectDevicePage() {
     setVerifyMsg(null);
     setInvite(null);
     try {
-      if (provider === "netlock") {
-        const data = await apiFetch<NetlockEnrollResponse>(token, "/api/netlock/enroll/self", {
-          method: "POST",
-          body: JSON.stringify({ hours: inviteHours, architecture: arch, deviceName: deviceName.trim() || undefined }),
-        });
-        setInvite({ url: data.url, hint: data.hint ?? null, correlationKey: data.correlationKey });
-      } else {
-        const data = await apiFetch<MeshInviteResponse>(token, "/api/meshcentral/invite/self", {
-          method: "POST",
-          body: JSON.stringify({ hours: inviteHours }),
-        });
-        setInvite({ url: data.url, hint: `Tu link es personal. Al instalar el agente, el equipo quedará asociado a tu cuenta automáticamente.` });
-      }
+      const data = await apiFetch<NetlockEnrollResponse>(token, "/api/netlock/enroll/self", {
+        method: "POST",
+        body: JSON.stringify({ hours: inviteHours, architecture: arch, deviceName: deviceName.trim() || undefined }),
+      });
+      setInvite({ url: data.url, hint: data.hint ?? null, correlationKey: data.correlationKey });
     } catch (e: unknown) {
       setInviteError(e instanceof Error ? e.message : "No se pudo generar el enlace.");
     } finally {
@@ -98,7 +82,7 @@ export default function ConnectDevicePage() {
     setAssetsError(null);
     setVerifyMsg(null);
 
-    if (provider === "netlock" && invite?.correlationKey) {
+    if (invite?.correlationKey) {
       try {
         const data = await apiFetch<NetlockVerifyResponse>(token, "/api/netlock/verify/self", {
           method: "POST",
@@ -167,7 +151,7 @@ export default function ConnectDevicePage() {
       <div className="space-y-5">
         <PageHeader
           title="Conectar mi PC"
-          description="Registra tu equipo para inventario y soporte remoto (MeshCentral + Activos)."
+          description="Registra tu equipo para inventario y soporte remoto (NetLock RMM + Activos)."
           actions={
             <Button variant="outline" asChild>
               <Link href="/app/assets">Ver mis equipos</Link>
@@ -180,7 +164,7 @@ export default function ConnectDevicePage() {
             <div className="rounded-3xl glass-surface">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <LinkIcon className="h-4 w-4 text-[hsl(var(--brand-cyan))]" /> Enrolar equipo ({provider === "netlock" ? "NetLock Agent" : "MeshAgent"})
+                  <LinkIcon className="h-4 w-4 text-[hsl(var(--brand-cyan))]" /> Enrolar equipo (NetLock Agent)
                 </CardTitle>
                 <CardDescription>
                   Genera un link de instalación, instálalo en tu PC y quedará registrado. Si después necesitas ayuda, soporte podrá tomar control desde el chat.
@@ -206,26 +190,20 @@ export default function ConnectDevicePage() {
                   </div>
                 </div>
 
-                {provider === "netlock" ? (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <Input value={deviceName} onChange={(e) => setDeviceName(e.target.value)} placeholder="Nombre del equipo (opcional)" />
-                    <div className="flex items-center gap-2 rounded-xl border border-border bg-background/30 px-3 py-2">
-                      <div className="text-xs text-muted-foreground">Arquitectura</div>
-                      <select
-                        value={arch}
-                        onChange={(e) => setArch(e.target.value as typeof arch)}
-                        className="ml-auto bg-transparent text-sm outline-none"
-                      >
-                        <option value="win-x64">Windows x64</option>
-                        <option value="win-arm64">Windows ARM64</option>
-                        <option value="osx-x64">macOS x64</option>
-                        <option value="osx-arm64">macOS ARM64</option>
-                        <option value="linux-x64">Linux x64</option>
-                        <option value="linux-arm64">Linux ARM64</option>
-                      </select>
-                    </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Input value={deviceName} onChange={(e) => setDeviceName(e.target.value)} placeholder="Nombre del equipo (opcional)" />
+                  <div className="flex items-center gap-2 rounded-xl border border-border bg-background/30 px-3 py-2">
+                    <div className="text-xs text-muted-foreground">Arquitectura</div>
+                    <select value={arch} onChange={(e) => setArch(e.target.value as typeof arch)} className="ml-auto bg-transparent text-sm outline-none">
+                      <option value="win-x64">Windows x64</option>
+                      <option value="win-arm64">Windows ARM64</option>
+                      <option value="osx-x64">macOS x64</option>
+                      <option value="osx-arm64">macOS ARM64</option>
+                      <option value="linux-x64">Linux x64</option>
+                      <option value="linux-arm64">Linux ARM64</option>
+                    </select>
                   </div>
-                ) : null}
+                </div>
 
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Button onClick={generateInvite} disabled={!token || inviteLoading}>
@@ -308,7 +286,7 @@ export default function ConnectDevicePage() {
                             </Badge>
                             {a.mesh_node_id ? (
                               <Badge className="bg-[hsl(var(--brand-cyan))]/12 text-[hsl(var(--brand-cyan))] ring-1 ring-[hsl(var(--brand-cyan))]/25">
-                                MeshCentral
+                                NetLock RMM
                               </Badge>
                             ) : null}
                           </div>

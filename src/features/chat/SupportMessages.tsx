@@ -17,12 +17,18 @@ import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/cn";
 import { ChatTranscript } from "@/features/chat/ChatTranscript";
 import { MetricTile, chatStatusBadge, displayName, presenceBadge } from "@/features/chat/chat-ui";
-import { RemoteSessionView } from "@/components/RemoteSessionView";
 import { toast } from "sonner";
 import { CheckCircle2, Laptop, MessageCircle, Monitor, RefreshCcw, Users } from "lucide-react";
 
 type ProfileLite = Pick<Profile, "id" | "full_name" | "email" | "role">;
-type RemoteDeviceLite = { id: string; name: string; protocol: "rdp" | "vnc"; mesh_node_id: string | null };
+type RemoteAssetLite = {
+  id: string;
+  name: string;
+  serial_number: string | null;
+  asset_type: string | null;
+  connectivity_status: string;
+  mesh_node_id: string | null;
+};
 type AgentWorkStatus = { profile_id: string; department_id: string | null; status: string; note: string | null; updated_at: string };
 
 function errorMessage(e: unknown) {
@@ -30,18 +36,6 @@ function errorMessage(e: unknown) {
   if (typeof e === "string") return e;
   if (e && typeof e === "object" && "message" in e && typeof (e as { message: unknown }).message === "string") return (e as { message: string }).message;
   return "Error";
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return !!v && typeof v === "object" && !Array.isArray(v);
-}
-
-function meshNodeIdFromMetadata(meta: unknown): string | null {
-  if (!isRecord(meta)) return null;
-  const mesh = meta.meshcentral;
-  if (!isRecord(mesh)) return null;
-  const nodeId = mesh.node_id;
-  return typeof nodeId === "string" && nodeId.trim() ? nodeId.trim() : null;
 }
 
 export function SupportMessages({ profile }: { profile: Profile }) {
@@ -94,8 +88,8 @@ export function SupportMessages({ profile }: { profile: Profile }) {
   const [remoteOpen, setRemoteOpen] = useState(false);
   const [remoteLoading, setRemoteLoading] = useState(false);
   const [remoteError, setRemoteError] = useState<string | null>(null);
-  const [remoteDevices, setRemoteDevices] = useState<RemoteDeviceLite[]>([]);
-  const [remoteDeviceId, setRemoteDeviceId] = useState<string | null>(null);
+  const [remoteAssets, setRemoteAssets] = useState<RemoteAssetLite[]>([]);
+  const [remoteAssetId, setRemoteAssetId] = useState<string | null>(null);
 
   const filteredAgents = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -529,69 +523,57 @@ export function SupportMessages({ profile }: { profile: Profile }) {
   }
 
   const remoteOptions = useMemo(() => {
-    return remoteDevices.map((d) => ({
-      value: d.id,
-      label: d.name,
-      description: d.protocol.toUpperCase(),
+    return remoteAssets.map((a) => ({
+      value: a.id,
+      label: a.name,
+      description: a.connectivity_status,
     }));
-  }, [remoteDevices]);
+  }, [remoteAssets]);
+
+  const selectedRemoteAsset = useMemo(() => remoteAssets.find((a) => a.id === remoteAssetId) ?? null, [remoteAssetId, remoteAssets]);
 
   const openRemote = useCallback(async () => {
     if (!canRemote || !selectedThread) return;
     setRemoteOpen(true);
     setRemoteError(null);
     setRemoteLoading(true);
-    setRemoteDevices([]);
-    setRemoteDeviceId(null);
+    setRemoteAssets([]);
+    setRemoteAssetId(null);
 
     try {
       const requesterId = selectedThread.requester_id;
 
-      const [{ data: devicesAll, error: devErr }, { data: assignments, error: aaErr }] = await Promise.all([
-        supabase.from("remote_devices").select("id,name,protocol,mesh_node_id").eq("department_id", deptId).order("name").limit(200),
-        supabase.from("asset_assignments").select("asset_id").eq("user_id", requesterId).is("ended_at", null).limit(15),
-      ]);
-      if (devErr) throw devErr;
+      const { data: assignments, error: aaErr } = await supabase.from("asset_assignments").select("asset_id").eq("user_id", requesterId).is("ended_at", null).limit(25);
       if (aaErr) throw aaErr;
 
-      const all = (devicesAll ?? []) as RemoteDeviceLite[];
       const assetIds = (assignments ?? []) as Array<{ asset_id: string }>;
 
-      let matched: RemoteDeviceLite[] = [];
-      if (assetIds.length) {
-        const { data: assets, error: aErr } = await supabase.from("assets").select("id,metadata").in(
-          "id",
-          assetIds.map((r) => r.asset_id)
-        );
-        if (aErr) throw aErr;
-        const nodeIds = Array.from(
-          new Set(
-            (assets ?? [])
-              .map((a) => meshNodeIdFromMetadata((a as { metadata?: unknown }).metadata))
-              .filter((v): v is string => !!v)
-          )
-        );
-        if (nodeIds.length) {
-          const { data: devs, error: mdErr } = await supabase.from("remote_devices").select("id,name,protocol,mesh_node_id").in("mesh_node_id", nodeIds).limit(50);
-          if (mdErr) throw mdErr;
-          matched = (devs ?? []) as RemoteDeviceLite[];
-        }
+      if (!assetIds.length) {
+        setRemoteAssets([]);
+        setRemoteAssetId(null);
+        return;
       }
 
-      const merged = new Map<string, RemoteDeviceLite>();
-      for (const d of matched) merged.set(d.id, d);
-      for (const d of all) merged.set(d.id, d);
+      const { data: assets, error: aErr } = await supabase
+        .from("assets")
+        .select("id,name,serial_number,asset_type,connectivity_status,mesh_node_id")
+        .in(
+          "id",
+          assetIds.map((r) => r.asset_id)
+        )
+        .order("updated_at", { ascending: false })
+        .limit(25);
+      if (aErr) throw aErr;
 
-      const list = Array.from(merged.values());
-      setRemoteDevices(list);
-      const preferred = matched[0]?.id ?? list[0]?.id ?? null;
-      setRemoteDeviceId(preferred);
+      const list = (assets ?? []) as unknown as RemoteAssetLite[];
+      setRemoteAssets(list);
+      setRemoteAssetId(list[0]?.id ?? null);
     } catch (e: unknown) {
       setRemoteError(errorMessage(e));
     } finally {
       setRemoteLoading(false);
     }
-  }, [canRemote, deptId, selectedThread]);
+  }, [canRemote, selectedThread]);
 
   const listTitle = isUser ? "Soporte" : "Conversaciones";
   const listIcon = isUser ? <Users className="h-4 w-4" /> : <MessageCircle className="h-4 w-4" />;
@@ -892,11 +874,9 @@ export function SupportMessages({ profile }: { profile: Profile }) {
                   <Laptop className="h-4 w-4 text-muted-foreground" />
                   <div className="truncate text-sm font-semibold">Control remoto</div>
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Selecciona el equipo y toma control en el navegador (Guacamole).
-                </div>
+                <div className="mt-1 text-xs text-muted-foreground">Selecciona el equipo y abre NetLock RMM para tomar control.</div>
               </div>
-              {remoteDeviceId ? (
+              {remoteAssetId ? (
                 <Badge variant="outline" className="border">
                   <CheckCircle2 className="h-4 w-4" />
                   Listo
@@ -913,18 +893,66 @@ export function SupportMessages({ profile }: { profile: Profile }) {
                 <Skeleton className="h-10 w-80" />
                 <Skeleton className="h-[520px] w-full" />
               </div>
-            ) : remoteDevices.length === 0 ? (
-              <EmptyState title="Sin dispositivos remotos" description="No hay equipos configurados para control remoto en este departamento." icon={<Monitor className="h-5 w-5" />} />
+            ) : remoteAssets.length === 0 ? (
+              <EmptyState
+                title="Sin equipos asociados"
+                description="Este usuario aún no tiene equipos asignados. Pídele que registre su PC en “Conectar mi PC”."
+                icon={<Monitor className="h-5 w-5" />}
+              />
             ) : (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-end gap-3">
                   <div className="w-full max-w-md space-y-1">
                     <div className="text-xs text-muted-foreground">Equipo</div>
-                    <Combobox value={remoteDeviceId} onValueChange={(v) => setRemoteDeviceId(v)} options={remoteOptions} placeholder="Seleccionar…" searchPlaceholder="Buscar equipo…" />
+                    <Combobox value={remoteAssetId} onValueChange={(v) => setRemoteAssetId(v)} options={remoteOptions} placeholder="Seleccionar…" searchPlaceholder="Buscar equipo…" />
                   </div>
                 </div>
 
-                {remoteDeviceId ? <RemoteSessionView deviceId={remoteDeviceId} title="Sesión remota" className="w-full" /> : null}
+                {selectedRemoteAsset ? (
+                  <div className="rounded-2xl border border-border bg-background/30 p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold truncate">{selectedRemoteAsset.name}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {selectedRemoteAsset.asset_type ?? "Equipo"} ·{" "}
+                          {selectedRemoteAsset.serial_number ? `S/N ${selectedRemoteAsset.serial_number}` : "Sin S/N"} ·{" "}
+                          {selectedRemoteAsset.connectivity_status}
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          const key = selectedRemoteAsset.mesh_node_id;
+                          if (!key) {
+                            toast.error("Sin Access Key", { description: "Este equipo no tiene identificador RMM asociado aún." });
+                            return;
+                          }
+                          void navigator.clipboard.writeText(key);
+                          toast.message("Copiado", { description: "Access Key copiado al portapapeles." });
+                        }}
+                      >
+                        Copiar Access Key
+                      </Button>
+                    </div>
+
+                    <Button
+                      onClick={() => {
+                        const consoleUrl = process.env.NEXT_PUBLIC_NETLOCK_CONSOLE_URL ?? "";
+                        if (!consoleUrl) {
+                          toast.error("Falta configuración", { description: "Configura NEXT_PUBLIC_NETLOCK_CONSOLE_URL para abrir NetLock." });
+                          return;
+                        }
+                        window.open(`${consoleUrl.replace(/\/+$/, "")}/devices`, "_blank", "noopener,noreferrer");
+                        const key = selectedRemoteAsset.mesh_node_id;
+                        if (key) toast.message("NetLock abierto", { description: `Busca el equipo por Access Key: ${key}` });
+                        else toast.message("NetLock abierto", { description: "Busca el equipo por nombre/serial." });
+                      }}
+                    >
+                      <Monitor className="h-4 w-4" />
+                      Abrir en NetLock
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>

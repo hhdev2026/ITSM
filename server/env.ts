@@ -9,34 +9,12 @@ const EnvSchema = z.object({
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   ASSETS_WEBHOOK_SECRET: z.string().min(8).optional(),
 
-  // Remote control (Guacamole + MeshCentral)
-  GUACD_HOST: z.string().default("127.0.0.1"),
-  GUACD_PORT: z.coerce.number().int().min(1).max(65535).default(4822),
-  REMOTE_TUNNEL_JWT_SECRET: z.string().min(32).optional(),
-  REMOTE_TUNNEL_TOKEN_TTL_SECONDS: z.coerce.number().int().min(10).max(600).default(60),
-  REMOTE_CREDENTIALS_KEY: z.string().min(32).optional(),
-
-  // MeshCentral (inventory + onboarding)
-  MESHCENTRAL_URL: z.string().min(1).optional(),
-  // Public base URL used for invite links shown to users (useful behind port-maps/reverse proxies).
-  // Example (dev): https://localhost:4430
-  MESHCENTRAL_PUBLIC_URL: z.string().url().optional(),
-  MESHCENTRAL_USER: z.string().min(1).optional(),
-  MESHCENTRAL_PASS: z.string().min(1).optional(),
-  MESHCENTRAL_TOKEN: z.string().trim().min(1).optional(),
-  MESHCENTRAL_INSECURE_TLS: z.coerce.boolean().default(false),
-  MESHCENTRAL_DEVICEGROUP_NAME: z.string().trim().min(1).default("TI"),
-  MESHCENTRAL_DEFAULT_DEPARTMENT_NAME: z.string().trim().min(1).default("TI"),
-
-  // RMM provider selection
-  RMM_PROVIDER: z.enum(["meshcentral", "netlock"]).default("meshcentral"),
-
   // NetLock RMM (self-hosted)
   NETLOCK_FILE_SERVER_URL: z.string().url().optional(),
   NETLOCK_FILE_SERVER_API_KEY: z.string().min(8).optional(),
   NETLOCK_INSECURE_TLS: z.coerce.boolean().default(false),
   // Used to generate server_config.json for the installer
-  NETLOCK_SSL: z.coerce.boolean().default(true),
+  NETLOCK_SSL: z.coerce.boolean().default(false),
   NETLOCK_PACKAGE_GUID: z.string().uuid().optional(),
   NETLOCK_TENANT_GUID: z.string().uuid().optional(),
   NETLOCK_LOCATION_GUID: z.string().uuid().optional(),

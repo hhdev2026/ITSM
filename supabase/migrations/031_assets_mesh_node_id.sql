@@ -1,9 +1,9 @@
 begin;
 
 -- ---------------------------------------------------------------------
--- MeshCentral linkage for Assets
+-- RMM linkage for Assets
 -- - Some devices may not provide a reliable serial_number.
--- - We store MeshCentral node id to upsert/deduplicate and link to remote_devices.
+-- - We store the RMM device/node id (or access key) to upsert/deduplicate and link remote access.
 -- ---------------------------------------------------------------------
 
 alter table public.assets add column if not exists mesh_node_id text;
@@ -13,4 +13,3 @@ create unique index if not exists assets_dept_mesh_node_uq on public.assets (dep
 where mesh_node_id is not null and length(trim(mesh_node_id)) > 0;
 
 commit;
-

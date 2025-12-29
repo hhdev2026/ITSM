@@ -26,6 +26,7 @@ function errorMessage(e: unknown) {
 }
 
 export function UserAssets({ profile }: { profile: Profile }) {
+  const rmmLabel = "NetLock RMM";
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -164,7 +165,11 @@ export function UserAssets({ profile }: { profile: Profile }) {
                             <Badge variant="outline" className="border">
                               {a.connectivity_status}
                             </Badge>
-                            {managed ? <Badge className="bg-[hsl(var(--brand-cyan))]/12 text-[hsl(var(--brand-cyan))] ring-1 ring-[hsl(var(--brand-cyan))]/25">MeshCentral</Badge> : null}
+                            {managed ? (
+                              <Badge className="bg-[hsl(var(--brand-cyan))]/12 text-[hsl(var(--brand-cyan))] ring-1 ring-[hsl(var(--brand-cyan))]/25">
+                                {rmmLabel}
+                              </Badge>
+                            ) : null}
                           </div>
                           <div className="mt-2 truncate text-base font-semibold">{a.name}</div>
                           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
@@ -188,4 +193,3 @@ export function UserAssets({ profile }: { profile: Profile }) {
     </div>
   );
 }
-

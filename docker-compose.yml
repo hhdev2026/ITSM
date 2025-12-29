@@ -1,38 +1,62 @@
 services:
-  guacd:
-    image: guacamole/guacd:1.5.5
-    container_name: itsm-guacd
+  mysql:
+    image: mysql:8.0
+    container_name: netlock-mysql
     restart: unless-stopped
-    platform: linux/amd64
-    ports:
-      - "4822:4822"
-    networks:
-      - itsm
-
-  meshcentral:
-    image: ghcr.io/ylianst/meshcentral:latest
-    container_name: itsm-meshcentral
-    restart: unless-stopped
-    ports:
-      - "4430:443"
     environment:
-      - DYNAMIC_CONFIG=true
-      - HOSTNAME=localhost
-      - ALLOW_NEW_ACCOUNTS=true
-      - ALLOWED_ORIGIN=true
-      - IFRAME=true
+      MYSQL_ROOT_PASSWORD: "netlock-dev"
+      MYSQL_DATABASE: "netlock"
+    command:
+      - --skip-log-bin
+      - --innodb_buffer_pool_size=512M
+      - --innodb_log_file_size=256M
+      - --innodb_flush_log_at_trx_commit=2
+      - --max_connections=200
     volumes:
-      - meshcentral-data:/opt/meshcentral/meshcentral-data
-      - meshcentral-files:/opt/meshcentral/meshcentral-files
-      - meshcentral-backup:/opt/meshcentral/meshcentral-backup
+      - netlock-mysql:/var/lib/mysql
     networks:
-      - itsm
+      - netlock
+
+  netlock-rmm-server:
+    image: nicomak101/netlock-rmm-server:latest
+    container_name: netlock-rmm-server
+    restart: unless-stopped
+    ports:
+      - "7080:7080"
+    environment:
+      - TZ=America/Santiago
+    volumes:
+      - ./netlock/server/appsettings.json:/app/appsettings.json:ro
+      - netlock-server-internal:/app/internal
+      - netlock-server-files:/app/www/private/files
+    depends_on:
+      - mysql
+    networks:
+      - netlock
+
+  netlock-rmm-web-console:
+    image: nicomak101/netlock-rmm-web-console:latest
+    container_name: netlock-rmm-web-console
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      - TZ=America/Santiago
+    volumes:
+      - ./netlock/web_console/appsettings.json:/app/appsettings.json:ro
+      - netlock-web-internal:/app/internal
+    depends_on:
+      - mysql
+      - netlock-rmm-server
+    networks:
+      - netlock
 
 networks:
-  itsm:
+  netlock:
     driver: bridge
 
 volumes:
-  meshcentral-data:
-  meshcentral-files:
-  meshcentral-backup:
+  netlock-mysql:
+  netlock-server-internal:
+  netlock-server-files:
+  netlock-web-internal:

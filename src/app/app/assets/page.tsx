@@ -97,6 +97,7 @@ export default function AssetsPage() {
 }
 
 function AssetsInventory({ profile }: { profile: Profile }) {
+  const rmmLabel = "NetLock RMM";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<AssetRow[]>([]);
@@ -179,7 +180,7 @@ function AssetsInventory({ profile }: { profile: Profile }) {
       <div className="space-y-5">
         <PageHeader
           title="Activos"
-          description="Inventario y gestión de activos IT (incluye MeshCentral)."
+          description={`Inventario y gestión de activos IT (incluye ${rmmLabel}).`}
           actions={
             <>
               {canManage ? (
@@ -295,7 +296,7 @@ function AssetsInventory({ profile }: { profile: Profile }) {
                   <div className="text-lg font-semibold">{loading ? "…" : stats.total}</div>
                 </div>
                 <div className="rounded-xl border border-border bg-muted/30 p-3">
-                  <div className="text-xs text-muted-foreground">MeshCentral</div>
+                  <div className="text-xs text-muted-foreground">{rmmLabel}</div>
                   <div className="text-lg font-semibold">{loading ? "…" : stats.mesh}</div>
                 </div>
                 <div className="rounded-xl border border-border bg-muted/30 p-3">
@@ -382,7 +383,7 @@ function AssetsInventory({ profile }: { profile: Profile }) {
                             <AssetConnectivityBadge status={a.connectivity_status} />
                             {a.mesh_node_id ? (
                               <Badge className="bg-[hsl(var(--brand-cyan))]/12 text-[hsl(var(--brand-cyan))] ring-1 ring-[hsl(var(--brand-cyan))]/25">
-                                MeshCentral
+                                {rmmLabel}
                               </Badge>
                             ) : null}
                             {a.failure_risk_pct >= 80 ? <Badge className="bg-rose-500/15 text-rose-200 ring-1 ring-rose-500/25">Riesgo alto</Badge> : null}

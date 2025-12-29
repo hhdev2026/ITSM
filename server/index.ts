@@ -8,9 +8,8 @@ import { loadEnv } from "./env";
 import { requireAuth, requireRole, type AuthedRequest } from "./auth";
 import { getChatKpis, getChatTrends, getKpis, getTrends, parseAnalyticsQuery, parseTrendsQuery } from "./analytics";
 import { createSupabaseAdmin } from "./supabase";
-import { attachRemoteTunnelWs, registerRemoteRoutes } from "./remote";
-import { registerMeshCentralOnboarding } from "./meshcentralAutoSync";
 import { registerNetlockRmmRoutes } from "./rmm/netlock";
+import { registerOnboardingRoutes } from "./onboarding";
 
 const env = loadEnv();
 const supabaseAdmin = env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : null;
@@ -26,8 +25,7 @@ app.use(pinoHttp());
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
-registerRemoteRoutes(app, { env, supabaseAdmin });
-registerMeshCentralOnboarding(app, { env, supabaseAdmin });
+registerOnboardingRoutes(app, { supabaseAdmin });
 registerNetlockRmmRoutes(app, { env, supabaseAdmin });
 
 function hasAssetsSecret(req: express.Request) {
@@ -600,7 +598,6 @@ app.get("/api/tickets/export.csv", requireAuth, requireRole(["supervisor", "admi
 });
 
 const server = http.createServer(app);
-attachRemoteTunnelWs(server, { env, supabaseAdmin });
 
 server.listen(env.PORT, () => {
   console.log(`[api] listening on :${env.PORT}`);

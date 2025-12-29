@@ -115,7 +115,7 @@ export default function SettingsPage() {
     },
     {
       title: "Activos y onboarding",
-      description: "Configura inventario y el flujo de enrolamiento (MeshCentral).",
+      description: "Configura inventario y el flujo de enrolamiento (NetLock RMM).",
       href: "/app/onboarding",
       icon: <HardDrive className="h-4 w-4 text-[hsl(var(--brand-cyan))]" />,
       meta: null,

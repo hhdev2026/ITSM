@@ -36,22 +36,12 @@ Opcional (datos ejemplo):
 
 - `supabase/seed.sql`
 
-### 2.1) Control remoto (Guacamole + MeshCentral) [dev]
+### 2.1) RMM (NetLock) [dev]
 
-- Aplica la migración `supabase/migrations/029_remote_devices.sql`.
-- Levanta servicios locales: `docker compose up -d` (MeshCentral queda en `https://localhost:4430`).
-- Configura en `.env` (API) las variables `GUACD_*`, `REMOTE_TUNNEL_*` y `REMOTE_CREDENTIALS_KEY` (ver `.env.example`).
-- Para generar el JSON encriptado de `remote_devices.credentials`, usa `tsx server/scripts/encrypt-remote-credentials.ts '<JSON>'`.
-- Para sincronizar inventario desde MeshCentral a `assets`, configura `MESHCENTRAL_*` y ejecuta `npm run dev:meshcentral-sync`.
-- Onboarding UI (botones): `http://localhost:3000/app/onboarding` (crear link de agente + crear técnico ITSM+MeshCentral).
-  - Tip: si tu `docker-compose` expone MeshCentral en `https://localhost:4430`, define `MESHCENTRAL_PUBLIC_URL=https://localhost:4430` para que los links de invitación salgan con el puerto correcto.
-
-### 2.1.1) NetLock RMM (migración en curso)
-
-- Configura variables `NETLOCK_*` + `RMM_PROVIDER=netlock` (ver `.env.example`).
-- Endpoints API:
-  - `POST /api/netlock/enroll/self` (genera instalador one-click y devuelve un link temporal de descarga).
-  - `POST /api/netlock/verify/self` (verifica si el dispositivo quedó conectado y lo registra en `assets`).
+- Levanta NetLock local: `docker compose up -d` (Web Console: `http://localhost:8080`, Server/Files: `http://localhost:7080`).
+- Configura variables `NETLOCK_*` + `NEXT_PUBLIC_NETLOCK_CONSOLE_URL` (ver `.env.example`).
+- Onboarding usuario: `http://localhost:3000/app/connect-device` (genera instalador, instala y luego “Verificar”).
+- Soporte remoto: en el chat, botón “Tomar control” abre `NEXT_PUBLIC_NETLOCK_CONSOLE_URL/devices`.
 
 ### 2.2) Importar catálogo real (Tier 1..4)
 

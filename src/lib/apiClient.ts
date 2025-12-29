@@ -30,7 +30,6 @@ function extractApiError(data: unknown): string | null {
 
   const friendly: Record<string, string> = {
     forbidden: "No tienes permiso para esta acción.",
-    meshcentral_not_configured: "MeshCentral no está configurado en la API (revisa MESHCENTRAL_URL / MESHCENTRAL_USER / MESHCENTRAL_PASS).",
     netlock_not_configured:
       "NetLock RMM no está configurado en la API (revisa NETLOCK_FILE_SERVER_URL / NETLOCK_FILE_SERVER_API_KEY / NETLOCK_* y RMM_INSTALLER_JWT_SECRET).",
     service_role_required: "La API requiere SUPABASE_SERVICE_ROLE_KEY para esta acción.",
