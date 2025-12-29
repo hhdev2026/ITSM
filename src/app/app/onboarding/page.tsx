@@ -10,48 +10,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
+import { apiFetch } from "@/lib/apiClient";
 import { useAccessToken, useProfile, useSession } from "@/lib/hooks";
 import { useRouter } from "next/navigation";
 import { Copy, Link as LinkIcon, RefreshCcw, UserPlus } from "lucide-react";
 
 type InviteResponse = { url: string; groupName: string; hours: number; flags: 0 | 1 | 2 };
-type StatusResponse = { running: boolean; lastEventAt: string | null; lastError: string | null };
+type StatusResponse = {
+  running: boolean;
+  lastEventAt: string | null;
+  lastError: string | null;
+  configured?: boolean;
+  connectivity?: { ok: boolean; checkedAt: string; error: string | null } | null;
+};
 type TechResponse = {
   itsm: { userId: string; email: string; full_name: string; role: "agent" | "supervisor"; department_id: string };
   meshcentral: { username: string; tempPassword: string; groupName: string };
 };
-
-function apiBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return !!v && typeof v === "object" && !Array.isArray(v);
-}
-
-function extractApiError(data: unknown): string | null {
-  if (!isRecord(data)) return null;
-  const err = data["error"];
-  if (typeof err === "string" && err.trim()) return err;
-  return null;
-}
-
-async function apiFetch<T>(token: string, path: string, init?: RequestInit) {
-  const res = await fetch(`${apiBaseUrl()}${path}`, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-  });
-  const data: unknown = await res.json().catch(() => null);
-  if (!res.ok) {
-    const msg = extractApiError(data) ?? `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  return data as T;
-}
 
 function obfuscatePassword(pw: string) {
   if (pw.length <= 6) return "••••••";
@@ -239,7 +214,22 @@ export default function OnboardingPage() {
                 )}
               </div>
 
-              {statusError ? <div className="text-xs text-rose-200/90">{statusError}</div> : null}
+              {status?.connectivity ? (
+                <div className="flex items-center justify-between rounded-2xl border border-border bg-background/40 px-3 py-2">
+                  <div className="text-xs text-muted-foreground">Conectividad MeshCentral</div>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      status.connectivity.ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-amber-500/30 bg-amber-500/10 text-amber-100"
+                    )}
+                  >
+                    {status.connectivity.ok ? "OK" : "Revisar"}
+                  </Badge>
+                </div>
+              ) : null}
+
+              {statusError ? <InlineAlert variant="error" title="No se pudo consultar el estado" description={statusError} /> : null}
+              {status?.connectivity?.error ? <div className="text-xs text-amber-200/90">MeshCentral: {status.connectivity.error}</div> : null}
               {status?.lastError ? <div className="text-xs text-amber-200/90">Último error: {status.lastError}</div> : null}
               {status?.lastEventAt ? <div className="text-xs text-muted-foreground">Último evento: {new Date(status.lastEventAt).toLocaleString()}</div> : null}
             </CardContent>
@@ -315,4 +305,3 @@ export default function OnboardingPage() {
     </AppShell>
   );
 }
-

@@ -547,8 +547,23 @@ export function registerMeshCentralOnboarding(app: express.Express, opts: { env:
     const authed = req as AuthedRequest;
     const ok = await ensureDepartmentMatches(authed, opts.env.MESHCENTRAL_DEFAULT_DEPARTMENT_NAME);
     if (!ok) return res.status(403).json({ error: "forbidden" });
+    const configured = !!opts.env.MESHCENTRAL_URL && !!opts.env.MESHCENTRAL_USER && !!opts.env.MESHCENTRAL_PASS;
+
+    let connectivity: { ok: boolean; checkedAt: string; error: string | null } | null = null;
+    const checkedAt = new Date().toISOString();
+    if (!configured) {
+      connectivity = { ok: false, checkedAt, error: "meshcentral_not_configured" };
+    } else {
+      try {
+        await runMeshCtrlJson<MeshDeviceGroup[]>("listdevicegroups", ["--json"], { timeoutMs: 8_000 });
+        connectivity = { ok: true, checkedAt, error: null };
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "meshcentral_unreachable";
+        connectivity = { ok: false, checkedAt, error: msg };
+      }
+    }
     res.setHeader("Cache-Control", "no-store");
-    return res.json({ ...service.getStatus() });
+    return res.json({ ...service.getStatus(), configured, connectivity });
   });
 
   app.post("/api/meshcentral/invite", requireAuth, requireRole(["agent", "supervisor", "admin"]), async (req, res) => {

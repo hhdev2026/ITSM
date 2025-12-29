@@ -3,21 +3,13 @@
 import * as React from "react";
 import Guacamole from "guacamole-common-js";
 import type { Client, Keyboard, Mouse, MouseState, Status } from "guacamole-common-js";
+import { apiFetch, wsBaseUrl } from "@/lib/apiClient";
 import { useAccessToken } from "@/lib/hooks";
 import { cn } from "@/lib/cn";
 
 type RemoteSessionStatus = "idle" | "connecting" | "connected" | "error";
 
 type RemoteTunnelResponse = { token: string; expiresInSeconds: number };
-
-function apiBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
-}
-
-function wsBaseUrl() {
-  const base = apiBaseUrl();
-  return base.replace(/^http:/i, "ws:").replace(/^https:/i, "wss:");
-}
 
 function clampInt(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, Math.trunc(value)));
@@ -80,6 +72,7 @@ export function RemoteSessionView({
       setError("Inicia sesión para abrir la sesión remota.");
       return;
     }
+    const authToken = accessToken;
 
     let cancelled = false;
     setStatus("connecting");
@@ -95,15 +88,11 @@ export function RemoteSessionView({
       const h = clampInt(rect.height || 720, 240, 2160);
       const dpi = clampInt((window.devicePixelRatio || 1) * 96, 72, 300);
 
-      const res = await fetch(`${apiBaseUrl()}/api/remote/tunnel`, {
+      const data = await apiFetch<RemoteTunnelResponse>(authToken, "/api/remote/tunnel", {
         method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ deviceId }),
       });
-
-      const data: unknown = await res.json().catch(() => null);
-      if (!res.ok || !data || typeof data !== "object") throw new Error("No se pudo iniciar el túnel remoto.");
-      const { token } = data as RemoteTunnelResponse;
+      const { token } = data;
       if (!token) throw new Error("Token de túnel inválido.");
 
       const tunnel = new Guacamole.WebSocketTunnel(`${wsBaseUrl()}/api/remote/tunnel`);

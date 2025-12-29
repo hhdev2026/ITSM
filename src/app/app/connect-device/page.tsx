@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
+import { apiFetch } from "@/lib/apiClient";
 import { errorMessage } from "@/lib/error";
 import { useAccessToken, useProfile, useSession } from "@/lib/hooks";
 import { supabase } from "@/lib/supabaseBrowser";
@@ -22,38 +23,6 @@ import { Copy, Laptop, Link as LinkIcon, RefreshCcw } from "lucide-react";
 type InviteResponse = { url: string; groupName: string; hours: number; flags: 0 | 1 | 2 };
 type AssetLite = Pick<Asset, "id" | "name" | "serial_number" | "asset_type" | "connectivity_status" | "updated_at" | "mesh_node_id">;
 type AssignmentRow = { id: string; assigned_at: string; asset: AssetLite | null };
-
-function apiBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return !!v && typeof v === "object" && !Array.isArray(v);
-}
-
-function extractApiError(data: unknown): string | null {
-  if (!isRecord(data)) return null;
-  const err = data["error"];
-  if (typeof err === "string" && err.trim()) return err;
-  return null;
-}
-
-async function apiFetch<T>(token: string, path: string, init?: RequestInit) {
-  const res = await fetch(`${apiBaseUrl()}${path}`, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-  });
-  const data: unknown = await res.json().catch(() => null);
-  if (!res.ok) {
-    const msg = extractApiError(data) ?? `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  return data as T;
-}
 
 function displayName(p: Pick<Profile, "full_name" | "email"> | null | undefined) {
   if (!p) return "—";

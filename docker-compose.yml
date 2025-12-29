@@ -3,6 +3,7 @@ services:
     image: guacamole/guacd:1.5.5
     container_name: itsm-guacd
     restart: unless-stopped
+    platform: linux/amd64
     ports:
       - "4822:4822"
     networks:
@@ -15,8 +16,10 @@ services:
     ports:
       - "4430:443"
     environment:
+      - DYNAMIC_CONFIG=true
       - HOSTNAME=localhost
-      - ALLOW_NEW_ACCOUNTS=false
+      - ALLOW_NEW_ACCOUNTS=true
+      - ALLOWED_ORIGIN=true
       - IFRAME=true
     volumes:
       - meshcentral-data:/opt/meshcentral/meshcentral-data
