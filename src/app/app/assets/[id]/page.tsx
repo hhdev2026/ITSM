@@ -400,7 +400,7 @@ export default function AssetDetailPage() {
     setSaving(true);
     setError(null);
     try {
-      await apiFetch<{ ok: boolean }>(token, "/api/netlock/authorize", { method: "POST", body: JSON.stringify({ accessKey }) });
+      await apiFetch<{ ok: boolean }>(token, "/api/agent/authorize", { method: "POST", body: JSON.stringify({ accessKey }) });
       await load();
     } catch (e) {
       setError(errorMessage(e));
@@ -846,8 +846,8 @@ export default function AssetDetailPage() {
                 return (
                   <Card className="tech-border">
                     <CardHeader>
-                      <CardTitle>NetLock RMM</CardTitle>
-                      <CardDescription>Inventario y telemetría sincronizada desde NetLock.</CardDescription>
+                      <CardTitle>Soporte remoto</CardTitle>
+                      <CardDescription>Inventario y telemetría sincronizada desde el agente remoto.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
                       <div className="grid gap-2">
@@ -917,14 +917,14 @@ export default function AssetDetailPage() {
                       {authorized === 0 ? (
                         <InlineAlert
                           variant="info"
-                          title="Falta autorizar en NetLock"
-                          description="Mientras el equipo esté “unauthorized” NetLock normalmente no ejecuta políticas (inventario/historial). Puedes autorizarlo en la consola NetLock o desde aquí (si tienes rol agente/supervisor/admin)."
+                          title="Equipo pendiente de autorización"
+                          description="Mientras el equipo esté sin autorización, el agente remoto puede no ejecutar políticas (inventario/historial). Puedes autorizarlo desde aquí (si tienes rol agente/supervisor/admin)."
                         />
                       ) : null}
 
                       {authorized === 0 && canManageRmm && asset.mesh_node_id ? (
                         <Button variant="outline" onClick={() => void authorizeNetlock(asset.mesh_node_id!)} disabled={saving}>
-                          {saving ? "Autorizando…" : "Autorizar en NetLock"}
+                          {saving ? "Autorizando…" : "Autorizar equipo"}
                         </Button>
                       ) : null}
 
@@ -1086,7 +1086,7 @@ export default function AssetDetailPage() {
                           ) : null}
                           <Button variant="outline" asChild>
                             <a href={consoleUrl} target="_blank" rel="noreferrer">
-                              Abrir consola NetLock
+                              Abrir consola de soporte remoto
                             </a>
                           </Button>
                         </div>

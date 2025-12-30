@@ -565,7 +565,7 @@ export default function TicketDetailPage() {
             <div className="space-y-4 p-5">
               <div>
                 <div className="text-sm font-semibold">Soporte remoto</div>
-                <div className="mt-1 text-xs text-muted-foreground">Selecciona un equipo del solicitante y toma control vía NetLock.</div>
+                <div className="mt-1 text-xs text-muted-foreground">Selecciona un equipo del solicitante y toma control vía la consola de soporte remoto.</div>
               </div>
 
               {remoteError ? <InlineAlert variant="error" description={remoteError} /> : null}

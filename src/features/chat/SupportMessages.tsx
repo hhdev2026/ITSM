@@ -877,7 +877,7 @@ export function SupportMessages({ profile }: { profile: Profile }) {
                   <Laptop className="h-4 w-4 text-muted-foreground" />
                   <div className="truncate text-sm font-semibold">Control remoto</div>
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">Selecciona el equipo y abre NetLock RMM para tomar control.</div>
+                <div className="mt-1 text-xs text-muted-foreground">Selecciona el equipo y abre la consola de soporte remoto para tomar control.</div>
               </div>
               {remoteAssetId ? (
                 <Badge variant="outline" className="border">

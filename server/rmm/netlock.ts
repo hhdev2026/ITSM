@@ -1,5 +1,5 @@
 import * as crypto from "crypto";
-import type express from "express";
+import express from "express";
 import { z } from "zod";
 import { SignJWT, jwtVerify } from "jose";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -122,7 +122,7 @@ async function netlockFetch(env: Env, path: string, init?: RequestInit) {
       },
     });
   } catch {
-    // NetLock not ready / restarting / not reachable.
+    // Provider not ready / restarting / not reachable.
     throw new Error("netlock_unreachable");
   }
 
@@ -138,7 +138,7 @@ async function createInstaller(env: Env, body: { name: string; serverConfig: unk
   const text = await res.text().catch(() => "");
   if (!res.ok) throw new Error(`netlock_create_installer_failed:${res.status}`);
   if (!text.trim()) {
-    // This typically means NetLock has no installer.package.* loaded (members portal key not set / packages missing).
+    // This typically means the provider has no installer.package.* loaded (members portal key not set / packages missing).
     throw new Error("netlock_installer_packages_missing");
   }
   const data: unknown = (() => {
@@ -164,7 +164,7 @@ function isUuid(value: string) {
 }
 
 async function listConnectedAccessKeys(env: Env) {
-  // NetLock does not expose a stable "connected devices" endpoint in the file-server API.
+  // The provider does not expose a stable "connected devices" endpoint in the file-server API.
   // We use the base file index as a best-effort signal: when an agent connects, it typically creates a folder keyed by `access_key`.
   const res = await netlockFetch(env, "/admin/files/index/base1337", { method: "POST" });
   if (!res.ok) throw new Error(`netlock_files_index_failed:${res.status}`);
@@ -256,7 +256,7 @@ async function ensureAssetAssignmentForUser(supabaseAdmin: SupabaseClient, opts:
     asset_id: opts.assetId,
     user_id: opts.userId,
     role: "principal",
-    notes: "Auto-asignado por NetLock RMM (enrolamiento del usuario).",
+    notes: "Auto-asignado por enrolamiento del agente remoto.",
   });
   if (insErr) throw insErr;
 }
@@ -335,8 +335,10 @@ async function verifyInstallerToken(env: Env, token: string) {
 }
 
 export function registerNetlockRmmRoutes(app: express.Express, opts: { env: Env; supabaseAdmin: SupabaseClient | null }) {
+  const router = express.Router();
+
   // Status (agents/supervisors/admin only) - does not reveal secrets.
-  app.get("/api/netlock/status", requireAuth, async (req, res) => {
+  router.get("/status", requireAuth, async (req, res) => {
     const authed = req as AuthedRequest;
     if (!["agent", "supervisor", "admin"].includes(authed.auth.role)) return res.status(403).json({ error: "forbidden" });
 
@@ -354,7 +356,7 @@ export function registerNetlockRmmRoutes(app: express.Express, opts: { env: Env;
   });
 
   // User self-enrollment: generate a one-click installer ZIP and return a short-lived download URL.
-  app.post("/api/netlock/enroll/self", requireAuth, async (req, res) => {
+  router.post("/enroll/self", requireAuth, async (req, res) => {
     try {
       if (!opts.supabaseAdmin) return res.status(500).json({ error: "service_role_required" });
       const authed = req as AuthedRequest;
@@ -382,20 +384,19 @@ export function registerNetlockRmmRoutes(app: express.Express, opts: { env: Env;
       res.setHeader("Cache-Control", "no-store");
       return res.json({
         provider: "netlock",
-        url: `${apiPublicUrl(req, opts.env)}/api/netlock/installer/${issued.token}`,
-        configUrl: `${apiPublicUrl(req, opts.env)}/api/netlock/server-config/${issued.token}`,
+        url: `${apiPublicUrl(req, opts.env)}/api/agent/installer/${issued.token}`,
+        configUrl: `${apiPublicUrl(req, opts.env)}/api/agent/server-config/${issued.token}`,
         expiresInSeconds: issued.expiresInSeconds,
         correlationKey: accessKey,
-        hint:
-          "Tip: en macOS/Linux usa el “Instalador automático” (recomendado). Alternativa avanzada: ZIP + `server_config.json` y ejecutar `NetLock_RMM_Agent_Installer clean server_config.json`.",
+        hint: "Tip: en macOS/Linux usa el “Instalador automático” (recomendado).",
       });
     } catch (err: unknown) {
       res.status(400).json({ error: safeErrorMessage(err) });
     }
   });
 
-  // Authorize a device in NetLock (agent/supervisor/admin only).
-  app.post("/api/netlock/authorize", requireAuth, async (req, res) => {
+  // Authorize a device in the RMM provider (agent/supervisor/admin only).
+  router.post("/authorize", requireAuth, async (req, res) => {
     try {
       const authed = req as AuthedRequest;
       if (!["agent", "supervisor", "admin"].includes(authed.auth.role)) return res.status(403).json({ error: "forbidden" });
@@ -416,7 +417,7 @@ export function registerNetlockRmmRoutes(app: express.Express, opts: { env: Env;
   });
 
   // Download server_config.json for installers that require CLI arguments (macOS often blocks unsigned embedded-config one-click binaries).
-  app.get("/api/netlock/server-config/:token", async (req, res) => {
+  router.get("/server-config/:token", async (req, res) => {
     try {
       const token = String(req.params.token ?? "").trim();
       if (!token) return res.status(400).send("invalid_token");
@@ -433,7 +434,7 @@ export function registerNetlockRmmRoutes(app: express.Express, opts: { env: Env;
   });
 
   // Convenience: generates a small install script that downloads the ZIP + server_config.json and runs the installer.
-  app.get("/api/netlock/install-script/macos/:token", async (req, res) => {
+  router.get("/install-script/macos/:token", async (req, res) => {
     try {
       const token = String(req.params.token ?? "").trim();
       if (!token) return res.status(400).send("invalid_token");
@@ -446,24 +447,23 @@ set -euo pipefail
 
 API_BASE="${base}"
 TOKEN="${token}"
-DEST="$HOME/Downloads/NetLock-ITSM"
-ZIP="$DEST/netlock-installer.zip"
+DEST="$HOME/Downloads/Geimser-ITSM"
+ZIP="$DEST/agent-installer.zip"
 CFG="$DEST/server_config.json"
-AGENT_ROOT="/usr/local/bin/0x101_Cyber_Security/NetLock_RMM"
 
 mkdir -p "$DEST"
 echo "[1/4] Descargando instalador..."
-curl -fL "$API_BASE/api/netlock/installer/$TOKEN" -o "$ZIP"
+curl -fL "$API_BASE/api/agent/installer/$TOKEN" -o "$ZIP"
 echo "[2/4] Descargando server_config.json..."
-curl -fL "$API_BASE/api/netlock/server-config/$TOKEN" -o "$CFG"
+curl -fL "$API_BASE/api/agent/server-config/$TOKEN" -o "$CFG"
 echo "[3/4] Descomprimiendo..."
 rm -rf "$DEST/pkg"
 mkdir -p "$DEST/pkg"
 unzip -oq "$ZIP" -d "$DEST/pkg"
 
-INSTALLER="$(find "$DEST/pkg" -maxdepth 3 -type f -name 'NetLock_RMM_Agent_Installer*' | head -n 1 || true)"
+INSTALLER="$(find "$DEST/pkg" -maxdepth 3 -type f -name '*_Agent_Installer*' | head -n 1 || true)"
 if [ -z "$INSTALLER" ]; then
-  echo "No encontré NetLock_RMM_Agent_Installer dentro del ZIP."
+  echo "No encontré el instalador dentro del ZIP."
   echo "Ruta: $DEST/pkg"
   exit 1
 fi
@@ -474,28 +474,19 @@ xattr -dr com.apple.quarantine "$DEST/pkg" 2>/dev/null || true
 codesign --force --sign - --no-strict "$INSTALLER" 2>/dev/null || true
 sudo "$INSTALLER" clean "$CFG"
 
-echo "[post] Firmando binarios del agente (requerido en Apple Silicon)..."
-if [ -d "$AGENT_ROOT" ]; then
-  sudo xattr -dr com.apple.quarantine "$AGENT_ROOT" 2>/dev/null || true
-  sudo codesign --force --sign - --no-strict "$AGENT_ROOT"/*_Agent/NetLock_RMM_Agent_* 2>/dev/null || true
-  sudo launchctl kickstart -k system/com.netlock.rmm.agentcomm 2>/dev/null || true
-  sudo launchctl kickstart -k system/com.netlock.rmm.agentremote 2>/dev/null || true
-  sudo launchctl kickstart -k system/com.netlock.rmm.agenthealth 2>/dev/null || true
-fi
-
 echo "Listo. Vuelve a la app y presiona “Verificar”."
 read -n 1 -s -r -p "Presiona cualquier tecla para cerrar..."
 echo
 `;
 
-      setDownloadHeaders(res, { contentType: "application/x-sh; charset=utf-8", filename: "Install-NetLock.command" });
+      setDownloadHeaders(res, { contentType: "application/x-sh; charset=utf-8", filename: "Install-Agente-Remoto.command" });
       return res.send(script);
     } catch {
       res.status(401).send("unauthorized");
     }
   });
 
-  app.get("/api/netlock/install-script/linux/:token", async (req, res) => {
+  router.get("/install-script/linux/:token", async (req, res) => {
     try {
       const token = String(req.params.token ?? "").trim();
       if (!token) return res.status(400).send("invalid_token");
@@ -508,23 +499,23 @@ set -euo pipefail
 
 API_BASE="${base}"
 TOKEN="${token}"
-DEST="$HOME/Downloads/netlock-itsm"
-ZIP="$DEST/netlock-installer.zip"
+DEST="$HOME/Downloads/geimser-itsm"
+ZIP="$DEST/agent-installer.zip"
 CFG="$DEST/server_config.json"
 
 mkdir -p "$DEST"
 echo "[1/4] Descargando instalador..."
-curl -fL "$API_BASE/api/netlock/installer/$TOKEN" -o "$ZIP"
+curl -fL "$API_BASE/api/agent/installer/$TOKEN" -o "$ZIP"
 echo "[2/4] Descargando server_config.json..."
-curl -fL "$API_BASE/api/netlock/server-config/$TOKEN" -o "$CFG"
+curl -fL "$API_BASE/api/agent/server-config/$TOKEN" -o "$CFG"
 echo "[3/4] Descomprimiendo..."
 rm -rf "$DEST/pkg"
 mkdir -p "$DEST/pkg"
 unzip -oq "$ZIP" -d "$DEST/pkg"
 
-INSTALLER="$(find "$DEST/pkg" -maxdepth 3 -type f -name 'NetLock_RMM_Agent_Installer*' | head -n 1 || true)"
+INSTALLER="$(find "$DEST/pkg" -maxdepth 3 -type f -name '*_Agent_Installer*' | head -n 1 || true)"
 if [ -z "$INSTALLER" ]; then
-  echo "No encontré NetLock_RMM_Agent_Installer dentro del ZIP."
+  echo "No encontré el instalador dentro del ZIP."
   echo "Ruta: $DEST/pkg"
   exit 1
 fi
@@ -536,7 +527,7 @@ sudo "$INSTALLER" clean "$CFG"
 echo "Listo. Vuelve a la app y presiona “Verificar”."
 `;
 
-      setDownloadHeaders(res, { contentType: "application/x-sh; charset=utf-8", filename: "install-netlock.sh" });
+      setDownloadHeaders(res, { contentType: "application/x-sh; charset=utf-8", filename: "install-agente-remoto.sh" });
       return res.send(script);
     } catch {
       res.status(401).send("unauthorized");
@@ -544,7 +535,7 @@ echo "Listo. Vuelve a la app y presiona “Verificar”."
   });
 
   // Public download endpoint (token-protected, no user session required).
-  app.get("/api/netlock/installer/:token", async (req, res) => {
+  router.get("/installer/:token", async (req, res) => {
     try {
       const token = String(req.params.token ?? "").trim();
       if (!token) return res.status(400).send("invalid_token");
@@ -569,7 +560,7 @@ echo "Listo. Vuelve a la app y presiona “Verificar”."
   });
 
   // Verification: if the device is connected (access_key online), create/update the asset and assign it to the user.
-  app.post("/api/netlock/verify/self", requireAuth, async (req, res) => {
+  router.post("/verify/self", requireAuth, async (req, res) => {
     try {
       if (!opts.supabaseAdmin) return res.status(500).json({ error: "service_role_required" });
       const authed = req as AuthedRequest;
@@ -589,8 +580,7 @@ echo "Listo. Vuelve a la app y presiona “Verificar”."
           return res.json({
             ok: false,
             assetId: null,
-            message:
-              "No pude conectar a NetLock MySQL para verificar el equipo. En dev: reinicia `docker compose up -d` (docker-compose.yml expone 127.0.0.1:3307) y revisa `NETLOCK_MYSQL_URL`.",
+            message: "No se pudo verificar el equipo en este momento. Intenta nuevamente más tarde.",
           });
         }
         throw e;
@@ -602,13 +592,12 @@ echo "Listo. Vuelve a la app y presiona “Verificar”."
           return res.json({
             ok: false,
             assetId: null,
-            message:
-              "Aún no aparece registrado en NetLock. Espera 10–60s y reintenta. Si persiste, revisa que el agente esté corriendo (LaunchDaemons) y que el server esté accesible.",
+            message: "Aún no aparece conectado. Espera 10–60s y reintenta.",
           });
         }
       }
 
-      // Auto-authorize device on first verification (enables inventory/policies in most NetLock setups).
+      // Auto-authorize device on first verification (enables inventory/policies in most setups).
       if (device && opts.env.NETLOCK_AUTO_AUTHORIZE_ON_VERIFY && (device.authorized ?? 0) === 0) {
         await authorizeDeviceInMysql(opts.env, parsed.data.accessKey).catch(() => undefined);
       }
@@ -624,4 +613,7 @@ echo "Listo. Vuelve a la app y presiona “Verificar”."
       res.status(400).json({ error: safeErrorMessage(err) });
     }
   });
+
+  app.use("/api/netlock", router);
+  app.use("/api/agent", router);
 }

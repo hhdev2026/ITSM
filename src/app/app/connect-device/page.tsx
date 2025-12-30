@@ -101,14 +101,14 @@ export default function ConnectDevicePage() {
     setVerifyMsg(null);
     setInvite(null);
     try {
-      const data = await apiFetch<NetlockEnrollResponse>(token, "/api/netlock/enroll/self", {
+      const data = await apiFetch<NetlockEnrollResponse>(token, "/api/agent/enroll/self", {
         method: "POST",
         body: JSON.stringify({ hours: inviteHours, architecture: arch, deviceName: deviceName.trim() || undefined }),
       });
       setInvite({ url: data.url, configUrl: data.configUrl ?? null, hint: data.hint ?? null, correlationKey: data.correlationKey });
       setAccessKey(data.correlationKey);
       try {
-        localStorage.setItem("netlock_last_access_key", data.correlationKey);
+        localStorage.setItem("remote_agent_last_code", data.correlationKey);
       } catch {
         // ignore
       }
@@ -133,7 +133,7 @@ export default function ConnectDevicePage() {
 
     if (key) {
       try {
-        const data = await apiFetch<NetlockVerifyResponse>(token, "/api/netlock/verify/self", {
+        const data = await apiFetch<NetlockVerifyResponse>(token, "/api/agent/verify/self", {
           method: "POST",
           body: JSON.stringify({ accessKey: key, deviceName: deviceName.trim() || undefined }),
         });
@@ -182,7 +182,7 @@ export default function ConnectDevicePage() {
 
   useEffect(() => {
     try {
-      const last = localStorage.getItem("netlock_last_access_key");
+      const last = localStorage.getItem("remote_agent_last_code");
       if (last && !accessKey) setAccessKey(last);
     } catch {
       // ignore
@@ -193,8 +193,8 @@ export default function ConnectDevicePage() {
   const hint = useMemo(() => invite?.hint ?? null, [invite?.hint]);
   const installScriptUrl = useMemo(() => {
     if (!invite?.url) return null;
-    if (arch.startsWith("osx-")) return invite.url.replace("/api/netlock/installer/", "/api/netlock/install-script/macos/");
-    if (arch.startsWith("linux-")) return invite.url.replace("/api/netlock/installer/", "/api/netlock/install-script/linux/");
+    if (arch.startsWith("osx-")) return invite.url.replace(/\/api\/(?:netlock|agent)\/installer\//, "/api/agent/install-script/macos/");
+    if (arch.startsWith("linux-")) return invite.url.replace(/\/api\/(?:netlock|agent)\/installer\//, "/api/agent/install-script/linux/");
     return null;
   }, [invite?.url, arch]);
 
@@ -223,7 +223,7 @@ export default function ConnectDevicePage() {
       <div className="space-y-5">
         <PageHeader
           title="Conectar mi PC"
-          description="Registra tu equipo para inventario y soporte remoto (NetLock RMM + Activos)."
+          description="Registra tu equipo para inventario y soporte remoto (agente remoto + activos)."
           actions={
             <Button variant="outline" asChild>
               <Link href="/app/assets">Ver mis equipos</Link>
@@ -236,7 +236,7 @@ export default function ConnectDevicePage() {
             <div className="rounded-3xl glass-surface">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <LinkIcon className="h-4 w-4 text-[hsl(var(--brand-cyan))]" /> Enrolar equipo (NetLock Agent)
+                  <LinkIcon className="h-4 w-4 text-[hsl(var(--brand-cyan))]" /> Conectar equipo (agente remoto)
                 </CardTitle>
                 <CardDescription>
                   Genera un link de instalación, instálalo en tu PC y quedará registrado. Si después necesitas ayuda, soporte podrá tomar control desde el chat.
@@ -424,7 +424,7 @@ export default function ConnectDevicePage() {
                             </Badge>
                             {a.mesh_node_id ? (
                               <Badge className="bg-[hsl(var(--brand-cyan))]/12 text-[hsl(var(--brand-cyan))] ring-1 ring-[hsl(var(--brand-cyan))]/25">
-                                NetLock RMM
+                                Agente remoto
                               </Badge>
                             ) : null}
                           </div>

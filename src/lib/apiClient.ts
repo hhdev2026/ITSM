@@ -29,19 +29,17 @@ function extractApiError(data: unknown): string | null {
   if (!raw) return null;
 
   if (raw.startsWith("netlock_create_installer_failed:")) {
-    return "NetLock rechazó la creación del instalador. Revisa `NETLOCK_FILE_SERVER_API_KEY` (debe coincidir con `files_api_key` de NetLock) y que `NETLOCK_FILE_SERVER_URL` apunte al server correcto.";
+    return "El servicio de instaladores rechazó la solicitud. Intenta nuevamente más tarde.";
   }
 
   const friendly: Record<string, string> = {
     forbidden: "No tienes permiso para esta acción.",
-    netlock_not_configured:
-      "NetLock RMM no está configurado en la API (revisa NETLOCK_FILE_SERVER_URL / NETLOCK_FILE_SERVER_API_KEY / NETLOCK_* y RMM_INSTALLER_JWT_SECRET).",
-    netlock_unreachable:
-      "No se pudo conectar con NetLock (puede estar iniciando/reiniciando o descargando paquetes). Revisa `docker logs netlock-rmm-server` y vuelve a intentar cuando diga “Server started”.",
+    netlock_not_configured: "El servicio de soporte remoto no está disponible en este momento.",
+    netlock_unreachable: "No se pudo conectar al servicio de soporte remoto. Intenta nuevamente en unos segundos.",
     netlock_installer_packages_missing:
-      "NetLock no tiene paquetes de instalador cargados para generar el ZIP (installer.package.*). Esto suele pasar si falta el Members Portal API key en NetLock o si el server no puede descargar paquetes (salida a Internet/firewall). Si estás en Windows ARM64, prueba Windows x64.",
-    service_role_required: "La API requiere SUPABASE_SERVICE_ROLE_KEY para esta acción.",
-    rmm_installer_jwt_secret_required: "Falta configurar RMM_INSTALLER_JWT_SECRET en la API.",
+      "El instalador aún no está listo para descargar. Intenta nuevamente más tarde. Si estás en Windows ARM64, prueba Windows x64.",
+    service_role_required: "Servicio no disponible (configuración incompleta).",
+    rmm_installer_jwt_secret_required: "Servicio no disponible (configuración incompleta).",
     invalid_body: "Datos inválidos.",
     device_not_found: "El equipo no existe o no es accesible.",
   };

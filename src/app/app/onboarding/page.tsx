@@ -55,11 +55,11 @@ export default function OnboardingPage() {
     setNetlockLoading(true);
     setNetlockError(null);
     try {
-      const data = await apiFetch<NetlockStatusResponse>(token, "/api/netlock/status");
+      const data = await apiFetch<NetlockStatusResponse>(token, "/api/agent/status");
       setNetlock(data);
     } catch (e: unknown) {
       setNetlock(null);
-      setNetlockError(e instanceof Error ? e.message : "No se pudo consultar el estado de NetLock.");
+      setNetlockError(e instanceof Error ? e.message : "No se pudo consultar el estado del servicio de soporte remoto.");
     } finally {
       setNetlockLoading(false);
     }
@@ -102,14 +102,14 @@ export default function OnboardingPage() {
 
   return (
     <AppShell profile={profile}>
-      <PageHeader title="Onboarding" description="Incorpora técnicos y equipos con un flujo simple (NetLock RMM + Activos)." />
+      <PageHeader title="Onboarding" description="Incorpora técnicos y equipos con un flujo simple (soporte remoto + activos)." />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="tech-border rounded-3xl p-[1px]">
           <div className="rounded-3xl glass-surface">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <RefreshCcw className={cn("h-4 w-4 text-[hsl(var(--brand-cyan))]", netlockLoading && "animate-spin")} /> Estado NetLock RMM
+                <RefreshCcw className={cn("h-4 w-4 text-[hsl(var(--brand-cyan))]", netlockLoading && "animate-spin")} /> Estado soporte remoto
               </CardTitle>
               <CardDescription>Comprueba conectividad con el Files server (API key) para generación de instaladores y verificación.</CardDescription>
             </CardHeader>
@@ -118,7 +118,7 @@ export default function OnboardingPage() {
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button variant="outline" onClick={loadNetlockStatus} disabled={!token || netlockLoading}>
-                  Estado NetLock
+                  Ver estado
                 </Button>
               </div>
 
@@ -138,7 +138,7 @@ export default function OnboardingPage() {
                 <Badge variant="outline">Sin estado</Badge>
               )}
 
-              {netlock?.connectivity?.error ? <div className="text-xs text-amber-200/90">NetLock: {netlock.connectivity.error}</div> : null}
+              {netlock?.connectivity?.error ? <div className="text-xs text-amber-200/90">Detalle: {netlock.connectivity.error}</div> : null}
               {typeof netlock?.details?.connected === "number" ? (
                 <div className="text-xs text-muted-foreground">Conectados: {netlock.details.connected}</div>
               ) : null}

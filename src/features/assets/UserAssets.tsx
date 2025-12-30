@@ -26,7 +26,7 @@ function errorMessage(e: unknown) {
 }
 
 export function UserAssets({ profile }: { profile: Profile }) {
-  const rmmLabel = "NetLock RMM";
+  const rmmLabel = "Agente remoto";
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

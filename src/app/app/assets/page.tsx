@@ -97,7 +97,7 @@ export default function AssetsPage() {
 }
 
 function AssetsInventory({ profile }: { profile: Profile }) {
-  const rmmLabel = "NetLock RMM";
+  const rmmLabel = "Agente remoto";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<AssetRow[]>([]);

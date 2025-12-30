@@ -52,6 +52,7 @@ app.use(
 
 app.use("/api/assets", createMemoryRateLimiter({ windowMs: 60_000, max: 600, keyPrefix: "assets" }));
 app.use("/api/netlock", createMemoryRateLimiter({ windowMs: 60_000, max: 120, keyPrefix: "netlock" }));
+app.use("/api/agent", createMemoryRateLimiter({ windowMs: 60_000, max: 120, keyPrefix: "agent" }));
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 

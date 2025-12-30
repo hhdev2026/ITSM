@@ -597,7 +597,7 @@ async function tick(opts: {
           kind: "netlock_events_critical_24h",
           shouldOpen: critical.length > 0,
           severity: "critical",
-          title: "NetLock: eventos críticos (24h)",
+          title: "Agente remoto: eventos críticos (24h)",
           message: critical.length ? `${critical.length} evento(s). ${summarize(critical)}` : "",
           meta: { source: "netlock-sync", windowHours: 24, count: critical.length },
         });
@@ -607,7 +607,7 @@ async function tick(opts: {
           kind: "netlock_events_warning_24h",
           shouldOpen: warning.length > 0,
           severity: "warning",
-          title: "NetLock: eventos de advertencia (24h)",
+          title: "Agente remoto: eventos de advertencia (24h)",
           message: warning.length ? `${warning.length} evento(s). ${summarize(warning)}` : "",
           meta: { source: "netlock-sync", windowHours: 24, count: warning.length },
         });

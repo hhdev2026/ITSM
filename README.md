@@ -5,7 +5,7 @@ Aplicación web de **Service Desk / Mesa de Servicios (ITSM)** inspirada en ITIL
 - Analytics para supervisión (KPIs: volumen, MTTR, SLA, pendientes, carga, FCR).
 - Automatizaciones (workflows) con un worker Node.js.
 - Inventario de activos con sincronización/import + monitoreo de conectividad (alertas básicas).
-- Chat de soporte con disponibilidad del agente + soporte remoto (RMM NetLock).
+- Chat de soporte con disponibilidad del agente + soporte remoto.
 
 ## Getting Started
 
@@ -41,52 +41,51 @@ Opcional (datos ejemplo):
 
 - `supabase/seed.sql`
 
-### 2.1) RMM (NetLock) [dev]
+### 2.1) RMM (agente remoto) [dev]
 
-- Levanta NetLock local: `docker compose up -d` (Web Console: `http://localhost:8080`, Server/Files: `http://localhost:7080`).
+- Levanta el servicio RMM local: `docker compose up -d` (Web Console: `http://localhost:8080`, Server/Files: `http://localhost:7080`).
 - En `docker-compose.yml` los puertos se publican solo en `127.0.0.1` (localhost). Si necesitas acceso desde otra máquina, ajusta el bind.
 - En dev, `docker-compose.yml` expone MySQL en `127.0.0.1:3307` para que la API pueda verificar equipos contra la tabla `devices` (ver `NETLOCK_MYSQL_URL` en `.env.example`).
-- En Mac Apple Silicon (ARM), las imágenes de NetLock se ejecutan como `linux/amd64` (emulación), puede ser más lento.
+- En Mac Apple Silicon (ARM), las imágenes se ejecutan como `linux/amd64` (emulación), puede ser más lento.
 - Tip (macOS): si el agente no logra conectar usando `localhost`, usa `127.0.0.1` en `NETLOCK_*_SERVERS` y `NETLOCK_FILE_SERVER_URL` (evita problemas de IPv6 `::1`).
 - Tip (macOS Apple Silicon): el instalador descargado puede ser bloqueado por AMFI si está completamente sin firma. Solución rápida: `xattr -dr com.apple.quarantine <archivo>` y `codesign --force --sign - --no-strict <archivo>`.
-- Tip (macOS Apple Silicon): los servicios del agente (`/usr/local/bin/0x101_Cyber_Security/NetLock_RMM/*_Agent/NetLock_RMM_Agent_*`) también pueden quedar sin firma y ser “killed”. Fírmalos y reinicia servicios: `sudo codesign --force --sign - --no-strict /usr/local/bin/0x101_Cyber_Security/NetLock_RMM/*_Agent/NetLock_RMM_Agent_*` + `sudo launchctl kickstart -k system/com.netlock.rmm.agentcomm` (repite para `agentremote`/`agenthealth`).
 - Configura variables `NETLOCK_*` + `NEXT_PUBLIC_NETLOCK_CONSOLE_URL` (ver `.env.example`).
 - Onboarding usuario: `http://localhost:3000/app/connect-device` (genera instalador, instala y luego “Verificar”).
 - Soporte remoto: en el chat, botón “Tomar control” abre `NEXT_PUBLIC_NETLOCK_CONSOLE_URL/devices`.
 
-### 2.1.1) RMM (NetLock) [prod / VM]
+### 2.1.1) RMM (agente remoto) [prod / VM]
 
-Patrón recomendado: NetLock detrás de Nginx con **dos hostnames** (evita routing por path; el agente espera host:puerto).
+Patrón recomendado: RMM detrás de Nginx con **dos hostnames** (evita routing por path; el agente espera host:puerto).
 
-- Web Console (UI NetLock): `https://netlock.<IP>.cloud-xip.com`
-- Server/Files (API + descargas): `https://netlock-files.<IP>.cloud-xip.com`
+- Web Console: `https://rmm.<IP>.cloud-xip.com`
+- Server/Files (API + descargas): `https://rmm-files.<IP>.cloud-xip.com`
 
 En la **VM**:
 
-- NetLock expuesto solo en `127.0.0.1` (Docker) y Nginx publica 80/443.
-- Ajusta `PublicOverrideUrl` en `netlock/web_console/appsettings.json` al URL público HTTPS del console.
+- RMM expuesto solo en `127.0.0.1` (Docker) y Nginx publica 80/443.
+- Ajusta `PublicOverrideUrl` en el `appsettings.json` del Web Console del RMM al URL público HTTPS del console.
 
 En la **UI (Vercel)**:
 
-- `NEXT_PUBLIC_NETLOCK_CONSOLE_URL=https://netlock.<IP>.cloud-xip.com`
+- `NEXT_PUBLIC_NETLOCK_CONSOLE_URL=https://rmm.<IP>.cloud-xip.com`
 
 En la **API (.env)** (donde esté corriendo tu Express API):
 
-- `NETLOCK_FILE_SERVER_URL=https://netlock-files.<IP>.cloud-xip.com`
+- `NETLOCK_FILE_SERVER_URL=https://rmm-files.<IP>.cloud-xip.com`
 - `NETLOCK_INSECURE_TLS=false`
 - `NETLOCK_SSL=true`
-- `NETLOCK_COMMUNICATION_SERVERS=netlock-files.<IP>.cloud-xip.com:443`
-- `NETLOCK_REMOTE_SERVERS=netlock-files.<IP>.cloud-xip.com:443`
-- `NETLOCK_UPDATE_SERVERS=netlock-files.<IP>.cloud-xip.com:443`
-- `NETLOCK_TRUST_SERVERS=netlock-files.<IP>.cloud-xip.com:443`
-- `NETLOCK_FILE_SERVERS=netlock-files.<IP>.cloud-xip.com:443`
+- `NETLOCK_COMMUNICATION_SERVERS=rmm-files.<IP>.cloud-xip.com:443`
+- `NETLOCK_REMOTE_SERVERS=rmm-files.<IP>.cloud-xip.com:443`
+- `NETLOCK_UPDATE_SERVERS=rmm-files.<IP>.cloud-xip.com:443`
+- `NETLOCK_TRUST_SERVERS=rmm-files.<IP>.cloud-xip.com:443`
+- `NETLOCK_FILE_SERVERS=rmm-files.<IP>.cloud-xip.com:443`
 
 Nota: si tu API corre fuera de la VM, no podrá usar `NETLOCK_MYSQL_URL` (MySQL está dentro del Docker). Para sync confiable (hardware/software/eventos) lo ideal es correr el worker `dev:netlock-sync` en la misma VM o en un contenedor con acceso a MySQL.
 
 #### Troubleshooting (RMM)
 
-- Error `netlock_create_installer_failed:401`: la API key de NetLock no coincide. Revisa `NETLOCK_FILE_SERVER_API_KEY` vs `files_api_key` en la DB de NetLock.
-- Error `netlock_installer_packages_missing`: NetLock no tiene cargados los `installer.package.*`. Configura tu **Members Portal API key** en NetLock y reinicia los contenedores.
+- Error `netlock_create_installer_failed:401`: la API key no coincide. Revisa `NETLOCK_FILE_SERVER_API_KEY` vs `files_api_key` en la DB del RMM.
+- Error `netlock_installer_packages_missing`: faltan paquetes de instalador `installer.package.*`. Configura tu **Members Portal API key** en el RMM y reinicia los contenedores.
 
 ### 2.2) Importar catálogo real (Tier 1..4)
 
@@ -171,7 +170,7 @@ Worker de monitoreo de activos (conectividad + alertas):
 npm run dev:assets-monitor
 ```
 
-Worker NetLock sync (inventario/telemetría desde NetLock -> Supabase):
+Worker sync RMM (inventario/telemetría -> Supabase):
 
 ```bash
 npm run dev:netlock-sync

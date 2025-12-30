@@ -12,7 +12,7 @@ create table if not exists public.rmm_snapshots (
   kind text not null,     -- e.g. 'device', 'hardware', 'apps_installed'
   asset_id uuid not null references public.assets (id) on delete cascade,
 
-  -- Provider device key (e.g. NetLock access_key). Kept redundant for convenience.
+  -- Provider device key (e.g. access_key). Kept redundant for convenience.
   device_key text,
 
   -- Timestamp of the upstream snapshot (best-effort).
@@ -87,4 +87,3 @@ using (public._has_role(array['admin']::public.role_enum[]))
 with check (public._has_role(array['admin']::public.role_enum[]));
 
 commit;
-

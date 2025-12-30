@@ -48,7 +48,7 @@ export function NetlockRemotePanel({
   return (
     <div className={cn("space-y-3", className)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm font-semibold">Soporte remoto (NetLock)</div>
+        <div className="text-sm font-semibold">Soporte remoto</div>
         <div className="flex flex-wrap items-center gap-2">
           {accessKey ? (
             <Button
@@ -56,11 +56,11 @@ export function NetlockRemotePanel({
               size="sm"
               onClick={() => {
                 void navigator.clipboard.writeText(accessKey);
-                toast.message("Copiado", { description: "Access Key copiado al portapapeles." });
+                toast.message("Copiado", { description: "Código del equipo copiado al portapapeles." });
               }}
             >
               <Copy className="h-4 w-4" />
-              Copiar Access Key
+              Copiar código
             </Button>
           ) : null}
           {accessKey ? <Badge variant="outline" className="font-mono">{accessKey}</Badge> : null}
@@ -68,21 +68,21 @@ export function NetlockRemotePanel({
       </div>
 
       {!consoleUrl ? (
-        <InlineAlert variant="error" title="Falta configuración" description="Configura `NEXT_PUBLIC_NETLOCK_CONSOLE_URL` para usar soporte remoto." />
+        <InlineAlert variant="error" title="No disponible" description="La consola de soporte remoto no está configurada." />
       ) : !canEmbed ? (
         <InlineAlert
           variant="info"
-          title="Embed bloqueado por seguridad"
+          title="Vista integrada no disponible"
           description={
             baseHref
-              ? `NetLock envía X-Frame-Options/CSP (SAMEORIGIN). Para embeber dentro de la app, publica NetLock bajo el MISMO origen (mismo dominio y puerto) que la UI, por ejemplo con reverse-proxy en /netlock, y apunta NEXT_PUBLIC_NETLOCK_CONSOLE_URL a esa URL (actual: ${baseHref}).`
-              : "NetLock envía X-Frame-Options/CSP (SAMEORIGIN). Para embeber dentro de la app, publica NetLock bajo el MISMO origen (mismo dominio y puerto) que la UI, por ejemplo con reverse-proxy en /netlock."
+              ? "Por políticas de seguridad del navegador, esta consola no se puede mostrar dentro de la app. Ábrela en una pestaña nueva."
+              : "Por políticas de seguridad del navegador, esta consola no se puede mostrar dentro de la app."
           }
         />
       ) : embedUrl ? (
         <div className={cn("overflow-hidden rounded-2xl border border-border bg-black/20", heightClassName ?? "h-[70vh]")}>
           <iframe
-            title="NetLock Remote"
+            title="Soporte remoto"
             src={embedUrl}
             className="h-full w-full"
             referrerPolicy="no-referrer"
@@ -90,12 +90,12 @@ export function NetlockRemotePanel({
           />
         </div>
       ) : (
-        <InlineAlert variant="error" title="No se pudo preparar el embed" description="Revisa NEXT_PUBLIC_NETLOCK_CONSOLE_URL." />
+        <InlineAlert variant="error" title="No se pudo abrir" description="La consola de soporte remoto no está disponible." />
       )}
 
       <div className="text-xs text-muted-foreground flex items-center gap-2">
         <Monitor className="h-4 w-4" />
-        Dentro de NetLock: ve a “Devices”, busca por Access Key y usa “Remote Screen Control”.
+        En la consola: busca el equipo por el código y usa la opción de control remoto.
       </div>
     </div>
   );

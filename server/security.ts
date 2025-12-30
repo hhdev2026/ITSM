@@ -12,12 +12,12 @@ export function sanitizeUrlForLogs(url: string) {
   if (!url) return url;
   const path = url.split("?", 1)[0] ?? url;
 
-  // NetLock endpoints include ephemeral JWTs as path segments; don't log them.
+  // Installer endpoints include ephemeral JWTs as path segments; don't log them.
   const redacted =
     path
-      .replace(/^(\/api\/netlock\/installer\/)[^/]+/i, "$1:token")
-      .replace(/^(\/api\/netlock\/server-config\/)[^/]+/i, "$1:token")
-      .replace(/^(\/api\/netlock\/install-script\/(?:macos|linux)\/)[^/]+/i, "$1:token") ?? path;
+      .replace(/^(\/api\/(?:netlock|agent)\/installer\/)[^/]+/i, "$1:token")
+      .replace(/^(\/api\/(?:netlock|agent)\/server-config\/)[^/]+/i, "$1:token")
+      .replace(/^(\/api\/(?:netlock|agent)\/install-script\/(?:macos|linux)\/)[^/]+/i, "$1:token") ?? path;
 
   return redacted;
 }

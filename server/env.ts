@@ -45,7 +45,7 @@ const EnvSchema = z.object({
   TRUST_PROXY: BoolSchema.default(false),
   PUBLIC_API_BASE_URL: OptionalUrl,
 
-  // NetLock RMM (self-hosted)
+  // RMM provider (self-hosted)
   NETLOCK_FILE_SERVER_URL: OptionalUrl,
   NETLOCK_FILE_SERVER_API_KEY: OptionalSecret,
   NETLOCK_INSECURE_TLS: BoolSchema.default(false),
@@ -103,7 +103,7 @@ export function loadEnv(): Env {
     }
 
     if (env.RMM_INSTALLER_JWT_SECRET && !env.PUBLIC_API_BASE_URL) {
-      throw new Error("PUBLIC_API_BASE_URL is required in production when NetLock installer links are enabled");
+      throw new Error("PUBLIC_API_BASE_URL is required in production when installer links are enabled");
     }
   }
 

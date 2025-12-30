@@ -25,9 +25,9 @@ Este proyecto combina **Supabase (Auth + RLS)** + **Next.js** + **Express API/Wo
 - Mantén rate limiting/WAF a nivel edge (Cloudflare/Nginx) además del rate limit in-app.
 - Webhook de activos: usa `ASSETS_WEBHOOK_IP_ALLOWLIST` y envía `asset_tag` o `serial_number` (se rechazan filas sin identificador).
 
-## 4) NetLock (RMM)
+## 4) RMM (agente remoto)
 
-- Nunca expongas NetLock directo a Internet: ponlo detrás de Nginx/HTTPS y restringe acceso.
+- Nunca expongas el RMM directo a Internet: ponlo detrás de Nginx/HTTPS y restringe acceso.
 - `NETLOCK_INSECURE_TLS=false` en prod (si usas HTTPS, certificados válidos).
 - Trata el RMM como componente **de alto impacto**: logging, hardening de VM, firewall estricto, backups, rotación de API keys.
 
