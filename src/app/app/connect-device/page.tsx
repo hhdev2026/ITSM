@@ -16,14 +16,30 @@ import { errorMessage } from "@/lib/error";
 import { useAccessToken, useProfile, useSession } from "@/lib/hooks";
 import { supabase } from "@/lib/supabaseBrowser";
 import type { Asset, Profile } from "@/lib/types";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Laptop, Link as LinkIcon, RefreshCcw } from "lucide-react";
+import { Check, ChevronDown, Copy, Laptop, Link as LinkIcon, RefreshCcw } from "lucide-react";
 
 type NetlockEnrollResponse = { url: string; configUrl?: string; expiresInSeconds: number; correlationKey: string; hint?: string | null };
 type NetlockVerifyResponse = { ok: boolean; assetId: string | null; message?: string | null };
 type AssetLite = Pick<Asset, "id" | "name" | "serial_number" | "asset_type" | "connectivity_status" | "updated_at" | "mesh_node_id">;
 type AssignmentRow = { id: string; assigned_at: string; asset: AssetLite | null };
+
+type Architecture = "win-x64" | "win-arm64" | "linux-x64" | "linux-arm64" | "osx-x64" | "osx-arm64";
+
+const ArchitectureOptions: Array<{ value: Architecture; label: string }> = [
+  { value: "win-x64", label: "Windows x64" },
+  { value: "win-arm64", label: "Windows ARM64" },
+  { value: "osx-x64", label: "macOS x64" },
+  { value: "osx-arm64", label: "macOS ARM64" },
+  { value: "linux-x64", label: "Linux x64" },
+  { value: "linux-arm64", label: "Linux ARM64" },
+];
+
+function architectureLabel(arch: Architecture) {
+  return ArchitectureOptions.find((o) => o.value === arch)?.label ?? arch;
+}
 
 function displayName(p: Pick<Profile, "full_name" | "email"> | null | undefined) {
   if (!p) return "—";
@@ -41,7 +57,7 @@ export default function ConnectDevicePage() {
   const [invite, setInvite] = useState<{ url: string; configUrl?: string | null; hint?: string | null; correlationKey?: string | null } | null>(null);
 
   const [deviceName, setDeviceName] = useState("");
-  const [arch, setArch] = useState<"win-x64" | "win-arm64" | "linux-x64" | "linux-arm64" | "osx-x64" | "osx-arm64">("osx-arm64");
+  const [arch, setArch] = useState<Architecture>("win-x64");
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const [accessKey, setAccessKey] = useState("");
 
@@ -50,6 +66,25 @@ export default function ConnectDevicePage() {
   const [assets, setAssets] = useState<AssetLite[]>([]);
 
   const canUse = !!profile;
+
+  useEffect(() => {
+    // Sensible default: avoid shipping macOS as default for Windows users.
+    // Best-effort detection (no hard dependency on User-Agent Client Hints).
+    try {
+      const ua = (navigator.userAgent ?? "").toLowerCase();
+      const platform = String(((navigator as unknown as { userAgentData?: { platform?: string } }).userAgentData?.platform ?? navigator.platform ?? "")).toLowerCase();
+      const isMac = platform.includes("mac") || ua.includes("mac os");
+      const isWindows = platform.includes("win") || ua.includes("windows");
+      const isLinux = platform.includes("linux") || ua.includes("linux");
+      const isArm = ua.includes("aarch64") || ua.includes("arm64") || ua.includes(" arm");
+
+      const guessed: Architecture = isMac ? (isArm ? "osx-arm64" : "osx-x64") : isWindows ? (isArm ? "win-arm64" : "win-x64") : isLinux ? (isArm ? "linux-arm64" : "linux-x64") : "win-x64";
+
+      setArch((prev) => (prev === "win-x64" ? guessed : prev));
+    } catch {
+      // ignore
+    }
+  }, []);
 
   async function copy(text: string) {
     try {
@@ -210,6 +245,13 @@ export default function ConnectDevicePage() {
               <CardContent className="space-y-3">
                 {inviteError ? <InlineAlert variant="error" title="Error" description={inviteError} /> : null}
                 {verifyMsg ? <InlineAlert variant="info" title="Verificación" description={verifyMsg} /> : null}
+                {arch === "win-arm64" ? (
+                  <InlineAlert
+                    variant="warning"
+                    title="Windows ARM64"
+                    description="Si falla la generación del instalador, prueba con Windows x64 (muchos entornos ARM64 ejecutan x64 por emulación y algunos RMM no publican binario ARM nativo)."
+                  />
+                ) : null}
 
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="text-sm text-muted-foreground">
@@ -231,14 +273,31 @@ export default function ConnectDevicePage() {
                   <Input value={deviceName} onChange={(e) => setDeviceName(e.target.value)} placeholder="Nombre del equipo (opcional)" />
                   <div className="flex items-center gap-2 rounded-xl border border-border bg-background/30 px-3 py-2">
                     <div className="text-xs text-muted-foreground">Arquitectura</div>
-                    <select value={arch} onChange={(e) => setArch(e.target.value as typeof arch)} className="ml-auto bg-transparent text-sm outline-none">
-                      <option value="win-x64">Windows x64</option>
-                      <option value="win-arm64">Windows ARM64</option>
-                      <option value="osx-x64">macOS x64</option>
-                      <option value="osx-arm64">macOS ARM64</option>
-                      <option value="linux-x64">Linux x64</option>
-                      <option value="linux-arm64">Linux ARM64</option>
-                    </select>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className={cn(
+                            "ml-auto inline-flex h-8 items-center gap-2 rounded-md px-2 text-sm text-foreground",
+                            "bg-background/60 ring-1 ring-border transition-colors hover:bg-accent/40 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-cyan))]"
+                          )}
+                        >
+                          <span className="truncate">{architectureLabel(arch)}</span>
+                          <ChevronDown className="h-4 w-4 opacity-70" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="min-w-[14rem]">
+                        {ArchitectureOptions.map((o) => {
+                          const active = o.value === arch;
+                          return (
+                            <DropdownMenuItem key={o.value} onSelect={() => setArch(o.value)} className={cn(active && "bg-accent")}>
+                              <span className="inline-flex h-4 w-4 items-center justify-center">{active ? <Check className="h-4 w-4" /> : null}</span>
+                              <span>{o.label}</span>
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
 

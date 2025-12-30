@@ -39,7 +39,7 @@ function extractApiError(data: unknown): string | null {
     netlock_unreachable:
       "No se pudo conectar con NetLock (puede estar iniciando/reiniciando o descargando paquetes). Revisa `docker logs netlock-rmm-server` y vuelve a intentar cuando diga “Server started”.",
     netlock_installer_packages_missing:
-      "NetLock no tiene paquetes de instalador cargados para generar el ZIP (installer.package.*). Configura el Members Portal API key en NetLock y reinicia los contenedores.",
+      "NetLock no tiene paquetes de instalador cargados para generar el ZIP (installer.package.*). Esto suele pasar si falta el Members Portal API key en NetLock o si el server no puede descargar paquetes (salida a Internet/firewall). Si estás en Windows ARM64, prueba Windows x64.",
     service_role_required: "La API requiere SUPABASE_SERVICE_ROLE_KEY para esta acción.",
     rmm_installer_jwt_secret_required: "Falta configurar RMM_INSTALLER_JWT_SECRET en la API.",
     invalid_body: "Datos inválidos.",
