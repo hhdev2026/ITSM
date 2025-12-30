@@ -74,6 +74,15 @@ const QuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+const PasswordSchema = z
+  .string()
+  .min(12)
+  .max(200)
+  .refine((s) => /[a-z]/.test(s), { message: "Must include a lowercase letter" })
+  .refine((s) => /[A-Z]/.test(s), { message: "Must include an uppercase letter" })
+  .refine((s) => /[0-9]/.test(s), { message: "Must include a number" })
+  .refine((s) => /[^A-Za-z0-9]/.test(s), { message: "Must include a symbol" });
+
 export async function GET(request: Request) {
   const guard = await requireAdmin(request);
   if ("error" in guard) return guard.error;
@@ -145,10 +154,10 @@ const CreateBodySchema = z
     department_id: z.string().uuid().optional().nullable(),
     manager_id: z.string().uuid().optional().nullable(),
     invite: z.coerce.boolean().default(true),
-    password: z.string().min(8).max(200).optional().nullable(),
+    password: PasswordSchema.optional().nullable(),
     points: z.coerce.number().int().min(0).max(100000).optional(),
   })
-  .refine((v) => v.invite || (!!v.password && v.password.length >= 8), {
+  .refine((v) => v.invite || !!v.password, {
     message: "Password is required when invite=false",
     path: ["password"],
   });

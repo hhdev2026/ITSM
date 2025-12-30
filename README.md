@@ -24,11 +24,18 @@ Completa los valores:
 - `CORS_ORIGIN` (por defecto `http://localhost:3000`)
 - `ASSETS_WEBHOOK_SECRET` (ingesta de activos sin login vía header `x-assets-secret`)
 
+### 1.1) Seguridad (prod)
+
+- Usa secretos largos y únicos (32+ chars) y rótalos si sospechas filtración: `SUPABASE_SERVICE_ROLE_KEY`, `ASSETS_WEBHOOK_SECRET`, `RMM_INSTALLER_JWT_SECRET`, `NETLOCK_FILE_SERVER_API_KEY`.
+- Configura `NODE_ENV=production`, `CORS_ORIGIN` sin `*`, `PUBLIC_API_BASE_URL` (HTTPS) y `TRUST_PROXY=true` si estás detrás de Nginx/Cloudflare.
+- Ejecuta la migración `supabase/migrations/036_security_hardening.sql` (evita escalamiento de privilegios via `profiles`).
+- En Supabase: habilita MFA para admins, limita quién puede cambiar roles/departamentos y revisa accesos periódicamente.
+
 ### 2) Base de datos (Supabase)
 
 En tu proyecto Supabase ejecuta (SQL Editor o Supabase CLI) **todas** las migraciones en orden:
 
-- `supabase/migrations/*` (001…035)
+- `supabase/migrations/*` (001…036)
 
 Opcional (datos ejemplo):
 

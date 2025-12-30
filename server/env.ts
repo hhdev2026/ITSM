@@ -30,6 +30,7 @@ const OptionalSecret = z.preprocess((value) => {
 }, z.string().min(8).optional());
 
 const EnvSchema = z.object({
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().default(4000),
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(20),
@@ -40,6 +41,9 @@ const EnvSchema = z.object({
   }, z.string().min(20).optional()),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   ASSETS_WEBHOOK_SECRET: OptionalSecret,
+  ASSETS_WEBHOOK_IP_ALLOWLIST: OptionalNonEmptyString,
+  TRUST_PROXY: BoolSchema.default(false),
+  PUBLIC_API_BASE_URL: OptionalUrl,
 
   // NetLock RMM (self-hosted)
   NETLOCK_FILE_SERVER_URL: OptionalUrl,
@@ -81,5 +85,27 @@ export function loadEnv(): Env {
     console.error(parsed.error.format());
     throw new Error("Invalid environment variables for server");
   }
-  return parsed.data;
+
+  const env = parsed.data;
+
+  if (env.NODE_ENV === "production") {
+    if (env.CORS_ORIGIN.includes("*")) throw new Error("Invalid CORS_ORIGIN for production (wildcards not allowed)");
+    if (!env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY is required in production");
+    if (env.NETLOCK_INSECURE_TLS) throw new Error("NETLOCK_INSECURE_TLS must be false in production");
+
+    if (env.ASSETS_WEBHOOK_SECRET) {
+      if (env.ASSETS_WEBHOOK_SECRET.length < 32) throw new Error("ASSETS_WEBHOOK_SECRET must be at least 32 chars in production");
+      if (/change-me/i.test(env.ASSETS_WEBHOOK_SECRET)) throw new Error("ASSETS_WEBHOOK_SECRET must be changed in production");
+    }
+
+    if (env.NETLOCK_FILE_SERVER_API_KEY && /change-me/i.test(env.NETLOCK_FILE_SERVER_API_KEY)) {
+      throw new Error("NETLOCK_FILE_SERVER_API_KEY must be changed in production");
+    }
+
+    if (env.RMM_INSTALLER_JWT_SECRET && !env.PUBLIC_API_BASE_URL) {
+      throw new Error("PUBLIC_API_BASE_URL is required in production when NetLock installer links are enabled");
+    }
+  }
+
+  return env;
 }

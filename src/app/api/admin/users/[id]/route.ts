@@ -29,6 +29,15 @@ function rankForPoints(points: number) {
   return "Bronce";
 }
 
+const PasswordSchema = z
+  .string()
+  .min(12)
+  .max(200)
+  .refine((s) => /[a-z]/.test(s), { message: "Must include a lowercase letter" })
+  .refine((s) => /[A-Z]/.test(s), { message: "Must include an uppercase letter" })
+  .refine((s) => /[0-9]/.test(s), { message: "Must include a number" })
+  .refine((s) => /[^A-Za-z0-9]/.test(s), { message: "Must include a symbol" });
+
 async function requireAdmin(request: Request) {
   const authHeader = request.headers.get("authorization") ?? "";
   const token = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : null;
@@ -56,7 +65,7 @@ const PatchBodySchema = z.object({
   manager_id: z.string().uuid().optional().nullable(),
   points: z.coerce.number().int().min(0).max(100000).optional(),
   disabled: z.coerce.boolean().optional(),
-  password: z.string().min(8).max(200).optional(),
+  password: PasswordSchema.optional(),
 });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -79,7 +88,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  if (typeof patch.password === "string" && patch.password.length >= 8) {
+  if (typeof patch.password === "string") {
     const { error } = await supabaseAdmin.auth.admin.updateUserById(id, { password: patch.password });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }

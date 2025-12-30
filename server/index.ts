@@ -10,28 +10,74 @@ import { getChatKpis, getChatTrends, getKpis, getTrends, parseAnalyticsQuery, pa
 import { createSupabaseAdmin } from "./supabase";
 import { registerNetlockRmmRoutes } from "./rmm/netlock";
 import { registerOnboardingRoutes } from "./onboarding";
+import { createMemoryRateLimiter, sanitizeUrlForLogs, timingSafeEqualString } from "./security";
 import { z } from "zod";
 
 const env = loadEnv();
 const supabaseAdmin = env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : null;
 
 const app = express();
-app.use(helmet());
+app.disable("x-powered-by");
+app.set("trust proxy", env.TRUST_PROXY ? 1 : false);
+app.use(
+  helmet({
+    hsts: env.NODE_ENV === "production" ? undefined : false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 const corsOrigins = env.CORS_ORIGIN.split(",")
   .map((s) => s.trim())
   .filter(Boolean);
 app.use(cors({ origin: corsOrigins.length ? corsOrigins : env.CORS_ORIGIN, credentials: true }));
 app.use(express.json({ limit: "10mb" }));
-app.use(pinoHttp());
+app.use(
+  pinoHttp({
+    redact: {
+      paths: [
+        "req.headers.authorization",
+        "req.headers.cookie",
+        "req.headers['x-assets-secret']",
+        "req.headers['x-api-key']",
+        "req.url",
+        "req.originalUrl",
+        "res.headers['set-cookie']",
+      ],
+      remove: true,
+    },
+    customProps(req) {
+      return { req_path: sanitizeUrlForLogs(req.url) };
+    },
+  })
+);
+
+app.use("/api/assets", createMemoryRateLimiter({ windowMs: 60_000, max: 600, keyPrefix: "assets" }));
+app.use("/api/netlock", createMemoryRateLimiter({ windowMs: 60_000, max: 120, keyPrefix: "netlock" }));
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 registerOnboardingRoutes(app, { supabaseAdmin });
 registerNetlockRmmRoutes(app, { env, supabaseAdmin });
 
+function normalizeIp(ip: string) {
+  return ip.replace(/^::ffff:/, "");
+}
+
+function ipAllowedForAssetsWebhook(req: express.Request) {
+  if (!env.ASSETS_WEBHOOK_IP_ALLOWLIST) return true;
+  const allow = new Set(
+    env.ASSETS_WEBHOOK_IP_ALLOWLIST.split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map(normalizeIp)
+  );
+  return allow.has(normalizeIp(req.ip || ""));
+}
+
 function hasAssetsSecret(req: express.Request) {
-  const header = req.header("x-assets-secret") ?? "";
-  return !!env.ASSETS_WEBHOOK_SECRET && header.length > 0 && header === env.ASSETS_WEBHOOK_SECRET;
+  const header = String(req.header("x-assets-secret") ?? "").trim();
+  if (!env.ASSETS_WEBHOOK_SECRET || !header) return false;
+  if (!ipAllowedForAssetsWebhook(req)) return false;
+  return timingSafeEqualString(header, env.ASSETS_WEBHOOK_SECRET);
 }
 
 function requireAuthOrAssetsSecret(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -120,6 +166,7 @@ app.post("/api/assets/sync", requireAuthOrAssetsSecret, async (req, res) => {
         ? (((body as { rows: unknown }).rows ?? []) as unknown[])
         : null;
     if (!rows) return res.status(400).json({ error: "rows_required" });
+    if (rows.length > 2000) return res.status(413).json({ error: "too_many_rows" });
 
     if (!isSecret) {
       const authed = req as AuthedRequest;
@@ -139,7 +186,57 @@ app.post("/api/assets/sync", requireAuthOrAssetsSecret, async (req, res) => {
     if (!deptId) return res.status(400).json({ error: "department_required" });
 
     const errors: Array<{ row: number; error: string }> = [];
-    const byTag: Array<Record<string, unknown>> = [];
+
+    const allowedFields = new Set([
+      "asset_tag",
+      "serial_number",
+      "barcode",
+      "manufacturer",
+      "model",
+      "asset_type",
+      "category",
+      "subcategory",
+      "region",
+      "comuna",
+      "building",
+      "floor",
+      "room",
+      "address",
+      "latitude",
+      "longitude",
+      "cost_center",
+      "department_name",
+      "lifecycle_status",
+      "purchased_at",
+      "installed_at",
+      "warranty_expires_at",
+      "eol_at",
+      "license_expires_at",
+      "description",
+      "tags",
+      "metadata",
+    ]);
+
+    function pickAllowedAssetFields(row: Record<string, unknown>) {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(row)) {
+        if (!allowedFields.has(k)) continue;
+        if (typeof v === "string") out[k] = v.trim();
+        else out[k] = v;
+      }
+      return out;
+    }
+
+    function parseAssetTag(v: unknown) {
+      if (v == null) return null;
+      const n = typeof v === "number" ? v : Number(String(v).trim());
+      if (!Number.isFinite(n)) return null;
+      const i = Math.trunc(n);
+      if (i <= 0) return null;
+      return i;
+    }
+
+    const byTag: Array<{ row: number; tag: number; payload: Record<string, unknown> }> = [];
     const bySerial: Array<Record<string, unknown>> = [];
 
     for (let i = 0; i < rows.length; i++) {
@@ -155,25 +252,85 @@ app.post("/api/assets/sync", requireAuthOrAssetsSecret, async (req, res) => {
         continue;
       }
 
-      const payload: Record<string, unknown> = { ...rr, department_id: deptId, name };
-      const assetTag = payload.asset_tag;
-      const serial = typeof payload.serial_number === "string" ? payload.serial_number.trim() : "";
+      const picked = pickAllowedAssetFields(rr);
+      const serial = typeof picked.serial_number === "string" ? picked.serial_number.trim() : "";
+      const tag = parseAssetTag(picked.asset_tag);
 
-      if (assetTag != null && String(assetTag).trim().length > 0) byTag.push(payload);
-      else if (serial) bySerial.push({ ...payload, serial_number: serial });
-      else bySerial.push(payload);
+      if (!tag && !serial) {
+        errors.push({ row: i + 1, error: "identifier_required" });
+        continue;
+      }
+
+      const payload: Record<string, unknown> = { ...picked, name, department_id: deptId };
+
+      if (tag) {
+        payload.asset_tag = tag;
+        byTag.push({ row: i + 1, tag, payload });
+      } else {
+        payload.serial_number = serial;
+        delete payload.asset_tag;
+        bySerial.push(payload);
+      }
     }
+
+    let upserted = 0;
 
     if (byTag.length) {
-      const { error } = await supabaseAdmin.from("assets").upsert(byTag, { onConflict: "asset_tag" });
-      if (error) throw error;
-    }
-    if (bySerial.length) {
-      const { error } = await supabaseAdmin.from("assets").upsert(bySerial, { onConflict: "department_id,serial_number" });
-      if (error) throw error;
+      const tags = Array.from(new Set(byTag.map((x) => x.tag)));
+      const existing = new Map<number, { department_id: string }>();
+
+      for (let i = 0; i < tags.length; i += 200) {
+        const chunk = tags.slice(i, i + 200);
+        const { data, error } = await supabaseAdmin.from("assets").select("asset_tag,department_id").in("asset_tag", chunk);
+        if (error) throw error;
+        for (const a of (data ?? []) as Array<{ asset_tag: number; department_id: string }>) {
+          existing.set(Number(a.asset_tag), { department_id: String(a.department_id) });
+        }
+      }
+
+      const toInsert: Array<Record<string, unknown>> = [];
+      const toUpdate: Array<{ row: number; tag: number; payload: Record<string, unknown> }> = [];
+
+      for (const item of byTag) {
+        const ex = existing.get(item.tag);
+        if (!ex) {
+          toInsert.push(item.payload);
+          continue;
+        }
+        if (ex.department_id !== deptId) {
+          errors.push({ row: item.row, error: "asset_tag_belongs_to_other_department" });
+          continue;
+        }
+        toUpdate.push(item);
+      }
+
+      for (const item of toUpdate) {
+        const updatePayload = { ...item.payload };
+        delete updatePayload.department_id;
+        delete updatePayload.asset_tag;
+        const { error } = await supabaseAdmin.from("assets").update(updatePayload).eq("asset_tag", item.tag);
+        if (error) throw error;
+        upserted += 1;
+      }
+
+      for (let i = 0; i < toInsert.length; i += 200) {
+        const chunk = toInsert.slice(i, i + 200);
+        const { error } = await supabaseAdmin.from("assets").insert(chunk);
+        if (error) throw error;
+        upserted += chunk.length;
+      }
     }
 
-    return res.json({ upserted: byTag.length + bySerial.length, errors });
+    if (bySerial.length) {
+      for (let i = 0; i < bySerial.length; i += 200) {
+        const chunk = bySerial.slice(i, i + 200);
+        const { error } = await supabaseAdmin.from("assets").upsert(chunk, { onConflict: "department_id,serial_number" });
+        if (error) throw error;
+        upserted += chunk.length;
+      }
+    }
+
+    return res.json({ upserted, errors });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "bad_request";
     res.status(400).json({ error: message });

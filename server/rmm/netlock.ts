@@ -48,7 +48,9 @@ function safeErrorMessage(err: unknown) {
   return "bad_request";
 }
 
-function apiPublicUrl(req: express.Request) {
+function apiPublicUrl(req: express.Request, env: Env) {
+  const configured = env.PUBLIC_API_BASE_URL?.replace(/\/+$/, "");
+  if (configured) return configured;
   const proto = String(req.headers["x-forwarded-proto"] ?? req.protocol ?? "http").split(",")[0]!.trim();
   const host = String(req.headers["x-forwarded-host"] ?? req.headers.host ?? "localhost").split(",")[0]!.trim();
   return `${proto}://${host}`;
@@ -380,8 +382,8 @@ export function registerNetlockRmmRoutes(app: express.Express, opts: { env: Env;
       res.setHeader("Cache-Control", "no-store");
       return res.json({
         provider: "netlock",
-        url: `${apiPublicUrl(req)}/api/netlock/installer/${issued.token}`,
-        configUrl: `${apiPublicUrl(req)}/api/netlock/server-config/${issued.token}`,
+        url: `${apiPublicUrl(req, opts.env)}/api/netlock/installer/${issued.token}`,
+        configUrl: `${apiPublicUrl(req, opts.env)}/api/netlock/server-config/${issued.token}`,
         expiresInSeconds: issued.expiresInSeconds,
         correlationKey: accessKey,
         hint:
@@ -438,7 +440,7 @@ export function registerNetlockRmmRoutes(app: express.Express, opts: { env: Env;
       if (!netlockConfigured(opts.env)) return res.status(500).send("netlock_not_configured");
 
       await verifyInstallerToken(opts.env, token);
-      const base = apiPublicUrl(req);
+      const base = apiPublicUrl(req, opts.env);
       const script = `#!/bin/bash
 set -euo pipefail
 
@@ -500,7 +502,7 @@ echo
       if (!netlockConfigured(opts.env)) return res.status(500).send("netlock_not_configured");
 
       await verifyInstallerToken(opts.env, token);
-      const base = apiPublicUrl(req);
+      const base = apiPublicUrl(req, opts.env);
       const script = `#!/bin/bash
 set -euo pipefail
 

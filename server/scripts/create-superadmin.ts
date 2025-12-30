@@ -48,7 +48,14 @@ const EnvSchema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   SUPERADMIN_EMAIL: z.string().email(),
-  SUPERADMIN_PASSWORD: z.string().min(8),
+  SUPERADMIN_PASSWORD: z
+    .string()
+    .min(12)
+    .max(200)
+    .refine((s) => /[a-z]/.test(s), { message: "Must include a lowercase letter" })
+    .refine((s) => /[A-Z]/.test(s), { message: "Must include an uppercase letter" })
+    .refine((s) => /[0-9]/.test(s), { message: "Must include a number" })
+    .refine((s) => /[^A-Za-z0-9]/.test(s), { message: "Must include a symbol" }),
   SUPERADMIN_FULL_NAME: z.string().default("Super Admin"),
   SUPERADMIN_DEPARTMENT_ID: z.string().uuid().optional(),
 });
