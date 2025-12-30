@@ -47,6 +47,35 @@ Opcional (datos ejemplo):
 - Onboarding usuario: `http://localhost:3000/app/connect-device` (genera instalador, instala y luego “Verificar”).
 - Soporte remoto: en el chat, botón “Tomar control” abre `NEXT_PUBLIC_NETLOCK_CONSOLE_URL/devices`.
 
+### 2.1.1) RMM (NetLock) [prod / VM]
+
+Patrón recomendado: NetLock detrás de Nginx con **dos hostnames** (evita routing por path; el agente espera host:puerto).
+
+- Web Console (UI NetLock): `https://netlock.<IP>.cloud-xip.com`
+- Server/Files (API + descargas): `https://netlock-files.<IP>.cloud-xip.com`
+
+En la **VM**:
+
+- NetLock expuesto solo en `127.0.0.1` (Docker) y Nginx publica 80/443.
+- Ajusta `PublicOverrideUrl` en `netlock/web_console/appsettings.json` al URL público HTTPS del console.
+
+En la **UI (Vercel)**:
+
+- `NEXT_PUBLIC_NETLOCK_CONSOLE_URL=https://netlock.<IP>.cloud-xip.com`
+
+En la **API (.env)** (donde esté corriendo tu Express API):
+
+- `NETLOCK_FILE_SERVER_URL=https://netlock-files.<IP>.cloud-xip.com`
+- `NETLOCK_INSECURE_TLS=false`
+- `NETLOCK_SSL=true`
+- `NETLOCK_COMMUNICATION_SERVERS=netlock-files.<IP>.cloud-xip.com:443`
+- `NETLOCK_REMOTE_SERVERS=netlock-files.<IP>.cloud-xip.com:443`
+- `NETLOCK_UPDATE_SERVERS=netlock-files.<IP>.cloud-xip.com:443`
+- `NETLOCK_TRUST_SERVERS=netlock-files.<IP>.cloud-xip.com:443`
+- `NETLOCK_FILE_SERVERS=netlock-files.<IP>.cloud-xip.com:443`
+
+Nota: si tu API corre fuera de la VM, no podrá usar `NETLOCK_MYSQL_URL` (MySQL está dentro del Docker). Para sync confiable (hardware/software/eventos) lo ideal es correr el worker `dev:netlock-sync` en la misma VM o en un contenedor con acceso a MySQL.
+
 #### Troubleshooting (RMM)
 
 - Error `netlock_create_installer_failed:401`: la API key de NetLock no coincide. Revisa `NETLOCK_FILE_SERVER_API_KEY` vs `files_api_key` en la DB de NetLock.

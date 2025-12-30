@@ -124,7 +124,11 @@ function looksLikeHardwareId(value: string | null) {
 }
 
 const EnvSchema = z.object({
-  NETLOCK_MYSQL_URL: z.string().trim().min(1).optional(),
+  NETLOCK_MYSQL_URL: z.preprocess((value) => {
+    if (typeof value !== "string") return value;
+    const s = value.trim();
+    return s.length ? s : undefined;
+  }, z.string().trim().min(1).optional()),
   NETLOCK_SYNC_INTERVAL_MS: z.coerce.number().int().min(10_000).max(24 * 60 * 60 * 1000).default(5 * 60_000),
   NETLOCK_SYNC_DEVICE_LIMIT: z.coerce.number().int().min(1).max(50_000).default(10_000),
   NETLOCK_SYNC_ENABLED: z.preprocess((v) => {
