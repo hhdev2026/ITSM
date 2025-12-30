@@ -101,7 +101,7 @@ export default function ConnectDevicePage() {
     setVerifyMsg(null);
     setInvite(null);
     try {
-      const data = await apiFetch<NetlockEnrollResponse>(token, "/api/agent/enroll/self", {
+      const data = await apiFetch<NetlockEnrollResponse>(token, "/api/netlock/enroll/self", {
         method: "POST",
         body: JSON.stringify({ hours: inviteHours, architecture: arch, deviceName: deviceName.trim() || undefined }),
       });
@@ -133,7 +133,7 @@ export default function ConnectDevicePage() {
 
     if (key) {
       try {
-        const data = await apiFetch<NetlockVerifyResponse>(token, "/api/agent/verify/self", {
+        const data = await apiFetch<NetlockVerifyResponse>(token, "/api/netlock/verify/self", {
           method: "POST",
           body: JSON.stringify({ accessKey: key, deviceName: deviceName.trim() || undefined }),
         });
@@ -193,8 +193,8 @@ export default function ConnectDevicePage() {
   const hint = useMemo(() => invite?.hint ?? null, [invite?.hint]);
   const installScriptUrl = useMemo(() => {
     if (!invite?.url) return null;
-    if (arch.startsWith("osx-")) return invite.url.replace(/\/api\/(?:netlock|agent)\/installer\//, "/api/agent/install-script/macos/");
-    if (arch.startsWith("linux-")) return invite.url.replace(/\/api\/(?:netlock|agent)\/installer\//, "/api/agent/install-script/linux/");
+    if (arch.startsWith("osx-")) return invite.url.replace(/\/api\/(?:netlock|agent)\/installer\//, "/api/netlock/install-script/macos/");
+    if (arch.startsWith("linux-")) return invite.url.replace(/\/api\/(?:netlock|agent)\/installer\//, "/api/netlock/install-script/linux/");
     return null;
   }, [invite?.url, arch]);
 

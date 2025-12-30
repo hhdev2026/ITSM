@@ -55,7 +55,7 @@ export default function OnboardingPage() {
     setNetlockLoading(true);
     setNetlockError(null);
     try {
-      const data = await apiFetch<NetlockStatusResponse>(token, "/api/agent/status");
+      const data = await apiFetch<NetlockStatusResponse>(token, "/api/netlock/status");
       setNetlock(data);
     } catch (e: unknown) {
       setNetlock(null);

@@ -400,7 +400,7 @@ export default function AssetDetailPage() {
     setSaving(true);
     setError(null);
     try {
-      await apiFetch<{ ok: boolean }>(token, "/api/agent/authorize", { method: "POST", body: JSON.stringify({ accessKey }) });
+      await apiFetch<{ ok: boolean }>(token, "/api/netlock/authorize", { method: "POST", body: JSON.stringify({ accessKey }) });
       await load();
     } catch (e) {
       setError(errorMessage(e));
