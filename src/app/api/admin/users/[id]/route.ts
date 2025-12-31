@@ -31,12 +31,11 @@ function rankForPoints(points: number) {
 
 const PasswordSchema = z
   .string()
-  .min(12)
+  .min(8)
   .max(200)
   .refine((s) => /[a-z]/.test(s), { message: "Must include a lowercase letter" })
   .refine((s) => /[A-Z]/.test(s), { message: "Must include an uppercase letter" })
-  .refine((s) => /[0-9]/.test(s), { message: "Must include a number" })
-  .refine((s) => /[^A-Za-z0-9]/.test(s), { message: "Must include a symbol" });
+  .refine((s) => /[0-9]/.test(s), { message: "Must include a number" });
 
 async function requireAdmin(request: Request) {
   const authHeader = request.headers.get("authorization") ?? "";
@@ -77,7 +76,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const body = await request.json().catch(() => null);
   const parsed = PatchBodySchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Invalid body", details: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "invalid_body", details: parsed.error.flatten() }, { status: 400 });
 
   const patch = parsed.data;
 

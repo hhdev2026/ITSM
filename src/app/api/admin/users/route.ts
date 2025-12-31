@@ -76,12 +76,11 @@ const QuerySchema = z.object({
 
 const PasswordSchema = z
   .string()
-  .min(12)
+  .min(8)
   .max(200)
   .refine((s) => /[a-z]/.test(s), { message: "Must include a lowercase letter" })
   .refine((s) => /[A-Z]/.test(s), { message: "Must include an uppercase letter" })
-  .refine((s) => /[0-9]/.test(s), { message: "Must include a number" })
-  .refine((s) => /[^A-Za-z0-9]/.test(s), { message: "Must include a symbol" });
+  .refine((s) => /[0-9]/.test(s), { message: "Must include a number" });
 
 export async function GET(request: Request) {
   const guard = await requireAdmin(request);
@@ -89,7 +88,7 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const parsed = QuerySchema.safeParse(Object.fromEntries(url.searchParams.entries()));
-  if (!parsed.success) return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "invalid_query", details: parsed.error.flatten() }, { status: 400 });
   const { q, role, department_id, offset, limit } = parsed.data;
 
   let query = supabaseAdmin
@@ -187,7 +186,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const parsed = CreateBodySchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Invalid body", details: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "invalid_body", details: parsed.error.flatten() }, { status: 400 });
 
   const { email, full_name, role, department_id, manager_id, invite, password, points } = parsed.data;
 

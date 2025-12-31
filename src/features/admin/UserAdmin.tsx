@@ -69,11 +69,46 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
 }
 
+function extractDetailsMessage(details: unknown): string | null {
+  if (typeof details === "string") return details.trim() || null;
+  if (!isRecord(details)) return null;
+
+  const msg = typeof details.message === "string" ? details.message.trim() : "";
+  if (msg) return msg;
+
+  const formErrors = details.formErrors;
+  if (Array.isArray(formErrors)) {
+    const out = formErrors.filter((v): v is string => typeof v === "string" && v.trim().length > 0).map((s) => s.trim());
+    if (out.length) return out.join(", ");
+  }
+
+  const fieldErrors = details.fieldErrors;
+  if (isRecord(fieldErrors)) {
+    for (const [field, errs] of Object.entries(fieldErrors)) {
+      if (!Array.isArray(errs)) continue;
+      const first = errs.find((v): v is string => typeof v === "string" && v.trim().length > 0);
+      if (first) return `${field}: ${first.trim()}`;
+    }
+  }
+
+  return null;
+}
+
 function extractApiError(data: unknown): string | null {
   if (!isRecord(data)) return null;
-  const err = data["error"];
-  if (typeof err === "string" && err.trim()) return err;
-  return null;
+  const raw = data["error"];
+  const err = typeof raw === "string" ? raw.trim() : "";
+  const details = extractDetailsMessage(data["details"]);
+
+  const friendly: Record<string, string> = {
+    invalid_body: "Datos inválidos",
+    invalid_query: "Consulta inválida",
+    forbidden: "No tienes permiso para esta acción",
+    unauthorized: "No estás autenticado",
+  };
+  const base = (friendly[err.toLowerCase()] ?? err).trim();
+  if (!base) return details;
+  return details ? `${base} (${details})` : base;
 }
 
 async function apiFetch<T>(url: string, token: string, init?: RequestInit) {
@@ -91,6 +126,14 @@ async function apiFetch<T>(url: string, token: string, init?: RequestInit) {
     throw new Error(msg);
   }
   return data as T;
+}
+
+function passwordError(password: string): string | null {
+  if (password.length < 8) return "Password mínimo 8 caracteres";
+  if (!/[a-z]/.test(password)) return "El password debe incluir una minúscula";
+  if (!/[A-Z]/.test(password)) return "El password debe incluir una mayúscula";
+  if (!/[0-9]/.test(password)) return "El password debe incluir un número";
+  return null;
 }
 
 export function UserAdmin({ adminProfile }: { adminProfile: Profile }) {
@@ -179,9 +222,12 @@ export function UserAdmin({ adminProfile }: { adminProfile: Profile }) {
       toast.error("Email inválido");
       return;
     }
-    if (!createInvite && createPassword.trim().length < 8) {
-      toast.error("Password mínimo 8 caracteres");
-      return;
+    if (!createInvite) {
+      const err = passwordError(createPassword.trim());
+      if (err) {
+        toast.error(err);
+        return;
+      }
     }
 
     setSaving(true);
@@ -236,6 +282,15 @@ export function UserAdmin({ adminProfile }: { adminProfile: Profile }) {
   async function saveEdit() {
     if (!token || !editing) return;
     setSaving(true);
+    const pw = resetPassword.trim();
+    if (pw) {
+      const err = passwordError(pw);
+      if (err) {
+        toast.error(err);
+        setSaving(false);
+        return;
+      }
+    }
     try {
       await apiFetch<{ ok: true }>(
         `/api/admin/users/${editing.id}`,
@@ -249,7 +304,7 @@ export function UserAdmin({ adminProfile }: { adminProfile: Profile }) {
             manager_id: editManagerId,
             points: editPoints,
             disabled: editDisabled ?? undefined,
-            password: resetPassword.trim() ? resetPassword.trim() : undefined,
+            password: pw ? pw : undefined,
           }),
         }
       );
