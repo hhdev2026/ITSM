@@ -20,7 +20,32 @@ import { formatAssetTag } from "@/lib/assetTag";
 import { UserAssets } from "@/features/assets/UserAssets";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, ChevronRight, Map as MapIcon, Plus, RefreshCcw, Upload } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, ChevronDown, ChevronRight, Map as MapIcon, Monitor, Plus, RefreshCcw, Upload } from "lucide-react";
+
+const PAGE_SIZE = 12;
+const PC_TYPES = new Set(["PC", "Laptop", "Desktop", "Computador", "Notebook", "Workstation"]);
+
+type SortCol = "problems" | "name" | "total" | "online";
+
+function SortableHeader({
+  col, label, current, dir, onSort,
+}: { col: SortCol; label: string; current: SortCol; dir: "asc" | "desc"; onSort: (c: SortCol) => void }) {
+  const active = current === col;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(col)}
+      className={cn(
+        "inline-flex items-center gap-1 transition-colors hover:text-foreground",
+        active ? "text-foreground" : "text-muted-foreground"
+      )}
+    >
+      {label}
+      <ArrowUpDown className={cn("h-3 w-3", active ? "opacity-100" : "opacity-40")} />
+      {active ? <span className="text-[10px]">{dir === "asc" ? "↑" : "↓"}</span> : null}
+    </button>
+  );
+}
 
 type AssetRow = Pick<
   Asset,
@@ -126,7 +151,12 @@ function AssetsInventory({ profile }: { profile: Profile }) {
   const [conn, setConn] = useState<string>("__all__");
   const [region, setRegion] = useState<string>("__all__");
   const [comuna, setComuna] = useState<string>("__all__");
+  const [assetType, setAssetType] = useState<string>("__all__");
+  const [pcOnly, setPcOnly] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
+  const [sortCol, setSortCol] = useState<SortCol>("problems");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(0);
 
   const canManage = profile.role === "admin" || profile.role === "supervisor";
 
@@ -154,6 +184,8 @@ function AssetsInventory({ profile }: { profile: Profile }) {
       if (conn !== "__all__") query = query.eq("connectivity_status", conn);
       if (region !== "__all__") query = query.eq("region", region);
       if (comuna !== "__all__") query = query.eq("comuna", comuna);
+      if (pcOnly) query = query.in("asset_type", ["PC", "Laptop", "Desktop", "Computador", "Notebook", "Workstation"]);
+      else if (assetType !== "__all__") query = query.eq("asset_type", assetType);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -163,9 +195,21 @@ function AssetsInventory({ profile }: { profile: Profile }) {
     } finally {
       setLoading(false);
     }
-  }, [q, life, conn, region, comuna]);
+  }, [q, life, conn, region, comuna, assetType, pcOnly]);
+
+  function handleSort(col: SortCol) {
+    if (sortCol === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortCol(col); setSortDir("desc"); }
+    setPage(0);
+  }
+
+  function resetFilters() {
+    setQ(""); setLife("__all__"); setConn("__all__");
+    setRegion("__all__"); setComuna("__all__"); setAssetType("__all__"); setPcOnly(false); setPage(0);
+  }
 
   useEffect(() => {
+    setPage(0);
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
@@ -188,6 +232,7 @@ function AssetsInventory({ profile }: { profile: Profile }) {
   );
   const regionOptions = useMemo(() => uniqueOptions(rows.map((r) => r.region), "Todas"), [rows]);
   const comunaOptions = useMemo(() => uniqueOptions(rows.map((r) => r.comuna), "Todas"), [rows]);
+  const typeOptions = useMemo(() => uniqueOptions(rows.map((r) => r.asset_type), "Todos los tipos"), [rows]);
 
   const stats = useMemo(() => {
     const total = rows.length;
@@ -246,12 +291,26 @@ function AssetsInventory({ profile }: { profile: Profile }) {
       byKey.set(key, existing);
     }
 
-    return Array.from(byKey.values()).sort((a, b) => {
-      const problemDelta = b.critical + b.offline + b.risk - (a.critical + a.offline + a.risk);
-      if (problemDelta !== 0) return problemDelta;
-      return a.title.localeCompare(b.title);
-    });
+    return Array.from(byKey.values());
   }, [rows]);
+
+  const sortedGroups = useMemo(() => {
+    const arr = [...grouped];
+    const mul = sortDir === "asc" ? 1 : -1;
+    arr.sort((a, b) => {
+      if (sortCol === "name") return mul * a.title.localeCompare(b.title);
+      if (sortCol === "total") return mul * (a.total - b.total);
+      if (sortCol === "online") return mul * (a.online - b.online);
+      // problems (default)
+      const pa = a.critical + a.offline + a.risk;
+      const pb = b.critical + b.offline + b.risk;
+      return mul * (pa - pb);
+    });
+    return arr;
+  }, [grouped, sortCol, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedGroups.length / PAGE_SIZE));
+  const pageGroups = sortedGroups.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const summaryByType = useMemo(() => {
     const entries = Object.entries(countBy(rows.map((r) => r.asset_type || "Sin tipo"))).sort((a, b) => b[1] - a[1]);
@@ -378,6 +437,10 @@ function AssetsInventory({ profile }: { profile: Profile }) {
                 <div className="text-xs text-muted-foreground">Conectividad</div>
                 <Combobox value={conn} onValueChange={(v) => setConn(v ?? "__all__")} options={connOptions} placeholder="Todos" />
               </label>
+              <label className="block">
+                <div className="text-xs text-muted-foreground">Tipo de activo</div>
+                <Combobox value={assetType} onValueChange={(v) => { setAssetType(v ?? "__all__"); setPage(0); }} options={typeOptions} placeholder="Todos los tipos" />
+              </label>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                 <label className="block">
                   <div className="text-xs text-muted-foreground">Región</div>
@@ -414,17 +477,7 @@ function AssetsInventory({ profile }: { profile: Profile }) {
                   <div className="text-lg font-semibold">{loading ? "…" : stats.repair}</div>
                 </div>
               </div>
-              <Button
-                variant="secondary"
-                className="w-full"
-                onClick={() => {
-                  setQ("");
-                  setLife("__all__");
-                  setConn("__all__");
-                  setRegion("__all__");
-                  setComuna("__all__");
-                }}
-              >
+              <Button variant="secondary" className="w-full" onClick={resetFilters}>
                 Limpiar filtros
               </Button>
             </CardContent>
@@ -467,27 +520,40 @@ function AssetsInventory({ profile }: { profile: Profile }) {
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <span className="font-medium text-foreground">Resumen por tipo</span>
                       {summaryByType.map(([type, count]) => (
-                        <Badge key={type} variant="outline">
-                          {type}: {count}
-                        </Badge>
+                        <Badge key={type} variant="outline">{type}: {count}</Badge>
                       ))}
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => setAllGroups(!allGroupsExpanded)}>
-                      {allGroupsExpanded ? "Contraer sedes" : "Expandir sedes"}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setPcOnly((v) => !v); setPage(0); }}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                          pcOnly
+                            ? "border-blue-500 bg-blue-500/20 text-blue-300"
+                            : "border-border bg-muted/30 text-muted-foreground hover:border-blue-500/50 hover:text-foreground"
+                        )}
+                      >
+                        <Monitor className="h-3 w-3" />
+                        Solo PCs
+                      </button>
+                      <Button variant="outline" size="sm" onClick={() => setAllGroups(!allGroupsExpanded)}>
+                        {allGroupsExpanded ? "Contraer sedes" : "Expandir sedes"}
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="overflow-hidden rounded-lg border border-border">
                     <div className="grid grid-cols-[minmax(280px,1fr)_90px_110px_110px_140px] gap-3 border-b border-border bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground max-xl:hidden">
-                      <div>Establecimiento</div>
-                      <div className="text-right">Activos</div>
-                      <div className="text-right">Online</div>
-                      <div className="text-right">Problemas</div>
+                      <SortableHeader col="name" label="Establecimiento" current={sortCol} dir={sortDir} onSort={handleSort} />
+                      <div className="text-right"><SortableHeader col="total" label="Activos" current={sortCol} dir={sortDir} onSort={handleSort} /></div>
+                      <div className="text-right"><SortableHeader col="online" label="Online" current={sortCol} dir={sortDir} onSort={handleSort} /></div>
+                      <div className="text-right"><SortableHeader col="problems" label="Problemas" current={sortCol} dir={sortDir} onSort={handleSort} /></div>
                       <div>Tipos</div>
                     </div>
 
                     <div className="divide-y divide-border">
-                      {grouped.map((group) => {
+                      {pageGroups.map((group) => {
                         const expanded = expandedGroups.has(group.key);
                         const problemCount = group.offline + group.critical + group.risk;
                         const topTypes = Object.entries(group.types)
@@ -604,6 +670,18 @@ function AssetsInventory({ profile }: { profile: Profile }) {
                           </section>
                         );
                       })}
+                    </div>
+                  </div>
+
+                  {/* Pagination */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3 text-xs">
+                    <span className="text-muted-foreground">
+                      Mostrando {Math.min(page * PAGE_SIZE + 1, sortedGroups.length)}–{Math.min((page + 1) * PAGE_SIZE, sortedGroups.length)} de {sortedGroups.length} establecimientos
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>← Anterior</Button>
+                      <span className="text-muted-foreground">Pág. {page + 1} / {totalPages}</span>
+                      <Button size="sm" variant="outline" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>Siguiente →</Button>
                     </div>
                   </div>
                 </div>
