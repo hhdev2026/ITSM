@@ -1,25 +1,8 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { getAdminSupabaseClients } from "./supabase";
 
 export const runtime = "nodejs";
-
-function env(name: string) {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env: ${name}`);
-  return v;
-}
-
-const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? env("NEXT_PUBLIC_SUPABASE_URL");
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? env("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? env("SUPABASE_SERVICE_ROLE_KEY");
-
-const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
 
 type ProfileRow = {
   id: string;
@@ -43,6 +26,7 @@ function rankForPoints(points: number) {
 }
 
 async function requireAdmin(request: Request) {
+  const { anon: supabaseAnon, admin: supabaseAdmin } = getAdminSupabaseClients();
   const authHeader = request.headers.get("authorization") ?? "";
   const token = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : null;
   if (!token) {
@@ -85,6 +69,7 @@ const PasswordSchema = z
 export async function GET(request: Request) {
   const guard = await requireAdmin(request);
   if ("error" in guard) return guard.error;
+  const { admin: supabaseAdmin } = getAdminSupabaseClients();
 
   const url = new URL(request.url);
   const parsed = QuerySchema.safeParse(Object.fromEntries(url.searchParams.entries()));
@@ -162,6 +147,7 @@ const CreateBodySchema = z
   });
 
 async function findUserIdByEmail(email: string) {
+  const { admin: supabaseAdmin } = getAdminSupabaseClients();
   const perPage = 200;
   for (let page = 1; page <= 50; page++) {
     const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
@@ -174,6 +160,7 @@ async function findUserIdByEmail(email: string) {
 }
 
 async function resolveDefaultDepartmentId() {
+  const { admin: supabaseAdmin } = getAdminSupabaseClients();
   const { data } = await supabaseAdmin.from("departments").select("id,name,created_at").order("created_at", { ascending: true });
   const list = (data ?? []) as Array<{ id: string; name: string }>;
   const ti = list.find((d) => d.name === "TI");
@@ -183,6 +170,7 @@ async function resolveDefaultDepartmentId() {
 export async function POST(request: Request) {
   const guard = await requireAdmin(request);
   if ("error" in guard) return guard.error;
+  const { admin: supabaseAdmin } = getAdminSupabaseClients();
 
   const body = await request.json().catch(() => null);
   const parsed = CreateBodySchema.safeParse(body);

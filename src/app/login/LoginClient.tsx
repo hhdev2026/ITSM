@@ -2,17 +2,41 @@
 
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Eye, EyeOff, LockKeyhole } from "lucide-react";
 import { supabase } from "@/lib/supabaseBrowser";
-import { Logo } from "@/components/Logo";
 import { errorMessage } from "@/lib/error";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { CheckCircle2, Clock, Eye, EyeOff, MessageSquare, ShieldCheck, Sparkles } from "lucide-react";
-import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+function HpLogo() {
+  return (
+    <div className="flex items-center gap-4">
+      <div className="grid h-16 w-16 place-items-center rounded-full bg-white text-[#0096d6] shadow-[0_18px_45px_rgb(15_23_42/0.18)] ring-1 ring-slate-200">
+        <svg viewBox="0 0 64 64" aria-label="HP" className="h-11 w-11" role="img">
+          <text
+            x="31.5"
+            y="42"
+            fill="currentColor"
+            fontFamily="Arial, Helvetica, sans-serif"
+            fontSize="31"
+            fontStyle="italic"
+            fontWeight="700"
+            letterSpacing="-4"
+            textAnchor="middle"
+          >
+            hp
+          </text>
+        </svg>
+      </div>
+      <div className="leading-tight">
+        <div className="text-xl font-semibold tracking-tight text-slate-950">Gestión de Ticket HP</div>
+        <div className="mt-1 text-sm text-slate-500">Portal de acceso</div>
+      </div>
+    </div>
+  );
+}
 
 export function LoginClient() {
   const router = useRouter();
@@ -42,82 +66,28 @@ export function LoginClient() {
   }
 
   return (
-    <div className="min-h-dvh tech-app-bg">
-      <div className="mx-auto grid max-w-5xl gap-10 px-6 py-14 lg:grid-cols-[1fr_420px] lg:items-start">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: "easeOut" }}
-          className="space-y-6"
-        >
-          <div className="flex items-center justify-between">
-            <Logo />
-            <Badge variant="outline" className="border-[hsl(var(--brand-cyan))]/30 bg-[hsl(var(--brand-cyan))]/10 text-[hsl(var(--brand-cyan))]">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Acceso administrado
-            </Badge>
-          </div>
+    <main className="min-h-dvh bg-[#f4f7fb] text-[#111827]">
+      <div className="mx-auto grid min-h-dvh w-full max-w-6xl grid-rows-[auto_1fr_auto] px-6 py-8">
+        <header className="border-b border-[#d9e0ea] pb-6">
+          <HpLogo />
+        </header>
 
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">
-                <Sparkles className="h-3.5 w-3.5" />
-                Portal de soporte
-              </Badge>
-              <Badge variant="outline">Tickets</Badge>
-              <Badge variant="outline">Catálogo</Badge>
-              <Badge variant="outline">Chat</Badge>
+        <section className="flex items-center justify-center py-12">
+          <div className="w-full max-w-[430px] rounded-lg border border-[#d7dee8] bg-white shadow-[0_24px_80px_rgb(15_23_42/0.10)]">
+            <div className="space-y-2 px-7 pt-7">
+              <div className="mb-2 grid h-11 w-11 place-items-center rounded-md bg-slate-950 text-white">
+                <LockKeyhole className="h-5 w-5" />
+              </div>
+              <h1 className="text-2xl font-semibold tracking-tight text-[#111827]">Iniciar sesión</h1>
+              <p className="text-sm leading-6 text-[#4b5563]">
+                Ingresa con las credenciales autorizadas para acceder a la gestión de tickets.
+              </p>
             </div>
-            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Acceso al{" "}
-              <span className="text-[hsl(var(--brand-cyan))]">Service Desk</span>
-            </h1>
-            <p className="max-w-xl text-sm text-muted-foreground md:text-base">
-              Solicitudes guiadas, comunicación en tiempo real y trazabilidad completa (SLA/OLA). Si no tienes cuenta, solicita acceso a tu administrador.
-            </p>
-          </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            {[
-              { title: "Seguimiento", desc: "Estados, responsables y trazabilidad.", icon: CheckCircle2 },
-              { title: "Chat", desc: "Canal directo con la mesa de ayuda.", icon: MessageSquare },
-              { title: "SLA/OLA", desc: "Prioridad y tiempo visible en cada caso.", icon: Clock },
-            ].map((x) => {
-              const Icon = x.icon;
-              return (
-                <div key={x.title} className="rounded-2xl glass-surface p-4">
-                  <div className="flex items-center gap-2 text-sm font-semibold">
-                    <span className="grid h-9 w-9 place-items-center rounded-xl bg-[hsl(var(--brand-cyan))]/10 text-[hsl(var(--brand-cyan))]">
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    {x.title}
-                  </div>
-                  <div className="mt-2 text-xs text-muted-foreground">{x.desc}</div>
-                </div>
-              );
-            })}
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: "easeOut", delay: 0.05 }}
-          className="space-y-4"
-        >
-          <div className="flex items-center justify-end">
-            <Badge variant="outline">Acceso</Badge>
-          </div>
-
-          <Card className="tech-border tech-glow">
-            <CardHeader>
-              <CardTitle>Iniciar sesión</CardTitle>
-              <CardDescription>Ingresa con tu cuenta habilitada por TI.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <form className="grid gap-3" onSubmit={submit}>
+            <div className="px-7 pb-7 pt-5">
+              <form className="grid gap-4" onSubmit={submit}>
                 <label className="block">
-                  <div className="text-xs text-muted-foreground">Email</div>
+                  <div className="mb-1.5 text-sm font-medium text-[#374151]">Correo electrónico</div>
                   <Input
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -125,28 +95,27 @@ export function LoginClient() {
                     autoComplete="email"
                     spellCheck={false}
                     placeholder="usuario@empresa.com"
+                    className="h-11 border-[#c4ccd8] bg-white text-[#111827] placeholder:text-[#8a97ab] focus-visible:ring-[#0096d6]"
                   />
                 </label>
+
                 <label className="block">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs text-muted-foreground">Contraseña</div>
-                    <div className="text-xs text-muted-foreground">Mínimo 6 caracteres</div>
-                  </div>
-                  <div className="relative mt-1">
+                  <div className="mb-1.5 text-sm font-medium text-[#374151]">Contraseña</div>
+                  <div className="relative">
                     <Input
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
-                      className="pr-10"
-                      placeholder="••••••••"
+                      className="h-11 border-[#c4ccd8] bg-white pr-10 text-[#111827] placeholder:text-[#8a97ab] focus-visible:ring-[#0096d6]"
+                      placeholder="Ingresa tu contraseña"
                     />
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-[#516179] hover:bg-[#eef3f8] hover:text-[#111827]"
                       aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -156,14 +125,25 @@ export function LoginClient() {
 
                 {error ? <InlineAlert variant="error" description={error} /> : null}
 
-                <Button type="submit" disabled={!canSubmit || busy} className={cn("w-full", busy && "opacity-90")}>
-                  {busy ? "Verificando…" : "Ingresar"}
+                <Button
+                  type="submit"
+                  disabled={!canSubmit || busy}
+                  className={cn(
+                    "mt-1 h-11 w-full bg-[#111827] text-white hover:bg-[#243042] disabled:bg-[#c8d0dc] disabled:text-[#5f6b7d]",
+                    busy && "opacity-90"
+                  )}
+                >
+                  {busy ? "Verificando..." : "Ingresar"}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
-        </motion.div>
+            </div>
+          </div>
+        </section>
+
+        <footer className="border-t border-[#d9e0ea] pt-5 text-center text-sm text-[#64748b]">
+          Desarrollado por <span className="font-semibold text-[#334155]">Geimser</span>
+        </footer>
       </div>
-    </div>
+    </main>
   );
 }

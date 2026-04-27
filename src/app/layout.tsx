@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Service Desk",
-  description: "Portal de soporte y mesa de servicios para tu organización.",
+  title: "Gestión de Ticket HP",
+  description: "Acceso a la gestión de tickets HP.",
 };
 
 export default function RootLayout({

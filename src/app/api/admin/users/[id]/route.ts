@@ -1,25 +1,8 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { getAdminSupabaseClients } from "../supabase";
 
 export const runtime = "nodejs";
-
-function env(name: string) {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env: ${name}`);
-  return v;
-}
-
-const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? env("NEXT_PUBLIC_SUPABASE_URL");
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? env("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? env("SUPABASE_SERVICE_ROLE_KEY");
-
-const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
 
 function rankForPoints(points: number) {
   if (points >= 2000) return "Diamante";
@@ -38,6 +21,7 @@ const PasswordSchema = z
   .refine((s) => /[0-9]/.test(s), { message: "Must include a number" });
 
 async function requireAdmin(request: Request) {
+  const { anon: supabaseAnon, admin: supabaseAdmin } = getAdminSupabaseClients();
   const authHeader = request.headers.get("authorization") ?? "";
   const token = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : null;
   if (!token) {
@@ -70,6 +54,7 @@ const PatchBodySchema = z.object({
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin(request);
   if ("error" in guard) return guard.error;
+  const { admin: supabaseAdmin } = getAdminSupabaseClients();
 
   const { id } = await params;
   if (!id || !z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
