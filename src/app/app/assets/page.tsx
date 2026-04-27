@@ -20,7 +20,7 @@ import { formatAssetTag } from "@/lib/assetTag";
 import { UserAssets } from "@/features/assets/UserAssets";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Map, Plus, RefreshCcw, Upload } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Map as MapIcon, Plus, RefreshCcw, Upload } from "lucide-react";
 
 type AssetRow = Pick<
   Asset,
@@ -77,6 +77,25 @@ function uniqueOptions(values: Array<string | null | undefined>, allLabel: strin
   return [{ value: "__all__", label: allLabel }, ...Array.from(set).sort((a, b) => a.localeCompare(b)).map((v) => ({ value: v, label: v }))];
 }
 
+function locationKey(a: AssetRow) {
+  return [a.region, a.comuna, a.building].map((v) => (typeof v === "string" && v.trim() ? v.trim() : "Sin dato")).join("||");
+}
+
+function locationTitle(a: AssetRow) {
+  return typeof a.building === "string" && a.building.trim() ? a.building.trim() : "Sin establecimiento";
+}
+
+function locationSubtitle(a: AssetRow) {
+  return [a.region, a.comuna].filter(Boolean).join(" · ") || "Sin ubicación";
+}
+
+function countBy<T extends string>(items: T[]) {
+  return items.reduce<Record<string, number>>((acc, item) => {
+    acc[item] = (acc[item] ?? 0) + 1;
+    return acc;
+  }, {});
+}
+
 export default function AssetsPage() {
   const { loading: sessionLoading, session } = useSession();
   const { loading: profileLoading, profile, error: profileError } = useProfile(session?.user.id);
@@ -107,6 +126,7 @@ function AssetsInventory({ profile }: { profile: Profile }) {
   const [conn, setConn] = useState<string>("__all__");
   const [region, setRegion] = useState<string>("__all__");
   const [comuna, setComuna] = useState<string>("__all__");
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
 
   const canManage = profile.role === "admin" || profile.role === "supervisor";
 
@@ -119,8 +139,11 @@ function AssetsInventory({ profile }: { profile: Profile }) {
         .select(
           "id,department_id,asset_tag,mesh_node_id,name,serial_number,asset_type,category,subcategory,region,comuna,building,floor,room,lifecycle_status,connectivity_status,last_seen_at,failure_risk_pct,created_at,updated_at"
         )
-        .order("updated_at", { ascending: false })
-        .limit(500);
+        .order("region", { ascending: true })
+        .order("comuna", { ascending: true })
+        .order("building", { ascending: true })
+        .order("asset_type", { ascending: true })
+        .limit(1000);
 
       const qq = q.trim();
       if (qq) {
@@ -143,7 +166,8 @@ function AssetsInventory({ profile }: { profile: Profile }) {
   }, [q, life, conn, region, comuna]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const lifeOptions = useMemo(
@@ -175,6 +199,80 @@ function AssetsInventory({ profile }: { profile: Profile }) {
     return { total, online, offline, repair, mesh, manual };
   }, [rows]);
 
+  const grouped = useMemo(() => {
+    const byKey = new Map<
+      string,
+      {
+        key: string;
+        title: string;
+        subtitle: string;
+        rows: AssetRow[];
+        total: number;
+        online: number;
+        offline: number;
+        critical: number;
+        repair: number;
+        risk: number;
+        types: Record<string, number>;
+      }
+    >();
+
+    for (const row of rows) {
+      const key = locationKey(row);
+      const existing =
+        byKey.get(key) ??
+        {
+          key,
+          title: locationTitle(row),
+          subtitle: locationSubtitle(row),
+          rows: [],
+          total: 0,
+          online: 0,
+          offline: 0,
+          critical: 0,
+          repair: 0,
+          risk: 0,
+          types: {},
+        };
+      existing.rows.push(row);
+      existing.total += 1;
+      if (row.connectivity_status === "Online") existing.online += 1;
+      if (row.connectivity_status === "Offline") existing.offline += 1;
+      if (row.connectivity_status === "Crítico") existing.critical += 1;
+      if (row.lifecycle_status === "En reparación") existing.repair += 1;
+      if (row.failure_risk_pct >= 80) existing.risk += 1;
+      const type = row.asset_type || "Sin tipo";
+      existing.types[type] = (existing.types[type] ?? 0) + 1;
+      byKey.set(key, existing);
+    }
+
+    return Array.from(byKey.values()).sort((a, b) => {
+      const problemDelta = b.critical + b.offline + b.risk - (a.critical + a.offline + a.risk);
+      if (problemDelta !== 0) return problemDelta;
+      return a.title.localeCompare(b.title);
+    });
+  }, [rows]);
+
+  const summaryByType = useMemo(() => {
+    const entries = Object.entries(countBy(rows.map((r) => r.asset_type || "Sin tipo"))).sort((a, b) => b[1] - a[1]);
+    return entries.slice(0, 6);
+  }, [rows]);
+
+  const allGroupsExpanded = grouped.length > 0 && grouped.every((group) => expandedGroups.has(group.key));
+
+  function toggleGroup(key: string) {
+    setExpandedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function setAllGroups(expanded: boolean) {
+    setExpandedGroups(expanded ? new Set(grouped.map((group) => group.key)) : new Set());
+  }
+
   return (
     <AppShell profile={profile}>
       <div className="space-y-5">
@@ -201,7 +299,7 @@ function AssetsInventory({ profile }: { profile: Profile }) {
               ) : null}
               <Button asChild variant="outline">
                 <Link href="/app/assets/map">
-                  <Map className="h-4 w-4" />
+                  <MapIcon className="h-4 w-4" />
                   Mapa
                 </Link>
               </Button>
@@ -335,7 +433,9 @@ function AssetsInventory({ profile }: { profile: Profile }) {
           <Card className="tech-border">
             <CardHeader>
               <CardTitle>Inventario</CardTitle>
-              <CardDescription>{loading ? "Cargando…" : `Mostrando ${rows.length} activos`}</CardDescription>
+              <CardDescription>
+                {loading ? "Cargando…" : `${rows.length} activos agrupados en ${grouped.length} establecimientos`}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {loading ? (
@@ -362,48 +462,150 @@ function AssetsInventory({ profile }: { profile: Profile }) {
                   ) : null}
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {rows.map((a) => (
-                    <Link
-                      key={a.id}
-                      href={`/app/assets/${a.id}`}
-                      className={cn(
-                        "block rounded-2xl border border-border bg-card/40 p-4",
-                        "transition-[background,box-shadow] hover:bg-card/70 hover:shadow-sm"
-                      )}
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="default" className="font-mono">
-                              {formatAssetTag(a.asset_tag) ?? `AST-${a.asset_tag}`}
-                            </Badge>
-                            {a.asset_type ? <Badge variant="outline">{a.asset_type}</Badge> : null}
-                            <AssetLifecycleBadge status={a.lifecycle_status} />
-                            <AssetConnectivityBadge status={a.connectivity_status} />
-                            {a.mesh_node_id ? (
-                              <Badge className="bg-[hsl(var(--brand-cyan))]/12 text-[hsl(var(--brand-cyan))] ring-1 ring-[hsl(var(--brand-cyan))]/25">
-                                {rmmLabel}
-                              </Badge>
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">Resumen por tipo</span>
+                      {summaryByType.map(([type, count]) => (
+                        <Badge key={type} variant="outline">
+                          {type}: {count}
+                        </Badge>
+                      ))}
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setAllGroups(!allGroupsExpanded)}>
+                      {allGroupsExpanded ? "Contraer sedes" : "Expandir sedes"}
+                    </Button>
+                  </div>
+
+                  <div className="overflow-hidden rounded-lg border border-border">
+                    <div className="grid grid-cols-[minmax(280px,1fr)_90px_110px_110px_140px] gap-3 border-b border-border bg-muted/30 px-4 py-2 text-xs font-medium text-muted-foreground max-xl:hidden">
+                      <div>Establecimiento</div>
+                      <div className="text-right">Activos</div>
+                      <div className="text-right">Online</div>
+                      <div className="text-right">Problemas</div>
+                      <div>Tipos</div>
+                    </div>
+
+                    <div className="divide-y divide-border">
+                      {grouped.map((group) => {
+                        const expanded = expandedGroups.has(group.key);
+                        const problemCount = group.offline + group.critical + group.risk;
+                        const topTypes = Object.entries(group.types)
+                          .sort((a, b) => b[1] - a[1])
+                          .slice(0, 4);
+
+                        return (
+                          <section key={group.key} className="bg-card/25">
+                            <button
+                              type="button"
+                              onClick={() => toggleGroup(group.key)}
+                              className="grid w-full grid-cols-1 gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/20 xl:grid-cols-[minmax(280px,1fr)_90px_110px_110px_140px]"
+                            >
+                              <div className="flex min-w-0 items-start gap-3">
+                                <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background/40">
+                                  {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                </span>
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-semibold">{group.title}</div>
+                                  <div className="mt-0.5 truncate text-xs text-muted-foreground">{group.subtitle}</div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between gap-2 xl:block xl:text-right">
+                                <span className="text-xs text-muted-foreground xl:hidden">Activos</span>
+                                <span className="text-sm font-semibold">{group.total}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-2 xl:block xl:text-right">
+                                <span className="text-xs text-muted-foreground xl:hidden">Online</span>
+                                <span className="text-sm font-semibold text-emerald-200">{group.online}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-2 xl:block xl:text-right">
+                                <span className="text-xs text-muted-foreground xl:hidden">Problemas</span>
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center justify-end gap-1 text-sm font-semibold",
+                                    problemCount > 0 ? "text-rose-200" : "text-muted-foreground"
+                                  )}
+                                >
+                                  {problemCount > 0 ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
+                                  {problemCount}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1">
+                                {topTypes.map(([type, count]) => (
+                                  <Badge key={type} variant="outline" className="text-[11px]">
+                                    {type} {count}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </button>
+
+                            {expanded ? (
+                              <div className="border-t border-border bg-background/35">
+                                <div className="overflow-x-auto">
+                                  <table className="min-w-full text-sm">
+                                    <thead className="bg-muted/20 text-xs text-muted-foreground">
+                                      <tr>
+                                        <th className="px-4 py-2 text-left font-medium">Activo</th>
+                                        <th className="px-3 py-2 text-left font-medium">Tipo</th>
+                                        <th className="px-3 py-2 text-left font-medium">Estado</th>
+                                        <th className="px-3 py-2 text-left font-medium">Conexión</th>
+                                        <th className="px-3 py-2 text-left font-medium">Ubicación</th>
+                                        <th className="px-3 py-2 text-right font-medium">Riesgo</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/70">
+                                      {group.rows
+                                        .slice()
+                                        .sort((a, b) => {
+                                          const problemDelta =
+                                            (b.connectivity_status === "Crítico" ? 3 : b.connectivity_status === "Offline" ? 2 : b.failure_risk_pct >= 80 ? 1 : 0) -
+                                            (a.connectivity_status === "Crítico" ? 3 : a.connectivity_status === "Offline" ? 2 : a.failure_risk_pct >= 80 ? 1 : 0);
+                                          if (problemDelta !== 0) return problemDelta;
+                                          return (a.asset_type ?? "").localeCompare(b.asset_type ?? "");
+                                        })
+                                        .map((a) => (
+                                          <tr key={a.id} className="hover:bg-accent/20">
+                                            <td className="max-w-[360px] px-4 py-2">
+                                              <Link href={`/app/assets/${a.id}`} className="block min-w-0 hover:underline">
+                                                <span className="block truncate font-medium">{a.name}</span>
+                                                <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
+                                                  {formatAssetTag(a.asset_tag) ?? `AST-${a.asset_tag}`} {a.serial_number ? `· ${a.serial_number}` : ""}
+                                                </span>
+                                              </Link>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                              <Badge variant="outline">{a.asset_type || "Sin tipo"}</Badge>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                              <AssetLifecycleBadge status={a.lifecycle_status} />
+                                            </td>
+                                            <td className="px-3 py-2">
+                                              <AssetConnectivityBadge status={a.connectivity_status} compact />
+                                            </td>
+                                            <td className="max-w-[260px] px-3 py-2 text-xs text-muted-foreground">
+                                              <span className="block truncate">{[a.floor ? `Piso ${a.floor}` : null, a.room].filter(Boolean).join(" · ") || "Sin detalle"}</span>
+                                              <span className="block truncate">
+                                                {a.last_seen_at ? `Última conexión: ${new Date(a.last_seen_at).toLocaleString()}` : "Sin telemetría"}
+                                              </span>
+                                            </td>
+                                            <td className="px-3 py-2 text-right">
+                                              <span className={cn("font-mono text-xs", a.failure_risk_pct >= 80 ? "text-rose-200" : "text-muted-foreground")}>
+                                                {a.failure_risk_pct}%
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
                             ) : null}
-                            {a.failure_risk_pct >= 80 ? <Badge className="bg-rose-500/15 text-rose-200 ring-1 ring-rose-500/25">Riesgo alto</Badge> : null}
-                          </div>
-                          <div className="mt-2 truncate text-base font-semibold">{a.name}</div>
-                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
-                            {a.serial_number ? <span className="font-mono">SN: {a.serial_number}</span> : null}
-                            <span className="truncate">
-                              {[a.region, a.comuna, a.building, a.floor ? `Piso ${a.floor}` : null, a.room].filter(Boolean).join(" · ") || "Sin ubicación"}
-                            </span>
-                            {a.last_seen_at ? <span>Última conexión: {new Date(a.last_seen_at).toLocaleString()}</span> : <span>Sin telemetría</span>}
-                          </div>
-                        </div>
-                        <div className="shrink-0 text-right text-xs text-muted-foreground">
-                          <div>Actualizado</div>
-                          <div className="mt-0.5">{new Date(a.updated_at).toLocaleString()}</div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
+                          </section>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>

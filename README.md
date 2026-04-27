@@ -107,6 +107,34 @@ Para que Realtime funcione en la UI (suscripciones `postgres_changes`), habilita
 - `chat_threads`, `chat_messages`, `chat_events`, `agent_presence`, `agent_work_status`
 - `asset_assignments`
 
+### 2.3) Datos demo desde listado real de establecimientos
+
+Este repo incluye una muestra generada desde `listado establecimientos.xlsx` en `data/demo/establecimientos-muestra.csv`.
+Para cargar una demo con sedes, activos, alertas y tickets:
+
+```bash
+npm run seed:demo:establishments
+```
+
+Requiere `.env` con `SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`.
+Opcionalmente ajusta:
+
+- `DEMO_ESTABLISHMENTS_LIMIT=160` para cambiar el tamaño de la muestra.
+- `DEMO_DEPARTMENT_ID=<uuid>` para cargar en otro departamento.
+
+Usuarios demo creados por el seed:
+
+- `supervisor.demo@nuestravticketera.local`
+- `agente.norte.demo@nuestravticketera.local`
+- `agente.centro.demo@nuestravticketera.local`
+- `agente.sur.demo@nuestravticketera.local`
+- `mesa.salud.demo@nuestravticketera.local`
+
+Password: `DemoTicketera2026!`
+
+Si solo necesitas probar la vista `/app/assets/import` sin service role, también puedes importar manualmente
+`data/demo/activos-demo-establecimientos.csv`.
+
 ### 3) Roles y multi-departamento
 
 Al registrarse un usuario se crea su fila en `profiles` con `role='user'`.
