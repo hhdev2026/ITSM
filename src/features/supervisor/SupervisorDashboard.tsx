@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartCard } from "@/components/charts/ChartCard";
-import { SlaLineChart, TimeLineChart, VolumeSlaComposedChart } from "@/components/charts/Charts";
+import { SlaLineChart, TimeLineChart, VolumeSlaComposedChart, PriorityPieChart } from "@/components/charts/Charts";
 import { Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -170,6 +170,17 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
     const p = kpis?.pending_by_priority ?? {};
     return ["Crítica", "Alta", "Media", "Baja"].map((k) => ({ k, v: p[k] ?? 0 }));
   }, [kpis]);
+
+  const pendingPieData = useMemo(() => {
+    return pendingRows.map(r => {
+      let color = "hsl(var(--emerald-500))";
+      if (r.k === "Crítica") color = "hsl(var(--destructive))";
+      if (r.k === "Alta") color = "#f97316";
+      if (r.k === "Media") color = "#eab308";
+      if (r.k === "Baja") color = "#10b981";
+      return { name: r.k, value: r.v, color };
+    });
+  }, [pendingRows]);
 
   return (
     <TooltipProvider>
@@ -385,23 +396,8 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
                 <CardTitle>Pendientes</CardTitle>
                 <CardDescription>Snapshot por prioridad.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {pendingRows.map((r) => {
-                  const total = pendingRows.reduce((acc, curr) => acc + curr.v, 0) || 1;
-                  const pct = Math.round((r.v / total) * 100);
-                  const color = r.k === "Crítica" ? "bg-destructive" : r.k === "Alta" ? "bg-orange-500" : r.k === "Media" ? "bg-amber-500" : "bg-emerald-500";
-                  return (
-                    <div key={r.k} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">{r.k}</span>
-                        <span className="font-semibold">{r.v}</span>
-                      </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
-                        <div className={`h-full ${color} transition-all duration-500`} style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
+              <CardContent className="pt-0">
+                <PriorityPieChart data={pendingPieData} />
               </CardContent>
             </Card>
 
