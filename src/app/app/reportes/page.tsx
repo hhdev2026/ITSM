@@ -6,7 +6,7 @@ import { AppBootScreen, AppNoticeScreen } from "@/components/layout/AppStates";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useProfile, useSession } from "@/lib/hooks";
 import { BarChart3, Download, FileText, PieChart, Users, Laptop, Activity, FileSpreadsheet } from "lucide-react";
 import { useState } from "react";
@@ -176,17 +176,17 @@ export default function ReportsPage() {
         <DialogContent className="max-w-4xl border-border bg-background/95 backdrop-blur-xl">
           {activeReport && previewData && (
             <>
-              <DialogHeader>
+              <div className="flex flex-col space-y-1.5 text-center sm:text-left mb-4">
                 <div className="flex items-center gap-3 mb-2">
                   <div className={`rounded-lg p-2 ${activeReport.bg}`}>
                     <activeReport.icon className={`h-5 w-5 ${activeReport.color}`} />
                   </div>
                   <div>
-                    <DialogTitle className="text-xl">{activeReport.title}</DialogTitle>
-                    <DialogDescription>Previsualización de los primeros registros (Generado dinámicamente)</DialogDescription>
+                    <h2 className="text-xl font-semibold leading-none tracking-tight">{activeReport.title}</h2>
+                    <p className="text-sm text-muted-foreground mt-1">Previsualización de los primeros registros (Generado dinámicamente)</p>
                   </div>
                 </div>
-              </DialogHeader>
+              </div>
 
               <div className="mt-4 rounded-xl border border-border bg-background shadow-inner overflow-hidden">
                 <div className="overflow-x-auto">
