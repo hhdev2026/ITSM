@@ -19,7 +19,7 @@ import { formatTicketNumber } from "@/lib/ticketNumber";
 import { errorMessage } from "@/lib/error";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { RefreshCcw } from "lucide-react";
+import { RefreshCcw, AlertCircle, Clock, UserX, User } from "lucide-react";
 
 type TicketLiveRow = Partial<Ticket> & {
   id: string;
@@ -31,6 +31,8 @@ type TicketLiveRow = Partial<Ticket> & {
   created_at: string;
   updated_at: string;
 };
+
+type QuickFilter = "all" | "mine" | "overdue" | "at_risk" | "unassigned";
 
 function profileLabel(p: { full_name: string | null; email: string }) {
   return p.full_name?.trim() || p.email;
@@ -94,10 +96,69 @@ function computeTraffic(opts: {
   return { light, remainingMinutes: remainingClamped, pctUsed };
 }
 
-function formatPct(v: unknown) {
-  if (typeof v !== "number" || !Number.isFinite(v)) return null;
-  if (v > 0 && v < 1) return "<1%";
-  return `${Math.round(v)}%`;
+function SlaProgressBar({ pctUsed, label, light }: { pctUsed: number | null; label: string; light: string | null }) {
+  if (pctUsed === null) return null;
+  const clamped = Math.min(Math.max(pctUsed, 0), 100);
+  let color = "bg-green-500";
+  if (light === "yellow") color = "bg-yellow-500";
+  if (light === "red") color = "bg-red-500";
+  if (light === "closed" || light === "excluded") color = "bg-muted";
+
+  return (
+    <div className="flex w-32 flex-col gap-1">
+      <div className="flex justify-between text-[10px] text-muted-foreground">
+        <span>{label}</span>
+        <span>{Math.round(clamped)}%</span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-secondary/80">
+        <div className={`h-full ${color}`} style={{ width: `${clamped}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function KpiCard({
+  title,
+  value,
+  icon: Icon,
+  onClick,
+  active,
+  color,
+}: {
+  title: string;
+  value: number;
+  icon: any;
+  onClick: () => void;
+  active: boolean;
+  color: "red" | "yellow" | "blue" | "purple";
+}) {
+  const colorMap = {
+    red: "border-red-500 bg-red-500/10 text-red-500",
+    yellow: "border-yellow-500 bg-yellow-500/10 text-yellow-500",
+    blue: "border-blue-500 bg-blue-500/10 text-blue-500",
+    purple: "border-purple-500 bg-purple-500/10 text-purple-500",
+  };
+  const activeClass = active ? colorMap[color] : "border-border bg-background hover:bg-accent/50";
+  const iconColorMap = {
+    red: "text-red-500",
+    yellow: "text-yellow-500",
+    blue: "text-blue-500",
+    purple: "text-purple-500",
+  };
+
+  return (
+    <Card className={`cursor-pointer transition-colors tech-border ${activeClass}`} onClick={onClick}>
+      <CardContent className="flex items-center justify-between p-4">
+        <div className="flex flex-col gap-1">
+          <div className="text-sm font-medium text-muted-foreground">{title}</div>
+          <div className="text-2xl font-bold">{value}</div>
+        </div>
+        <div className={`rounded-full bg-background/50 p-2 ${active ? iconColorMap[color] : "text-muted-foreground"}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function TicketsTrackingPage() {
@@ -106,7 +167,8 @@ export default function TicketsTrackingPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<TicketLiveRow[]>([]);
+  
+  const [allTickets, setAllTickets] = useState<TicketLiveRow[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [profiles, setProfiles] = useState<Array<{ id: string; email: string; full_name: string | null }>>([]);
@@ -116,6 +178,8 @@ export default function TicketsTrackingPage() {
   const [priority, setPriority] = useState<string | null>(null);
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
+  
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
 
   const canSee = profile?.role === "supervisor" || profile?.role === "admin";
 
@@ -150,7 +214,7 @@ export default function TicketsTrackingPage() {
         setSubcategories([]);
       }
 
-      // Fetch a snapshot and apply filters locally (avoids enum-filter errors if DB is mid-migration).
+      // Fetch a snapshot
       const { data, error } = await supabase
         .from("tickets_sla_live")
         .select("*")
@@ -158,14 +222,14 @@ export default function TicketsTrackingPage() {
         .order("created_at", { ascending: false })
         .limit(250);
 
-      let finalRows: TicketLiveRow[] = [];
+      let fetchedRows: TicketLiveRow[] = [];
 
       if (error) {
         // Fallback: DB may not have the view/grants yet; use base table.
         const base = await supabase.from("tickets").select("*").eq("department_id", profile.department_id).order("created_at", { ascending: false }).limit(250);
         if (base.error) throw base.error;
 
-        const computed = ((base.data ?? []) as Array<Record<string, unknown>>).map((t) => {
+        fetchedRows = ((base.data ?? []) as Array<Record<string, unknown>>).map((t) => {
           const sla = computeTraffic({
             status: t.status,
             excluded: (t as { sla_excluded?: unknown }).sla_excluded,
@@ -188,39 +252,17 @@ export default function TicketsTrackingPage() {
             response_pct_used: resp.pctUsed,
           } satisfies TicketLiveRow;
         });
-
-        finalRows = computed.filter((t) => {
-          const title = typeof t.title === "string" ? t.title : "";
-          if (!showClosed && (t.status === "Cerrado" || t.status === "Cancelado")) return false;
-          if (status && t.status !== status) return false;
-          if (priority && t.priority !== priority) return false;
-          if (assigneeId && t.assignee_id !== assigneeId) return false;
-          if (q.trim() && !title.toLowerCase().includes(q.trim().toLowerCase())) return false;
-          return true;
-        });
       } else {
-        const tickets = (data ?? []) as Array<Record<string, unknown>>;
-        finalRows = tickets.filter((t) => {
-          const st = typeof t.status === "string" ? t.status : "";
-          const pr = typeof t.priority === "string" ? t.priority : "";
-          const asg = typeof t.assignee_id === "string" ? t.assignee_id : null;
-          const title = typeof t.title === "string" ? t.title : "";
-          if (!showClosed && (st === "Cerrado" || st === "Cancelado")) return false;
-          if (status && st !== status) return false;
-          if (priority && pr !== priority) return false;
-          if (assigneeId && asg !== assigneeId) return false;
-          if (q.trim() && !title.toLowerCase().includes(q.trim().toLowerCase())) return false;
-          return true;
-        }) as unknown as TicketLiveRow[];
+        fetchedRows = (data ?? []) as unknown as TicketLiveRow[];
       }
 
+      setAllTickets(fetchedRows);
+
       const ids = new Set<string>();
-      for (const t of finalRows) {
+      for (const t of fetchedRows) {
         if (typeof t.requester_id === "string") ids.add(t.requester_id);
         if (typeof t.assignee_id === "string") ids.add(t.assignee_id);
       }
-
-      setRows(finalRows);
 
       if (ids.size) {
         const { data: profsRaw, error: pErr } = await supabase.from("profiles").select("id,email,full_name").in("id", Array.from(ids));
@@ -232,15 +274,62 @@ export default function TicketsTrackingPage() {
     } catch (e: unknown) {
       const msg = errorMessage(e) ?? "No se pudo cargar tickets";
       setError(msg);
-      setRows([]);
+      setAllTickets([]);
     } finally {
       setLoading(false);
     }
-  }, [assigneeId, priority, profile?.department_id, q, showClosed, status]);
+  }, [profile?.department_id]);
 
   useEffect(() => {
     if (canSee) void load();
   }, [canSee, load]);
+
+  const kpiCounts = useMemo(() => {
+    let overdue = 0;
+    let atRisk = 0;
+    let unassigned = 0;
+    let mine = 0;
+    for (const t of allTickets) {
+      if (t.status === "Cerrado" || t.status === "Cancelado") continue;
+      if (t.sla_traffic_light === "red" || t.response_traffic_light === "red") overdue++;
+      else if (t.sla_traffic_light === "yellow" || t.response_traffic_light === "yellow") atRisk++;
+      if (!t.assignee_id) unassigned++;
+      if (t.assignee_id === session?.user.id) mine++;
+    }
+    return { overdue, atRisk, unassigned, mine };
+  }, [allTickets, session?.user.id]);
+
+  const finalRows = useMemo(() => {
+    const filtered = allTickets.filter((t) => {
+      const st = typeof t.status === "string" ? t.status : "";
+      const pr = typeof t.priority === "string" ? t.priority : "";
+      const asg = typeof t.assignee_id === "string" ? t.assignee_id : null;
+      const title = typeof t.title === "string" ? t.title : "";
+      
+      if (!showClosed && (st === "Cerrado" || st === "Cancelado")) return false;
+      if (status && st !== status) return false;
+      if (priority && pr !== priority) return false;
+      if (assigneeId && asg !== assigneeId) return false;
+      if (q.trim() && !title.toLowerCase().includes(q.trim().toLowerCase())) return false;
+      
+      if (quickFilter === "mine" && asg !== session?.user.id) return false;
+      if (quickFilter === "overdue" && t.sla_traffic_light !== "red" && t.response_traffic_light !== "red") return false;
+      if (quickFilter === "at_risk" && t.sla_traffic_light !== "yellow" && t.response_traffic_light !== "yellow") return false;
+      if (quickFilter === "unassigned" && asg !== null) return false;
+      
+      return true;
+    });
+
+    filtered.sort((a, b) => {
+      // Prioritize SLA remaining time
+      const aRem = typeof a.sla_remaining_minutes === "number" ? a.sla_remaining_minutes : 999999;
+      const bRem = typeof b.sla_remaining_minutes === "number" ? b.sla_remaining_minutes : 999999;
+      if (aRem !== bRem) return aRem - bRem;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    return filtered;
+  }, [allTickets, showClosed, status, priority, assigneeId, q, quickFilter, session?.user.id]);
 
   if (sessionLoading || profileLoading) return <AppBootScreen label="Cargando…" />;
   if (!session) return null;
@@ -278,7 +367,7 @@ export default function TicketsTrackingPage() {
             </Link>
           }
           title="Seguimiento de tickets"
-          description="Detalle por ticket con semáforo de SLA y tiempos restantes."
+          description="Monitoreo operativo de tickets con filtros rápidos y SLAs."
           actions={
             <>
               <Button
@@ -300,7 +389,7 @@ export default function TicketsTrackingPage() {
                     "category",
                     "subcategory",
                   ];
-                  const out = rows.map((t) => {
+                  const out = finalRows.map((t) => {
                     const tracking = formatTicketNumber(t.ticket_number) ?? t.id.slice(0, 8).toUpperCase();
                     const requester = t.requester_id ? profById.get(t.requester_id) ?? null : null;
                     const assignee = t.assignee_id ? profById.get(t.assignee_id) ?? null : null;
@@ -325,7 +414,7 @@ export default function TicketsTrackingPage() {
                   });
                   downloadCsv(`tickets-seguimiento-${profile.department_id}.csv`, header, out);
                 }}
-                disabled={loading || rows.length === 0}
+                disabled={loading || finalRows.length === 0}
               >
                 Descargar Excel (CSV)
               </Button>
@@ -340,19 +429,53 @@ export default function TicketsTrackingPage() {
           }
         />
 
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <KpiCard
+            title="Fuera de SLA / Vencidos"
+            value={kpiCounts.overdue}
+            icon={AlertCircle}
+            active={quickFilter === "overdue"}
+            onClick={() => setQuickFilter(quickFilter === "overdue" ? "all" : "overdue")}
+            color="red"
+          />
+          <KpiCard
+            title="SLA en Riesgo"
+            value={kpiCounts.atRisk}
+            icon={Clock}
+            active={quickFilter === "at_risk"}
+            onClick={() => setQuickFilter(quickFilter === "at_risk" ? "all" : "at_risk")}
+            color="yellow"
+          />
+          <KpiCard
+            title="Sin Asignar"
+            value={kpiCounts.unassigned}
+            icon={UserX}
+            active={quickFilter === "unassigned"}
+            onClick={() => setQuickFilter(quickFilter === "unassigned" ? "all" : "unassigned")}
+            color="blue"
+          />
+          <KpiCard
+            title="Mis Tickets"
+            value={kpiCounts.mine}
+            icon={User}
+            active={quickFilter === "mine"}
+            onClick={() => setQuickFilter(quickFilter === "mine" ? "all" : "mine")}
+            color="purple"
+          />
+        </div>
+
         <Card className="tech-border">
-          <CardHeader>
-            <CardTitle>Filtros</CardTitle>
-            <CardDescription>Filtra por estado, prioridad y asignado. Busca por título.</CardDescription>
+          <CardHeader className="pb-3">
+            <CardTitle>Filtros Detallados</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
               <label className="block">
-                <div className="text-xs text-muted-foreground">Buscar</div>
+                <div className="text-xs text-muted-foreground mb-1.5">Buscar</div>
                 <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ej: impresora, wifi, office…" />
               </label>
               <label className="block">
-                <div className="text-xs text-muted-foreground">Estado</div>
+                <div className="text-xs text-muted-foreground mb-1.5">Estado</div>
                 <Combobox
                   value={status ?? "__all__"}
                   onValueChange={(v) => setStatus(v === "__all__" ? null : v)}
@@ -361,7 +484,7 @@ export default function TicketsTrackingPage() {
                 />
               </label>
               <label className="block">
-                <div className="text-xs text-muted-foreground">Prioridad</div>
+                <div className="text-xs text-muted-foreground mb-1.5">Prioridad</div>
                 <Combobox
                   value={priority ?? "__all__"}
                   onValueChange={(v) => setPriority(v === "__all__" ? null : v)}
@@ -370,7 +493,7 @@ export default function TicketsTrackingPage() {
                 />
               </label>
               <label className="block">
-                <div className="text-xs text-muted-foreground">Asignado</div>
+                <div className="text-xs text-muted-foreground mb-1.5">Asignado</div>
                 <Combobox
                   value={assigneeId ?? "__all__"}
                   onValueChange={(v) => setAssigneeId(v === "__all__" ? null : v)}
@@ -380,11 +503,20 @@ export default function TicketsTrackingPage() {
               </label>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Button variant={showClosed ? "secondary" : "outline"} onClick={() => setShowClosed((v) => !v)}>
-                {showClosed ? "Incluye cerrados/cancelados" : "Oculta cerrados/cancelados"}
-              </Button>
-              <div className="text-xs text-muted-foreground">Mostrando {rows.length} tickets</div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-4">
+              <div className="flex gap-2">
+                <Button variant={showClosed ? "secondary" : "outline"} size="sm" onClick={() => setShowClosed((v) => !v)}>
+                  {showClosed ? "Ocultar cerrados" : "Incluir cerrados"}
+                </Button>
+                {quickFilter !== "all" && (
+                  <Button variant="ghost" size="sm" onClick={() => setQuickFilter("all")}>
+                    Limpiar vista rápida
+                  </Button>
+                )}
+              </div>
+              <div className="text-xs font-medium text-muted-foreground">
+                Mostrando {finalRows.length} tickets
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -393,21 +525,25 @@ export default function TicketsTrackingPage() {
 
         <Card className="tech-border">
           <CardHeader>
-            <CardTitle>Detalle</CardTitle>
-            <CardDescription>Semáforo SLA/Respuesta: verde (en plazo), amarillo (riesgo), rojo (vencido), excluido/cerrado.</CardDescription>
+            <CardTitle>Detalle de Tickets</CardTitle>
+            <CardDescription>
+              Ordenados por urgencia de SLA. Selecciona un ticket para ver más detalles.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="space-y-2">
-                <Skeleton className="h-14 w-full" />
-                <Skeleton className="h-14 w-full" />
-                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
               </div>
-            ) : rows.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No hay tickets con los filtros actuales.</div>
+            ) : finalRows.length === 0 ? (
+              <div className="flex h-32 items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">
+                No hay tickets con los filtros actuales.
+              </div>
             ) : (
-              <div className="space-y-2">
-                {rows.map((t) => {
+              <div className="space-y-3">
+                {finalRows.map((t) => {
                   const tracking = formatTicketNumber(t.ticket_number) ?? t.id.slice(0, 8).toUpperCase();
                   const requester = t.requester_id ? profById.get(t.requester_id) ?? null : null;
                   const assignee = t.assignee_id ? profById.get(t.assignee_id) ?? null : null;
@@ -439,12 +575,9 @@ export default function TicketsTrackingPage() {
                               ? "En plazo"
                               : "Sin objetivo";
 
-                  const slaUse = formatPct(t.sla_pct_used);
-                  const respUse = formatPct(t.response_pct_used);
-
                   return (
-                    <Link key={t.id} href={`/app/tickets/${t.id}`} className="block rounded-2xl border border-border bg-background/20 p-3 hover:bg-accent/20">
-                      <div className="flex items-start justify-between gap-3">
+                    <Link key={t.id} href={`/app/tickets/${t.id}`} className="block rounded-2xl border border-border bg-background/20 p-4 transition-colors hover:bg-accent/20">
+                      <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge variant="outline" className="font-mono">
@@ -462,32 +595,45 @@ export default function TicketsTrackingPage() {
                             {t.sla_excluded ? <Badge variant="outline">Excluido de KPI</Badge> : null}
                           </div>
 
-                          <div className="mt-2 min-w-0 truncate text-sm font-medium">{t.title}</div>
+                          <div className="mt-3 min-w-0 truncate text-base font-medium">{t.title}</div>
 
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                             <span>Creado: {new Date(t.created_at).toLocaleString()}</span>
-                            {requester ? <span>• Solicitante: {profileLabel(requester)}</span> : null}
-                            {assignee ? <span>• Asignado: {profileLabel(assignee)}</span> : <span>• Asignado: Sin asignar</span>}
-                            {cat ? <span>• {cat}</span> : null}
-                            {sub ? <span>• {sub}</span> : null}
+                            {requester ? <span>Solicitante: <span className="font-medium text-foreground/80">{profileLabel(requester)}</span></span> : null}
+                            {assignee ? <span>Asignado: <span className="font-medium text-foreground/80">{profileLabel(assignee)}</span></span> : <span>Asignado: <span className="font-medium text-yellow-500">Sin asignar</span></span>}
+                            {cat ? <span>Categoría: {cat} {sub ? `> ${sub}` : ''}</span> : null}
                           </div>
 
-                          {tiers ? <div className="mt-2 truncate text-xs text-muted-foreground">{tiers}</div> : null}
+                          {tiers ? <div className="mt-1 truncate text-xs text-muted-foreground">{tiers}</div> : null}
 
                           {(t.sla_excluded && t.sla_exclusion_reason) || t.canceled_reason || t.planned_for_at ? (
-                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                              {t.sla_excluded && t.sla_exclusion_reason ? <span>Justificación SLA: {t.sla_exclusion_reason}</span> : null}
-                              {t.canceled_reason ? <span>Motivo cancelación: {t.canceled_reason}</span> : null}
-                              {t.planned_for_at ? <span>Planificado: {new Date(t.planned_for_at).toLocaleString()}</span> : null}
+                            <div className="mt-3 flex flex-wrap gap-3 rounded-md bg-accent/30 p-2 text-xs text-muted-foreground">
+                              {t.sla_excluded && t.sla_exclusion_reason ? <span><strong>Justificación SLA:</strong> {t.sla_exclusion_reason}</span> : null}
+                              {t.canceled_reason ? <span><strong>Motivo cancelación:</strong> {t.canceled_reason}</span> : null}
+                              {t.planned_for_at ? <span><strong>Planificado:</strong> {new Date(t.planned_for_at).toLocaleString()}</span> : null}
                             </div>
                           ) : null}
                         </div>
 
-                        <div className="shrink-0 text-right text-xs text-muted-foreground">
-                          {typeof t.sla_remaining_minutes === "number" ? <div>SLA: {Math.max(0, Math.round(t.sla_remaining_minutes))}m</div> : null}
-                          {typeof t.response_remaining_minutes === "number" ? <div>Resp: {Math.max(0, Math.round(t.response_remaining_minutes))}m</div> : null}
-                          {slaUse ? <div>Consumo SLA: {slaUse}</div> : null}
-                          {respUse ? <div>Consumo Resp: {respUse}</div> : null}
+                        <div className="flex shrink-0 flex-col items-end gap-3 rounded-xl bg-background/50 p-3 shadow-sm border border-border/50">
+                          <div className="text-right text-xs font-medium">
+                            {typeof t.sla_remaining_minutes === "number" ? (
+                              <div className={t.sla_remaining_minutes < 0 ? "text-red-500" : "text-foreground/80"}>
+                                SLA Restante: {Math.max(0, Math.round(t.sla_remaining_minutes))}m
+                                {t.sla_remaining_minutes < 0 && ` (Vencido hace ${Math.abs(Math.round(t.sla_remaining_minutes))}m)`}
+                              </div>
+                            ) : null}
+                            {typeof t.response_remaining_minutes === "number" ? (
+                              <div className={t.response_remaining_minutes < 0 ? "text-red-500 mt-1" : "text-foreground/80 mt-1"}>
+                                Resp. Restante: {Math.max(0, Math.round(t.response_remaining_minutes))}m
+                              </div>
+                            ) : null}
+                          </div>
+                          
+                          <div className="flex flex-col gap-2">
+                            <SlaProgressBar pctUsed={t.sla_pct_used} label="SLA Uso" light={t.sla_traffic_light} />
+                            <SlaProgressBar pctUsed={t.response_pct_used} label="Resp. Uso" light={t.response_traffic_light} />
+                          </div>
                         </div>
                       </div>
                     </Link>
