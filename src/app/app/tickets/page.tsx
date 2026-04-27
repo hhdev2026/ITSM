@@ -11,7 +11,7 @@ import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TicketPriorityBadge, TicketStatusBadge, TicketTypeBadge } from "@/components/tickets/TicketBadges";
-import { slaBadgeFromTrafficLight, TicketPriorities, TicketStatuses } from "@/lib/constants";
+import { TicketPriorities, TicketStatuses } from "@/lib/constants";
 import { useProfile, useSession } from "@/lib/hooks";
 import { supabase } from "@/lib/supabaseBrowser";
 import type { Category, Subcategory, Ticket } from "@/lib/types";
@@ -19,7 +19,7 @@ import { formatTicketNumber } from "@/lib/ticketNumber";
 import { errorMessage } from "@/lib/error";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { RefreshCcw, AlertCircle, Clock, UserX, User } from "lucide-react";
+import { RefreshCcw, AlertCircle, Clock, UserX, User, CalendarDays } from "lucide-react";
 
 type TicketLiveRow = Partial<Ticket> & {
   id: string;
@@ -81,40 +81,21 @@ function computeTraffic(opts: {
   targetMinutes?: unknown;
 }): { light: Ticket["sla_traffic_light"]; remainingMinutes: number | null; pctUsed: number | null } {
   const status = typeof opts.status === "string" ? opts.status : null;
-  if (opts.excluded === true) return { light: "excluded", remainingMinutes: 0, pctUsed: null };
-  if (status === "Cerrado" || status === "Cancelado" || status === "Rechazado") return { light: "closed", remainingMinutes: 0, pctUsed: null };
+  if (opts.excluded === true) return { light: "excluded", remainingMinutes: null, pctUsed: null };
+  if (status === "Cerrado" || status === "Cancelado" || status === "Rechazado") return { light: "closed", remainingMinutes: null, pctUsed: null };
 
   const deadline = typeof opts.deadline === "string" ? opts.deadline : null;
   const target = typeof opts.targetMinutes === "number" ? opts.targetMinutes : null;
   if (!deadline || !target || target <= 0) return { light: null, remainingMinutes: null, pctUsed: null };
 
   const remaining = Math.floor((new Date(deadline).getTime() - Date.now()) / 60000);
-  const remainingClamped = Math.max(remaining, 0);
   const ratio = remaining / target;
   const light: Ticket["sla_traffic_light"] = remaining <= 0 ? "red" : ratio <= 0.2 ? "yellow" : "green";
+  
+  const remainingClamped = Math.max(remaining, 0);
   const pctUsed = Math.round((1 - remainingClamped / target) * 10000) / 100;
-  return { light, remainingMinutes: remainingClamped, pctUsed };
-}
-
-function SlaProgressBar({ pctUsed, label, light }: { pctUsed: number | null | undefined; label: string; light: string | null | undefined }) {
-  if (pctUsed == null) return null;
-  const clamped = Math.min(Math.max(pctUsed, 0), 100);
-  let color = "bg-green-500";
-  if (light === "yellow") color = "bg-yellow-500";
-  if (light === "red") color = "bg-red-500";
-  if (light === "closed" || light === "excluded") color = "bg-muted";
-
-  return (
-    <div className="flex w-32 flex-col gap-1">
-      <div className="flex justify-between text-[10px] text-muted-foreground">
-        <span>{label}</span>
-        <span>{Math.round(clamped)}%</span>
-      </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-secondary/80">
-        <div className={`h-full ${color}`} style={{ width: `${clamped}%` }} />
-      </div>
-    </div>
-  );
+  
+  return { light, remainingMinutes: remaining, pctUsed };
 }
 
 function KpiCard({
@@ -151,10 +132,10 @@ function KpiCard({
       <CardContent className="flex items-center justify-between p-4">
         <div className="flex flex-col gap-1">
           <div className="text-sm font-medium text-muted-foreground">{title}</div>
-          <div className="text-2xl font-bold">{value}</div>
+          <div className="text-3xl font-bold">{value}</div>
         </div>
-        <div className={`rounded-full bg-background/50 p-2 ${active ? iconColorMap[color] : "text-muted-foreground"}`}>
-          <Icon className="h-5 w-5" />
+        <div className={`rounded-full bg-background/50 p-2.5 ${active ? iconColorMap[color] : "text-muted-foreground"}`}>
+          <Icon className="h-6 w-6" />
         </div>
       </CardContent>
     </Card>
@@ -331,6 +312,106 @@ export default function TicketsTrackingPage() {
     return filtered;
   }, [allTickets, showClosed, status, priority, assigneeId, q, quickFilter, session?.user.id]);
 
+  const groupedTickets = useMemo(() => {
+    return {
+      red: finalRows.filter(t => t.sla_traffic_light === "red" || t.response_traffic_light === "red"),
+      yellow: finalRows.filter(t => (t.sla_traffic_light === "yellow" || t.response_traffic_light === "yellow") && t.sla_traffic_light !== "red" && t.response_traffic_light !== "red"),
+      green: finalRows.filter(t => (t.sla_traffic_light === "green" || t.response_traffic_light === "green") && t.sla_traffic_light !== "red" && t.response_traffic_light !== "red" && t.sla_traffic_light !== "yellow" && t.response_traffic_light !== "yellow"),
+      other: finalRows.filter(t => !["red", "yellow", "green"].includes(t.sla_traffic_light || "") && !["red", "yellow", "green"].includes(t.response_traffic_light || "")),
+    };
+  }, [finalRows]);
+
+  const renderTicketTable = (tickets: TicketLiveRow[]) => (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm text-left border-collapse whitespace-nowrap">
+        <thead>
+          <tr className="border-b border-border/30 text-muted-foreground text-xs bg-black/10">
+            <th className="px-5 py-3 font-medium w-24">Ticket</th>
+            <th className="px-5 py-3 font-medium min-w-[300px] w-full">Título</th>
+            <th className="px-5 py-3 font-medium w-32">Estado</th>
+            <th className="px-5 py-3 font-medium w-32">Prioridad</th>
+            <th className="px-5 py-3 font-medium w-48">Asignado</th>
+            <th className="px-5 py-3 font-medium w-48 text-right">SLA Restante</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border/20">
+          {tickets.map(t => {
+            const tracking = formatTicketNumber(t.ticket_number) ?? t.id.slice(0, 8).toUpperCase();
+            const assignee = t.assignee_id ? profById.get(t.assignee_id) ?? null : null;
+            const remaining = typeof t.sla_remaining_minutes === "number" ? Math.round(t.sla_remaining_minutes) : null;
+            
+            let remClass = "text-muted-foreground";
+            if (remaining !== null) {
+              if (remaining < 0) remClass = "text-red-500 font-bold";
+              else if (remaining <= 60) remClass = "text-yellow-500 font-medium";
+              else remClass = "text-green-500";
+            }
+            
+            const formatTime = (mins: number) => {
+              const abs = Math.abs(mins);
+              const d = Math.floor(abs / 1440);
+              const h = Math.floor((abs % 1440) / 60);
+              const m = abs % 60;
+              if (d > 0) return `${d}d ${h}h`;
+              if (h > 0) return `${h}h ${m}m`;
+              return `${m}m`;
+            };
+
+            return (
+              <tr key={t.id} className="hover:bg-accent/20 group transition-colors">
+                <td className="px-5 py-3.5">
+                  <Link href={`/app/tickets/${t.id}`} className="font-mono font-semibold text-primary hover:underline">
+                    {tracking}
+                  </Link>
+                </td>
+                <td className="px-5 py-3.5">
+                  <div className="truncate max-w-[400px]" title={t.title}>
+                    <Link href={`/app/tickets/${t.id}`} className="hover:underline font-medium text-foreground">
+                      {t.title}
+                    </Link>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-2">
+                    <span>{new Date(t.created_at).toLocaleString()}</span>
+                  </div>
+                </td>
+                <td className="px-5 py-3.5">
+                  <TicketStatusBadge status={t.status} />
+                </td>
+                <td className="px-5 py-3.5">
+                  <TicketPriorityBadge priority={t.priority} />
+                </td>
+                <td className="px-5 py-3.5">
+                  {assignee ? (
+                    <span className="text-foreground/90">{profileLabel(assignee)}</span>
+                  ) : (
+                    <span className="text-yellow-500 font-medium flex items-center gap-1.5 text-xs">
+                      <UserX className="w-3.5 h-3.5" /> Sin asignar
+                    </span>
+                  )}
+                </td>
+                <td className={`px-5 py-3.5 text-right ${remClass}`}>
+                  {remaining !== null ? (
+                    remaining < 0 ? (
+                       <span className="flex items-center justify-end gap-1.5">
+                         Vencido hace {formatTime(remaining)} <AlertCircle className="w-4 h-4" />
+                       </span>
+                    ) : (
+                       <span className="flex items-center justify-end gap-1.5">
+                         {formatTime(remaining)}
+                       </span>
+                    )
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+
   if (sessionLoading || profileLoading) return <AppBootScreen label="Cargando…" />;
   if (!session) return null;
   if (profileError) return <AppNoticeScreen variant="error" title="No se pudo cargar el perfil" description={profileError} />;
@@ -359,15 +440,15 @@ export default function TicketsTrackingPage() {
 
   return (
     <AppShell profile={profile}>
-      <div className="space-y-5">
+      <div className="space-y-6">
         <PageHeader
           kicker={
             <Link href="/app" className="hover:underline">
               ← Volver al panel
             </Link>
           }
-          title="Seguimiento de tickets"
-          description="Monitoreo operativo de tickets con filtros rápidos y SLAs."
+          title="Monitoreo de Tickets (NOC)"
+          description="Vista operacional agrupada por estado de SLA y urgencia."
           actions={
             <>
               <Button
@@ -416,10 +497,7 @@ export default function TicketsTrackingPage() {
                 }}
                 disabled={loading || finalRows.length === 0}
               >
-                Descargar Excel (CSV)
-              </Button>
-              <Button variant="outline" onClick={() => window.print()}>
-                Descargar PDF (Imprimir)
+                Descargar CSV
               </Button>
               <Button variant="outline" onClick={() => void load()} disabled={loading}>
                 <RefreshCcw className="h-4 w-4" />
@@ -431,7 +509,7 @@ export default function TicketsTrackingPage() {
 
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <KpiCard
-            title="Fuera de SLA / Vencidos"
+            title="Vencidos / Fuera SLA"
             value={kpiCounts.overdue}
             icon={AlertCircle}
             active={quickFilter === "overdue"}
@@ -466,16 +544,16 @@ export default function TicketsTrackingPage() {
 
         <Card className="tech-border">
           <CardHeader className="pb-3">
-            <CardTitle>Filtros Detallados</CardTitle>
+            <CardTitle className="text-lg">Filtros de Tablero</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <label className="block">
-                <div className="text-xs text-muted-foreground mb-1.5">Buscar</div>
-                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ej: impresora, wifi, office…" />
+                <div className="text-xs text-muted-foreground mb-1.5 font-medium">Búsqueda Rápida</div>
+                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ej: impresora, wifi, office…" className="bg-background" />
               </label>
               <label className="block">
-                <div className="text-xs text-muted-foreground mb-1.5">Estado</div>
+                <div className="text-xs text-muted-foreground mb-1.5 font-medium">Estado</div>
                 <Combobox
                   value={status ?? "__all__"}
                   onValueChange={(v) => setStatus(v === "__all__" ? null : v)}
@@ -484,7 +562,7 @@ export default function TicketsTrackingPage() {
                 />
               </label>
               <label className="block">
-                <div className="text-xs text-muted-foreground mb-1.5">Prioridad</div>
+                <div className="text-xs text-muted-foreground mb-1.5 font-medium">Prioridad</div>
                 <Combobox
                   value={priority ?? "__all__"}
                   onValueChange={(v) => setPriority(v === "__all__" ? null : v)}
@@ -493,7 +571,7 @@ export default function TicketsTrackingPage() {
                 />
               </label>
               <label className="block">
-                <div className="text-xs text-muted-foreground mb-1.5">Asignado</div>
+                <div className="text-xs text-muted-foreground mb-1.5 font-medium">Asignado a</div>
                 <Combobox
                   value={assigneeId ?? "__all__"}
                   onValueChange={(v) => setAssigneeId(v === "__all__" ? null : v)}
@@ -503,19 +581,19 @@ export default function TicketsTrackingPage() {
               </label>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-4">
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border/50 pt-4">
               <div className="flex gap-2">
                 <Button variant={showClosed ? "secondary" : "outline"} size="sm" onClick={() => setShowClosed((v) => !v)}>
                   {showClosed ? "Ocultar cerrados" : "Incluir cerrados"}
                 </Button>
                 {quickFilter !== "all" && (
-                  <Button variant="ghost" size="sm" onClick={() => setQuickFilter("all")}>
-                    Limpiar vista rápida
+                  <Button variant="ghost" size="sm" onClick={() => setQuickFilter("all")} className="text-muted-foreground">
+                    Quitar filtro rápido ({quickFilter})
                   </Button>
                 )}
               </div>
-              <div className="text-xs font-medium text-muted-foreground">
-                Mostrando {finalRows.length} tickets
+              <div className="text-sm font-medium text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-md">
+                Total en vista: {finalRows.length} tickets
               </div>
             </div>
           </CardContent>
@@ -523,126 +601,65 @@ export default function TicketsTrackingPage() {
 
         {error ? <InlineAlert variant="error" description={error} /> : null}
 
-        <Card className="tech-border">
-          <CardHeader>
-            <CardTitle>Detalle de Tickets</CardTitle>
-            <CardDescription>
-              Ordenados por urgencia de SLA. Selecciona un ticket para ver más detalles.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-              </div>
-            ) : finalRows.length === 0 ? (
-              <div className="flex h-32 items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">
-                No hay tickets con los filtros actuales.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {finalRows.map((t) => {
-                  const tracking = formatTicketNumber(t.ticket_number) ?? t.id.slice(0, 8).toUpperCase();
-                  const requester = t.requester_id ? profById.get(t.requester_id) ?? null : null;
-                  const assignee = t.assignee_id ? profById.get(t.assignee_id) ?? null : null;
-                  const cat = t.category_id ? catById.get(t.category_id) ?? null : null;
-                  const sub = t.subcategory_id ? subById.get(t.subcategory_id) ?? null : null;
-                  const tiers = tierPathFromMetadata(t.metadata);
-                  const slaLabel =
-                    t.sla_traffic_light === "excluded"
-                      ? "Excluido"
-                      : t.sla_traffic_light === "closed"
-                        ? "Cerrado"
-                        : t.sla_traffic_light === "red"
-                          ? "Fuera de SLA"
-                          : t.sla_traffic_light === "yellow"
-                            ? "En riesgo"
-                            : t.sla_traffic_light === "green"
-                              ? "En plazo"
-                              : "Sin SLA";
-                  const respLabel =
-                    t.response_traffic_light === "excluded"
-                      ? "Excluido"
-                      : t.response_traffic_light === "closed"
-                        ? "Cerrado"
-                        : t.response_traffic_light === "red"
-                          ? "Vencido"
-                          : t.response_traffic_light === "yellow"
-                            ? "En riesgo"
-                            : t.response_traffic_light === "green"
-                              ? "En plazo"
-                              : "Sin objetivo";
-
-                  return (
-                    <Link key={t.id} href={`/app/tickets/${t.id}`} className="block rounded-2xl border border-border bg-background/20 p-4 transition-colors hover:bg-accent/20">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline" className="font-mono">
-                              {tracking}
-                            </Badge>
-                            <TicketTypeBadge type={t.type} />
-                            <TicketPriorityBadge priority={t.priority} />
-                            <TicketStatusBadge status={t.status} />
-                            <Badge variant="outline" className={slaBadgeFromTrafficLight(t.sla_traffic_light)}>
-                              SLA: {slaLabel}
-                            </Badge>
-                            <Badge variant="outline" className={slaBadgeFromTrafficLight(t.response_traffic_light)}>
-                              Resp: {respLabel}
-                            </Badge>
-                            {t.sla_excluded ? <Badge variant="outline">Excluido de KPI</Badge> : null}
-                          </div>
-
-                          <div className="mt-3 min-w-0 truncate text-base font-medium">{t.title}</div>
-
-                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                            <span>Creado: {new Date(t.created_at).toLocaleString()}</span>
-                            {requester ? <span>Solicitante: <span className="font-medium text-foreground/80">{profileLabel(requester)}</span></span> : null}
-                            {assignee ? <span>Asignado: <span className="font-medium text-foreground/80">{profileLabel(assignee)}</span></span> : <span>Asignado: <span className="font-medium text-yellow-500">Sin asignar</span></span>}
-                            {cat ? <span>Categoría: {cat} {sub ? `> ${sub}` : ''}</span> : null}
-                          </div>
-
-                          {tiers ? <div className="mt-1 truncate text-xs text-muted-foreground">{tiers}</div> : null}
-
-                          {(t.sla_excluded && t.sla_exclusion_reason) || t.canceled_reason || t.planned_for_at ? (
-                            <div className="mt-3 flex flex-wrap gap-3 rounded-md bg-accent/30 p-2 text-xs text-muted-foreground">
-                              {t.sla_excluded && t.sla_exclusion_reason ? <span><strong>Justificación SLA:</strong> {t.sla_exclusion_reason}</span> : null}
-                              {t.canceled_reason ? <span><strong>Motivo cancelación:</strong> {t.canceled_reason}</span> : null}
-                              {t.planned_for_at ? <span><strong>Planificado:</strong> {new Date(t.planned_for_at).toLocaleString()}</span> : null}
-                            </div>
-                          ) : null}
-                        </div>
-
-                        <div className="flex shrink-0 flex-col items-end gap-3 rounded-xl bg-background/50 p-3 shadow-sm border border-border/50">
-                          <div className="text-right text-xs font-medium">
-                            {typeof t.sla_remaining_minutes === "number" ? (
-                              <div className={t.sla_remaining_minutes < 0 ? "text-red-500" : "text-foreground/80"}>
-                                SLA Restante: {Math.max(0, Math.round(t.sla_remaining_minutes))}m
-                                {t.sla_remaining_minutes < 0 && ` (Vencido hace ${Math.abs(Math.round(t.sla_remaining_minutes))}m)`}
-                              </div>
-                            ) : null}
-                            {typeof t.response_remaining_minutes === "number" ? (
-                              <div className={t.response_remaining_minutes < 0 ? "text-red-500 mt-1" : "text-foreground/80 mt-1"}>
-                                Resp. Restante: {Math.max(0, Math.round(t.response_remaining_minutes))}m
-                              </div>
-                            ) : null}
-                          </div>
-                          
-                          <div className="flex flex-col gap-2">
-                            <SlaProgressBar pctUsed={t.sla_pct_used} label="SLA Uso" light={t.sla_traffic_light} />
-                            <SlaProgressBar pctUsed={t.response_pct_used} label="Resp. Uso" light={t.response_traffic_light} />
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
+        {loading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-40 w-full rounded-xl" />
+            <Skeleton className="h-40 w-full rounded-xl" />
+          </div>
+        ) : finalRows.length === 0 ? (
+          <div className="flex h-40 flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 text-muted-foreground">
+            <CalendarDays className="w-8 h-8 mb-2 opacity-20" />
+            <p className="text-sm font-medium">No hay tickets que coincidan con los filtros.</p>
+          </div>
+        ) : (
+          <div className="space-y-8 pb-10">
+            {groupedTickets.red.length > 0 && (
+              <div className="rounded-xl border border-red-500/30 bg-red-500/5 overflow-hidden shadow-sm shadow-red-500/10">
+                <div className="bg-red-500/10 px-5 py-3.5 border-b border-red-500/20 flex items-center gap-3">
+                  <div className="w-3.5 h-3.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]"></div>
+                  <h3 className="font-bold text-red-500 tracking-wide">FUERA DE SLA / VENCIDOS</h3>
+                  <Badge variant="outline" className="ml-2 border-red-500/50 text-red-500 bg-red-500/10">{groupedTickets.red.length}</Badge>
+                  <span className="text-xs text-red-500/80 ml-auto flex items-center gap-1.5 uppercase font-bold"><AlertCircle className="w-4 h-4" /> Atención Inmediata</span>
+                </div>
+                {renderTicketTable(groupedTickets.red)}
               </div>
             )}
-          </CardContent>
-        </Card>
+
+            {groupedTickets.yellow.length > 0 && (
+              <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 overflow-hidden shadow-sm shadow-yellow-500/5">
+                <div className="bg-yellow-500/10 px-5 py-3.5 border-b border-yellow-500/20 flex items-center gap-3">
+                  <div className="w-3.5 h-3.5 rounded-full bg-yellow-500 shadow-[0_0_6px_rgba(234,179,8,0.6)]"></div>
+                  <h3 className="font-bold text-yellow-500 tracking-wide">SLA EN RIESGO</h3>
+                  <Badge variant="outline" className="ml-2 border-yellow-500/50 text-yellow-500 bg-yellow-500/10">{groupedTickets.yellow.length}</Badge>
+                  <span className="text-xs text-yellow-500/80 ml-auto flex items-center gap-1.5 uppercase font-bold"><Clock className="w-4 h-4" /> Próximos a Vencer</span>
+                </div>
+                {renderTicketTable(groupedTickets.yellow)}
+              </div>
+            )}
+
+            {groupedTickets.green.length > 0 && (
+              <div className="rounded-xl border border-green-500/20 bg-green-500/5 overflow-hidden">
+                <div className="bg-green-500/10 px-5 py-3 border-b border-green-500/20 flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></div>
+                  <h3 className="font-bold text-green-500 tracking-wide">EN PLAZO</h3>
+                  <Badge variant="outline" className="ml-2 border-green-500/50 text-green-500 bg-green-500/10">{groupedTickets.green.length}</Badge>
+                </div>
+                {renderTicketTable(groupedTickets.green)}
+              </div>
+            )}
+
+            {groupedTickets.other.length > 0 && (
+              <div className="rounded-xl border border-border bg-background overflow-hidden">
+                <div className="bg-muted/30 px-5 py-3 border-b border-border flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-muted-foreground"></div>
+                  <h3 className="font-bold text-muted-foreground tracking-wide">OTROS (Cerrados / Sin SLA)</h3>
+                  <Badge variant="outline" className="ml-2">{groupedTickets.other.length}</Badge>
+                </div>
+                {renderTicketTable(groupedTickets.other)}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </AppShell>
   );
