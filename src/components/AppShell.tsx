@@ -136,6 +136,7 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
         items: [
           { href: "/app/dispatch", label: "Centro de mando", icon: IconKanban },
           { href: "/app/tickets", label: "Seguimiento de tickets", icon: IconTickets },
+          { href: "/app/reportes", label: "Reportes gerenciales", icon: IconAnalytics },
           { href: "/app/messages", label: "Chats", icon: IconChat },
           { href: "/app/approvals", label: "Aprobaciones", icon: IconApprovals },
         ],
