@@ -266,22 +266,12 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
                       <div className="truncate text-sm font-medium">{profile.full_name || profile.email}</div>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         <Badge variant="outline">{roleLabel}</Badge>
-                        <Badge variant="outline">
-                          {profile.rank} · {profile.points} pts
-                        </Badge>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
-              {!collapsed && (
-                <div className="mt-2 text-xs text-sidebar-muted-foreground">
-                  Área:{" "}
-                  <span className="text-sidebar-foreground">
-                    {profile.department_id ? (profile.role === "user" ? "Asignada" : profile.department_id) : "Sin asignar"}
-                  </span>
-                </div>
-              )}
+
             </div>
 
             <div className="mt-4">
@@ -314,11 +304,16 @@ export function AppShell({ profile, children, wide = true }: { profile: Profile;
               </div>
             ) : null}
 
-            <div className="mt-auto pt-4">
+            <div className="mt-auto pt-4 flex flex-col gap-4">
               <Button variant="outline" className={cn("w-full justify-start", collapsed && "justify-center")} onClick={() => void onSignOut()}>
                 <LogOut className="h-4 w-4" />
                 {!collapsed && "Salir"}
               </Button>
+              {!collapsed && (
+                <div className="text-center text-xs text-sidebar-muted-foreground/70">
+                  Desarrollado por <span className="font-semibold text-sidebar-foreground/70">Geimser</span>
+                </div>
+              )}
             </div>
           </motion.aside>
 
