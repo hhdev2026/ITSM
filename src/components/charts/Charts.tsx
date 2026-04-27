@@ -235,3 +235,75 @@ export function PriorityPieChart({ data }: { data: { name: string; value: number
     </div>
   );
 }
+
+export function VolumeAreaChart({ data }: { data: Point[] }) {
+  return (
+    <div className="h-72">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 6, right: 10, left: -18, bottom: 6 }}>
+          <defs>
+            <linearGradient id="createdFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="hsl(var(--brand-cyan))" stopOpacity={0.32} />
+              <stop offset="100%" stopColor="hsl(var(--brand-cyan))" stopOpacity={0.02} />
+            </linearGradient>
+            <linearGradient id="closedFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="hsl(var(--brand-violet))" stopOpacity={0.28} />
+              <stop offset="100%" stopColor="hsl(var(--brand-violet))" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="hsl(var(--border) / 0.6)" vertical={false} />
+          <XAxis dataKey="bucket" tickFormatter={formatBucketLabel} minTickGap={28} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+          <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+          <Tooltip
+            contentStyle={{
+              background: "hsl(var(--card) / 0.75)",
+              border: "1px solid hsl(var(--border) / 0.6)",
+              borderRadius: 14,
+              backdropFilter: "blur(18px) saturate(150%)",
+            }}
+            labelFormatter={(v) => `Periodo: ${formatBucketLabel(String(v))}`}
+          />
+          <Legend />
+          <Area connectNulls={true} type="monotone" dataKey="created" name="Creados" stroke="hsl(var(--brand-cyan))" fill="url(#createdFill)" strokeWidth={2} />
+          <Area connectNulls={true} type="monotone" dataKey="closed" name="Cerrados" stroke="hsl(var(--brand-violet))" fill="url(#closedFill)" strokeWidth={2} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function ChatTimeLineChart({ data }: { data: Point[] }) {
+  return (
+    <div className="h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 6, right: 10, left: -18, bottom: 6 }}>
+          <defs>
+            <linearGradient id="cRespFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="hsl(var(--brand-blue))" stopOpacity={0.4}/>
+              <stop offset="95%" stopColor="hsl(var(--brand-blue))" stopOpacity={0}/>
+            </linearGradient>
+            <linearGradient id="cResolFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="hsl(var(--brand-violet))" stopOpacity={0.4}/>
+              <stop offset="95%" stopColor="hsl(var(--brand-violet))" stopOpacity={0}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="hsl(var(--border) / 0.4)" vertical={false} strokeDasharray="3 3" />
+          <XAxis dataKey="bucket" tickFormatter={formatBucketLabel} minTickGap={28} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+          <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+          <Tooltip
+            contentStyle={{
+              background: "hsl(var(--card) / 0.9)",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: 14,
+              backdropFilter: "blur(20px) saturate(200%)",
+            }}
+            labelFormatter={(v) => `Periodo: ${formatBucketLabel(String(v))}`}
+          />
+          <Legend />
+          <Area connectNulls={true} type="monotone" dataKey="avg_first_response_minutes" name="Primera resp (min)" stroke="hsl(var(--brand-blue))" fill="url(#cRespFill)" strokeWidth={2.5} dot={false} />
+          <Area connectNulls={true} type="monotone" dataKey="avg_resolution_minutes" name="Resolución (min)" stroke="hsl(var(--brand-violet))" fill="url(#cResolFill)" strokeWidth={2.5} dot={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
