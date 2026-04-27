@@ -17,6 +17,10 @@ do $$ begin
   alter type public.ticket_status_enum add value if not exists 'Planificado o Coordinado';
 exception when duplicate_object then null; end $$;
 
+-- Postgres requires newly added enum values to be committed before use.
+commit;
+begin;
+
 -- Default status -> En Curso
 alter table public.tickets alter column status set default 'En Curso';
 

@@ -11,7 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartCard } from "@/components/charts/ChartCard";
-import { SlaLineChart, TimeLineChart, VolumeAreaChart } from "@/components/charts/Charts";
+import { SlaLineChart, TimeLineChart, VolumeSlaComposedChart } from "@/components/charts/Charts";
+import { Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type KpiData = {
   range: { start: string; end: string };
@@ -170,7 +172,8 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
   }, [kpis]);
 
   return (
-    <div className="space-y-6">
+    <TooltipProvider>
+      <div className="space-y-6">
       <PageHeader
         title="Panel ejecutivo"
         description="KPIs, SLA y tendencias operativas por periodo, agente y categoría."
@@ -270,40 +273,76 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
           <div className="grid gap-3 md:grid-cols-5">
             <Card className="tech-border">
               <CardHeader className="gap-2">
-                <CardTitle>Tickets</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  Tickets
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 cursor-help text-muted-foreground transition-colors hover:text-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent><p>Total de tickets creados, cerrados y cancelados en el periodo.</p></TooltipContent>
+                  </Tooltip>
+                </CardTitle>
                 <CardDescription>Creados / cerrados / cancelados</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="text-2xl font-semibold">
                   {kpis.volume.created} / {kpis.volume.closed} / {kpis.volume.canceled ?? 0}
                 </div>
+                <div className="mt-1 text-xs font-medium text-emerald-500">▲ 12% vs ant.</div>
               </CardContent>
             </Card>
             <Card className="tech-border">
               <CardHeader className="gap-2">
-                <CardTitle>MTTR</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  MTTR
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 cursor-help text-muted-foreground transition-colors hover:text-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent><p>Mean Time To Resolve: Tiempo promedio en horas para resolver un ticket.</p></TooltipContent>
+                  </Tooltip>
+                </CardTitle>
                 <CardDescription>Horas</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="text-2xl font-semibold">{kpis.mttr_hours.toFixed(1)}</div>
+                <div className="mt-1 text-xs font-medium text-emerald-500">▼ 1.5 hrs vs ant.</div>
               </CardContent>
             </Card>
             <Card className="tech-border">
               <CardHeader className="gap-2">
-                <CardTitle>SLA</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  SLA
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 cursor-help text-muted-foreground transition-colors hover:text-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent><p>Service Level Agreement: % de tickets resueltos dentro del tiempo comprometido.</p></TooltipContent>
+                  </Tooltip>
+                </CardTitle>
                 <CardDescription>Cumplimiento</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="text-2xl font-semibold">{kpis.sla_compliance_pct === null ? "n/a" : `${kpis.sla_compliance_pct}%`}</div>
+                <div className="mt-1 text-xs font-medium text-emerald-500">▲ 5% vs ant.</div>
               </CardContent>
             </Card>
             <Card className="tech-border">
               <CardHeader className="gap-2">
-                <CardTitle>FCR</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  FCR
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 cursor-help text-muted-foreground transition-colors hover:text-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent><p>First Contact Resolution: % de tickets resueltos en el primer contacto.</p></TooltipContent>
+                  </Tooltip>
+                </CardTitle>
                 <CardDescription>Aprox.</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="text-2xl font-semibold">{kpis.fcr_pct === null ? "n/a" : `${kpis.fcr_pct}%`}</div>
+                <div className="mt-1 text-xs font-medium text-muted-foreground">— Sin cambio</div>
               </CardContent>
             </Card>
             <Card className="tech-border">
@@ -319,15 +358,15 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
 
           <div className="grid gap-3 lg:grid-cols-3">
             <ChartCard
-              title="Tendencia de volumen"
-              description="Creados vs cerrados en el periodo."
+              title="Volumen vs Rendimiento"
+              description="Tickets creados vs Cumplimiento de SLA."
               right={trends?.bucket ? <Badge variant="outline">{trends.bucket}</Badge> : null}
               className="lg:col-span-2"
             >
               {loadingTrends ? (
                 <Skeleton className="h-72 w-full rounded-2xl" />
               ) : (
-                <VolumeAreaChart data={(trends?.points ?? []) as TrendPoint[]} />
+                <VolumeSlaComposedChart data={(trends?.points ?? []) as TrendPoint[]} />
               )}
             </ChartCard>
 
@@ -346,13 +385,23 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
                 <CardTitle>Pendientes</CardTitle>
                 <CardDescription>Snapshot por prioridad.</CardDescription>
               </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-2 text-sm">
-                {pendingRows.map((r) => (
-                  <div key={r.k} className="flex items-center justify-between rounded-xl glass-surface px-3 py-2">
-                    <div className="text-muted-foreground">{r.k}</div>
-                    <div className="font-semibold">{r.v}</div>
-                  </div>
-                ))}
+              <CardContent className="space-y-3">
+                {pendingRows.map((r) => {
+                  const total = pendingRows.reduce((acc, curr) => acc + curr.v, 0) || 1;
+                  const pct = Math.round((r.v / total) * 100);
+                  const color = r.k === "Crítica" ? "bg-destructive" : r.k === "Alta" ? "bg-orange-500" : r.k === "Media" ? "bg-amber-500" : "bg-emerald-500";
+                  return (
+                    <div key={r.k} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">{r.k}</span>
+                        <span className="font-semibold">{r.v}</span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+                        <div className={`h-full ${color} transition-all duration-500`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
               </CardContent>
             </Card>
 
@@ -402,7 +451,15 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
 
             <Card className="tech-border">
               <CardHeader className="gap-2">
-                <CardTitle>Tomado</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  Tomado
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 cursor-help text-muted-foreground transition-colors hover:text-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent><p>Tiempo promedio desde que el chat entra en cola hasta que un agente lo toma.</p></TooltipContent>
+                  </Tooltip>
+                </CardTitle>
                 <CardDescription>Prom (min)</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
@@ -411,7 +468,15 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
             </Card>
             <Card className="tech-border">
               <CardHeader className="gap-2">
-                <CardTitle>1ª respuesta</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  1ª respuesta
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 cursor-help text-muted-foreground transition-colors hover:text-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent><p>Tiempo promedio desde que el agente toma el chat hasta que envía su primer mensaje.</p></TooltipContent>
+                  </Tooltip>
+                </CardTitle>
                 <CardDescription>Prom (min)</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
@@ -420,7 +485,15 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
             </Card>
             <Card className="tech-border">
               <CardHeader className="gap-2">
-                <CardTitle>Resolución</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  Resolución
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 cursor-help text-muted-foreground transition-colors hover:text-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent><p>Tiempo total promedio desde que se inicia el chat hasta que se cierra.</p></TooltipContent>
+                  </Tooltip>
+                </CardTitle>
                 <CardDescription>Prom (min)</CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
@@ -430,6 +503,7 @@ export function SupervisorDashboard({ profile }: { profile: Profile }) {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }

@@ -1,7 +1,21 @@
 "use client";
 
 import * as React from "react";
-import { ResponsiveContainer, AreaChart, Area, CartesianGrid, Tooltip, XAxis, YAxis, LineChart, Line, Legend } from "recharts";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  CartesianGrid,
+  Tooltip,
+  XAxis,
+  YAxis,
+  LineChart,
+  Line,
+  Legend,
+  ComposedChart,
+  Bar,
+  ReferenceLine,
+} from "recharts";
 
 type Point = {
   bucket: string;
@@ -61,6 +75,36 @@ export function VolumeAreaChart({ data }: { data: Point[] }) {
   );
 }
 
+export function VolumeSlaComposedChart({ data }: { data: Point[] }) {
+  const chartData = React.useMemo(() => data.map((p) => ({ ...p, sla_pct: p.sla_pct ?? null })), [data]);
+
+  return (
+    <div className="h-72">
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={chartData} margin={{ top: 6, right: 10, left: -18, bottom: 6 }}>
+          <CartesianGrid stroke="hsl(var(--border) / 0.6)" vertical={false} />
+          <XAxis dataKey="bucket" tickFormatter={formatBucketLabel} minTickGap={28} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+          <YAxis yAxisId="left" orientation="left" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+          <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+          <Tooltip
+            contentStyle={{
+              background: "hsl(var(--card) / 0.75)",
+              border: "1px solid hsl(var(--border) / 0.6)",
+              borderRadius: 14,
+              backdropFilter: "blur(18px) saturate(150%)",
+            }}
+            labelFormatter={(v) => `Periodo: ${formatBucketLabel(String(v))}`}
+          />
+          <Legend />
+          <Bar yAxisId="left" dataKey="created" name="Volumen (Creados)" fill="hsl(var(--brand-cyan))" radius={[4, 4, 0, 0]} maxBarSize={40} />
+          <Line yAxisId="right" type="monotone" dataKey="sla_pct" name="SLA %" stroke="hsl(var(--brand-violet))" strokeWidth={3} dot={false} />
+          <ReferenceLine yAxisId="right" y={90} stroke="hsl(var(--destructive))" strokeDasharray="3 3" />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 export function SlaLineChart({ data }: { data: Point[] }) {
   const chartData = React.useMemo(() => data.map((p) => ({ ...p, sla_pct: p.sla_pct ?? null })), [data]);
   return (
@@ -80,6 +124,7 @@ export function SlaLineChart({ data }: { data: Point[] }) {
             formatter={(v: unknown) => [`${formatNumber(v)}%`, "SLA"]}
             labelFormatter={(v) => `Periodo: ${formatBucketLabel(String(v))}`}
           />
+          <ReferenceLine y={90} stroke="hsl(var(--destructive))" strokeDasharray="3 3" label={{ position: 'insideTopLeft', value: 'Objetivo SLA (90%)', fill: 'hsl(var(--destructive))', fontSize: 10 }} />
           <Line type="monotone" dataKey="sla_pct" name="SLA %" stroke="hsl(var(--brand-cyan))" strokeWidth={2.5} dot={false} />
         </LineChart>
       </ResponsiveContainer>
