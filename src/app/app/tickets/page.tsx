@@ -96,8 +96,8 @@ function computeTraffic(opts: {
   return { light, remainingMinutes: remainingClamped, pctUsed };
 }
 
-function SlaProgressBar({ pctUsed, label, light }: { pctUsed: number | null; label: string; light: string | null }) {
-  if (pctUsed === null) return null;
+function SlaProgressBar({ pctUsed, label, light }: { pctUsed: number | null | undefined; label: string; light: string | null | undefined }) {
+  if (pctUsed == null) return null;
   const clamped = Math.min(Math.max(pctUsed, 0), 100);
   let color = "bg-green-500";
   if (light === "yellow") color = "bg-yellow-500";
