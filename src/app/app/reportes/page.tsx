@@ -159,7 +159,7 @@ export default function ReportsPage() {
                   {report.description}
                 </CardDescription>
                 <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-4">
-                  <Badge variant="secondary" className="font-normal text-xs">
+                  <Badge variant="outline" className="font-normal text-xs">
                     Datos del Mes Actual
                   </Badge>
                   <Button variant="ghost" size="sm" className="text-xs h-8">
